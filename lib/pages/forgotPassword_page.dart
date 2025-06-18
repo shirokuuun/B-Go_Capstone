@@ -55,7 +55,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       body:Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-         Text('Enter you email to reset your password',
+         Text('Enter your email to reset your password',
                  style: GoogleFonts.bebasNeue(
           fontSize: 20,
                  ),

@@ -1,10 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-<<<<<<< HEAD
         android:label="capstone_project"
-=======
-        android:label="capstone_project"
->>>>>>> origin/renson
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

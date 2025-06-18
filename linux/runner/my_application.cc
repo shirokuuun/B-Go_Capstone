@@ -47,11 +47,11 @@ static void my_application_activate(GApplication* application) {
   } else {
     gtk_window_set_title(window, "capstone_project");
 =======
-    gtk_header_bar_set_title(header_bar, "firebase_first_try");
+    gtk_header_bar_set_title(header_bar, "capstone_project");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "firebase_first_try");
+    gtk_window_set_title(window, "capstone_project");
 >>>>>>> origin/renson
   }
 

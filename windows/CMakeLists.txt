@@ -7,11 +7,11 @@ project(capstone_project LANGUAGES CXX)
 # the on-disk name of your application.
 set(BINARY_NAME "capstone_project")
 =======
-project(firebase_first_try LANGUAGES CXX)
+project(capstone_project LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "firebase_first_try")
+set(BINARY_NAME "capstone_project")
 >>>>>>> origin/renson
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent

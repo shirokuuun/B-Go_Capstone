@@ -1,4 +1,4 @@
-package com.renson.firebase_first_try
+package com.renson.capstone_project
 
 import io.flutter.embedding.android.FlutterActivity
 

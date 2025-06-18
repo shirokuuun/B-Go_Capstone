@@ -10,10 +10,10 @@ set(BINARY_NAME "capstone_project")
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
 set(APPLICATION_ID "com.example.capstone_project")
 =======
-set(BINARY_NAME "firebase_first_try")
+set(BINARY_NAME "capstone_project")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.renson.firebase_first_try")
+set(APPLICATION_ID "com.renson.capstone_project")
 >>>>>>> origin/renson
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent

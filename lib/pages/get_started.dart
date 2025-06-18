@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_first_try/auth/main_page.dart';
+import 'package:capstone_project/auth/main_page.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 

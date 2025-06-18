@@ -3,7 +3,7 @@
 <<<<<<< HEAD
         android:label="capstone_project"
 =======
-        android:label="firebase_first_try"
+        android:label="capstone_project"
 >>>>>>> origin/renson
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">

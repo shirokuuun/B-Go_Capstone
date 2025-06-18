@@ -18,7 +18,7 @@
 <<<<<<< HEAD
                BuildableName = "capstone_project.app"
 =======
-               BuildableName = "firebase_first_try.app"
+               BuildableName = "capstone_project.app"
 >>>>>>> origin/renson
                BlueprintName = "Runner"
                ReferencedContainer = "container:Runner.xcodeproj">
@@ -38,7 +38,7 @@
 <<<<<<< HEAD
             BuildableName = "capstone_project.app"
 =======
-            BuildableName = "firebase_first_try.app"
+            BuildableName = "capstone_project.app"
 >>>>>>> origin/renson
             BlueprintName = "Runner"
             ReferencedContainer = "container:Runner.xcodeproj">
@@ -80,7 +80,7 @@
 <<<<<<< HEAD
             BuildableName = "capstone_project.app"
 =======
-            BuildableName = "firebase_first_try.app"
+            BuildableName = "capstone_project.app"
 >>>>>>> origin/renson
             BlueprintName = "Runner"
             ReferencedContainer = "container:Runner.xcodeproj">
@@ -101,7 +101,7 @@
 <<<<<<< HEAD
             BuildableName = "capstone_project.app"
 =======
-            BuildableName = "firebase_first_try.app"
+            BuildableName = "capstone_project.app"
 >>>>>>> origin/renson
             BlueprintName = "Runner"
             ReferencedContainer = "container:Runner.xcodeproj">

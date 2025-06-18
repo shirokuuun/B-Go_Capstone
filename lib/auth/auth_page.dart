@@ -1,4 +1,4 @@
-import 'package:firebase_first_try/pages/login_page.dart';
+import 'package:capstone_project/pages/login_page.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/register_page.dart';

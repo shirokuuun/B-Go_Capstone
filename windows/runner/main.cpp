@@ -30,7 +30,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 <<<<<<< HEAD
   if (!window.Create(L"capstone_project", origin, size)) {
 =======
-  if (!window.Create(L"firebase_first_try", origin, size)) {
+  if (!window.Create(L"capstone_project", origin, size)) {
 >>>>>>> origin/renson
     return EXIT_FAILURE;
   }

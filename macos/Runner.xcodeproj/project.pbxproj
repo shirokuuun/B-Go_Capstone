@@ -67,7 +67,7 @@
 <<<<<<< HEAD
 		33CC10ED2044A3C60003C045 /* capstone_project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "capstone_project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 =======
-		33CC10ED2044A3C60003C045 /* firebase_first_try.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "firebase_first_try.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		33CC10ED2044A3C60003C045 /* capstone_project.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "capstone_project.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 >>>>>>> origin/renson
 		33CC10F02044A3C60003C045 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		33CC10F22044A3C60003C045 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Assets.xcassets; path = Runner/Assets.xcassets; sourceTree = "<group>"; };
@@ -138,7 +138,7 @@
 <<<<<<< HEAD
 				33CC10ED2044A3C60003C045 /* capstone_project.app */,
 =======
-				33CC10ED2044A3C60003C045 /* firebase_first_try.app */,
+				33CC10ED2044A3C60003C045 /* capstone_project.app */,
 >>>>>>> origin/renson
 				331C80D5294CF71000263BE5 /* RunnerTests.xctest */,
 			);
@@ -228,7 +228,7 @@
 <<<<<<< HEAD
 			productReference = 33CC10ED2044A3C60003C045 /* capstone_project.app */;
 =======
-			productReference = 33CC10ED2044A3C60003C045 /* firebase_first_try.app */;
+			productReference = 33CC10ED2044A3C60003C045 /* capstone_project.app */;
 >>>>>>> origin/renson
 			productType = "com.apple.product-type.application";
 		};
@@ -406,7 +406,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.renson.firebaseFirstTry.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/firebase_first_try.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/firebase_first_try";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/capstone_project.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/capstone_project";
 >>>>>>> origin/renson
 			};
 			name = Debug;
@@ -427,7 +427,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.renson.firebaseFirstTry.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/firebase_first_try.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/firebase_first_try";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/capstone_project.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/capstone_project";
 >>>>>>> origin/renson
 			};
 			name = Release;
@@ -448,7 +448,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.renson.firebaseFirstTry.RunnerTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/firebase_first_try.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/firebase_first_try";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/capstone_project.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/capstone_project";
 >>>>>>> origin/renson
 			};
 			name = Profile;

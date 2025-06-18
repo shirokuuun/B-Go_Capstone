@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "652774635365",
-    "project_id": "fir-try-b99b0",
-    "storage_bucket": "fir-try-b99b0.firebasestorage.app"
+    "project_number": "183068104612",
+    "project_id": "it-capstone-6fe19",
+    "storage_bucket": "it-capstone-6fe19.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:652774635365:android:fb2e87780f661724a0d38c",
+        "mobilesdk_app_id": "1:183068104612:android:7f42637f006a2739265331",
         "android_client_info": {
-          "package_name": "com.renson.firebase_first_try"
+          "package_name": "com.example.capstone_project"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBiAceV_nLHAT_zId3ELUVIace_DP-pvD4"
+          "current_key": "AIzaSyAuZHCcRdGvMyxxPhV4R8YcOUuRDH6yCXA"
         }
       ],
       "services": {

@@ -260,13 +260,26 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 10),
 
                     // sign in with Google
-                    ElevatedButton(
-                      onPressed: () => AuthServices().SignInWithGoogle(),
-                      child: Image.asset(
-                        'assets/google-icon.png', 
-                        height: 24, 
-                        width: 24,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center, 
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => AuthServices().SignInWithGoogle(),
+                          child: Image.asset(
+                            'assets/google-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),
+                        /*ElevatedButton(
+                          onPressed: () => AuthServices().SignInWithFacebook(),
+                          child: Image.asset(
+                            'assets/facebook-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),*/
+                      ],
                     ),
 
                     SizedBox(height: 40),

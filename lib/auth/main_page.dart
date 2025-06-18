@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_first_try/auth/auth_page.dart';
 import 'package:firebase_first_try/pages/home_page.dart';
-// ignore: unused_import
 import 'package:firebase_first_try/pages/login_page.dart';
 import 'package:flutter/material.dart';
 

@@ -1,4 +1,12 @@
+<<<<<<< HEAD
+
 # capstone_project
+
+=======
+
+# capstone_project
+
+> > > > > > > origin/renson
 
 A new Flutter project.
 

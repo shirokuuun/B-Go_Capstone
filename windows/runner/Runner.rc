@@ -89,6 +89,7 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
+<<<<<<< HEAD
             VALUE "CompanyName", "com.example" "\0"
             VALUE "FileDescription", "capstone_project" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
@@ -96,6 +97,15 @@ BEGIN
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
             VALUE "OriginalFilename", "capstone_project.exe" "\0"
             VALUE "ProductName", "capstone_project" "\0"
+=======
+            VALUE "CompanyName", "com.renson" "\0"
+            VALUE "FileDescription", "capstone_project" "\0"
+            VALUE "FileVersion", VERSION_AS_STRING "\0"
+            VALUE "InternalName", "capstone_project" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 com.renson. All rights reserved." "\0"
+            VALUE "OriginalFilename", "capstone_project.exe" "\0"
+            VALUE "ProductName", "capstone_project" "\0"
+>>>>>>> origin/renson
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:capstone_project/auth/auth_page.dart';
 import 'package:capstone_project/pages/home_page.dart';
-import 'package:capstone_project/pages/login_page.dart';
 import 'package:flutter/material.dart';
 
 class MainPage extends StatelessWidget{

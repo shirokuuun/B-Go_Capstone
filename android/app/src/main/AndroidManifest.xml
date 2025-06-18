@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="firebase_first_try"
+        android:label="com.example.capstone_project"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

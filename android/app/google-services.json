@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "652774635365",
+    "project_id": "fir-try-b99b0",
+    "storage_bucket": "fir-try-b99b0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:652774635365:android:fb2e87780f661724a0d38c",
+        "android_client_info": {
+          "package_name": "com.renson.firebase_first_try"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBiAceV_nLHAT_zId3ELUVIace_DP-pvD4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

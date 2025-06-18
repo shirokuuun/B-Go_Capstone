@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # capstone_project
+=======
+# firebase_first_try
+>>>>>>> origin/renson
 
 A new Flutter project.
 

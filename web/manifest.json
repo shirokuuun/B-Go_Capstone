@@ -1,6 +1,11 @@
 {
+<<<<<<< HEAD
     "name": "capstone_project",
     "short_name": "capstone_project",
+=======
+    "name": "firebase_first_try",
+    "short_name": "firebase_first_try",
+>>>>>>> origin/renson
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

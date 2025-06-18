@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 {"flutter":{"platforms":{"android":{"default":{"projectId":"it-capstone-6fe19","appId":"1:183068104612:android:7f42637f006a2739265331","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"it-capstone-6fe19","configurations":{"android":"1:183068104612:android:7f42637f006a2739265331","ios":"1:183068104612:ios:6cd4301938a2c32d265331","macos":"1:183068104612:ios:6cd4301938a2c32d265331","web":"1:183068104612:web:beb560880f035631265331","windows":"1:183068104612:web:78575bdfe9df2a19265331"}}}}}}
+=======
+{"flutter":{"platforms":{"android":{"default":{"projectId":"fir-try-b99b0","appId":"1:652774635365:android:fb2e87780f661724a0d38c","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"fir-try-b99b0","configurations":{"android":"1:652774635365:android:fb2e87780f661724a0d38c","ios":"1:652774635365:ios:09838320185daea4a0d38c","macos":"1:652774635365:ios:09838320185daea4a0d38c","web":"1:652774635365:web:1df88951c0cc8456a0d38c","windows":"1:652774635365:web:08fdf4a9ba16bd00a0d38c"}}}}}}
+>>>>>>> origin/renson

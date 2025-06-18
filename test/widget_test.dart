@@ -8,12 +8,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+<<<<<<< HEAD
 import 'package:capstone_project/main.dart';
+=======
+import 'package:firebase_first_try/main.dart';
+>>>>>>> origin/renson
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
+<<<<<<< HEAD
     await tester.pumpWidget(const MyApp());
+=======
+     tester.pumpWidget(const MyApp());
+>>>>>>> origin/renson
 
     // Verify that our counter starts at 0.
     expect(find.text('0'), findsOneWidget);

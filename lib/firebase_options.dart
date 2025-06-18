@@ -22,6 +22,20 @@ class DefaultFirebaseOptions {
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
+<<<<<<< HEAD
+=======
+      case TargetPlatform.iOS:
+        return ios;
+      case TargetPlatform.macOS:
+        return macos;
+      case TargetPlatform.windows:
+        return windows;
+      case TargetPlatform.linux:
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for linux - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
+>>>>>>> origin/renson
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -30,6 +44,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
+<<<<<<< HEAD
     apiKey: 'AIzaSyDjqLNklma1gr3IOwPxiMO5S38hu8UQ2Fc',
     appId: '1:183068104612:web:beb560880f035631265331',
     messagingSenderId: '183068104612',
@@ -45,5 +60,48 @@ class DefaultFirebaseOptions {
     messagingSenderId: '183068104612',
     projectId: 'it-capstone-6fe19',
     storageBucket: 'it-capstone-6fe19.appspot.com', // fixed domain
+=======
+    apiKey: 'AIzaSyCz2XNfQBSEXfTAki27oP2Ra9O4QDxuD48',
+    appId: '1:652774635365:web:1df88951c0cc8456a0d38c',
+    messagingSenderId: '652774635365',
+    projectId: 'fir-try-b99b0',
+    authDomain: 'fir-try-b99b0.firebaseapp.com',
+    storageBucket: 'fir-try-b99b0.firebasestorage.app',
+  );
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyBiAceV_nLHAT_zId3ELUVIace_DP-pvD4',
+    appId: '1:652774635365:android:fb2e87780f661724a0d38c',
+    messagingSenderId: '652774635365',
+    projectId: 'fir-try-b99b0',
+    storageBucket: 'fir-try-b99b0.firebasestorage.app',
+  );
+
+  static const FirebaseOptions ios = FirebaseOptions(
+    apiKey: 'AIzaSyAriXGjwMzW_9z4vQFpBHHQxVoFdhUS074',
+    appId: '1:652774635365:ios:09838320185daea4a0d38c',
+    messagingSenderId: '652774635365',
+    projectId: 'fir-try-b99b0',
+    storageBucket: 'fir-try-b99b0.firebasestorage.app',
+    iosBundleId: 'com.renson.firebaseFirstTry',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAriXGjwMzW_9z4vQFpBHHQxVoFdhUS074',
+    appId: '1:652774635365:ios:09838320185daea4a0d38c',
+    messagingSenderId: '652774635365',
+    projectId: 'fir-try-b99b0',
+    storageBucket: 'fir-try-b99b0.firebasestorage.app',
+    iosBundleId: 'com.renson.firebaseFirstTry',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCz2XNfQBSEXfTAki27oP2Ra9O4QDxuD48',
+    appId: '1:652774635365:web:08fdf4a9ba16bd00a0d38c',
+    messagingSenderId: '652774635365',
+    projectId: 'fir-try-b99b0',
+    authDomain: 'fir-try-b99b0.firebaseapp.com',
+    storageBucket: 'fir-try-b99b0.firebasestorage.app',
+>>>>>>> origin/renson
   );
 }

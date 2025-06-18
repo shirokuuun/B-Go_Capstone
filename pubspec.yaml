@@ -1,8 +1,16 @@
+<<<<<<< HEAD
 name: capstone_project
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
+=======
+name: firebase_first_try
+description: "A new Flutter project."
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+>>>>>>> origin/renson
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -19,7 +27,11 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
 environment:
+<<<<<<< HEAD
   sdk: ^3.7.2
+=======
+  sdk: ^3.6.1
+>>>>>>> origin/renson
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -30,11 +42,23 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+<<<<<<< HEAD
   firebase_core: ^2.30.0
+=======
+  firebase_core: ^3.14.0
+
+>>>>>>> origin/renson
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+<<<<<<< HEAD
+=======
+  firebase_auth: ^5.6.0
+  cloud_firestore: ^5.6.9
+  google_fonts: ^6.2.1
+  google_sign_in: ^6.3.0
+>>>>>>> origin/renson
 
 dev_dependencies:
   flutter_test:
@@ -52,10 +76,33 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+<<<<<<< HEAD
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+=======
+  uses-material-design: true
+
+  assets:
+    - assets/bus.png
+    - assets/bus2.png
+    - assets/ticket.png
+    - assets/gps.png
+    - assets/bus-stop.png
+    - assets/highway-sign.png
+    - assets/bag.png
+    - assets/passenger.png
+    - assets/signal.png
+    - assets/work.png
+    - assets/batrasco-logo.png
+    - assets/google-icon.png
+    - assets/facebook-icon.png
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+ 
+>>>>>>> origin/renson
 
   # To add assets to your application, add an assets section, like this:
   # assets:

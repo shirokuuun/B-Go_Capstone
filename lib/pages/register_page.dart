@@ -3,6 +3,7 @@ import 'package:firebase_first_try/auth/auth_services.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
+import 'package:firebase_first_try/pages/terms_and_conditions_page.dart';
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback showLoginPage;
@@ -25,6 +26,9 @@ class _RegisterPageState extends State<RegisterPage> {
 
   final AuthServices _authServices = AuthServices();
 
+  bool agreedToTerms = false;
+  
+
   @override
   void dispose() {
     nameController.dispose();
@@ -34,7 +38,17 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  Future<void> signUp() async {
+   Future<void> signUpWithTerms() async {
+    if (!agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('You must agree to the Terms and Conditions to sign up.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     final errorMessage = await _authServices.signUpWithEmail(
       name: nameController.text,
       email: emailController.text,
@@ -57,6 +71,34 @@ class _RegisterPageState extends State<RegisterPage> {
     'name': name,
     'email': email,
   });
+}
+
+  Future<void> signUp() async {
+  if (!agreedToTerms) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('You must agree to the Terms and Conditions to sign up.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    return;
+  }
+
+  final errorMessage = await _authServices.signUpWithEmail(
+    name: nameController.text,
+    email: emailController.text,
+    password: passwordController.text,
+    confirmPassword: confirmPasswordController.text,
+  );
+
+  if (errorMessage != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+      ),
+    );
+  } 
 }
 
   @override
@@ -227,32 +269,82 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 50),
 
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: GestureDetector(
-                        onTap: signUp,
-                        child: Container(
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Color(0xFF1D2B53),
-                            borderRadius: BorderRadius.circular(12),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: agreedToTerms,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                agreedToTerms = value ?? false;
+                              });
+                            },
                           ),
-                          child: Center(
-                            child: Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: RichText(
+                              text: TextSpan(
+                                style: TextStyle(color: Colors.black),
+                                children: [
+                                  TextSpan(
+                                    text: 'I agree to the ',
+                                  ),
+                                  WidgetSpan(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
+                                          ),
+                                        );
+                                      },
+                                    child: Text(
+                                    'Terms and Conditions',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 20),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Color(0xFF1D2B53),
+                          minimumSize: Size(double.infinity, 60),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: agreedToTerms
+                            ? () {
+                                signUp();
+                              }
+                            : null,
+                        child: Text(
+                          'Sign Up',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: 40),
+                    SizedBox(height: 30),
 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -275,8 +367,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         )
                       ],
                     ),
-
-                    SizedBox(height: 20),
 
                   ],
                 ),

@@ -1,4 +1,4 @@
-import 'package:capstone_project/pages/login_page.dart';
+import 'package:b_go/pages/login_page.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/register_page.dart';

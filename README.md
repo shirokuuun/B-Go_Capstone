@@ -1,12 +1,4 @@
-<<<<<<< HEAD
-
-# capstone_project
-
-=======
-
-# capstone_project
-
-> > > > > > > origin/renson
+# b_go
 
 A new Flutter project.
 

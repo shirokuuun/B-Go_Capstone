@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:capstone_project/auth/main_page.dart';
+import 'package:b_go/auth/main_page.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -181,7 +181,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
               child: Column(
                 children: [
                   Text(
-                    'B-GO',
+                    'b_go',
                     style: TextStyle(
                       fontSize: 70,
                       fontWeight: FontWeight.bold,

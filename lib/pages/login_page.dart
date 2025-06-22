@@ -1,6 +1,6 @@
-import 'package:capstone_project/auth/auth_services.dart';
+import 'package:b_go/auth/auth_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:capstone_project/pages/forgotPassword_page.dart';
+import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 

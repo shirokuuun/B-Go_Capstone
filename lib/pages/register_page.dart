@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:capstone_project/auth/auth_services.dart';
+import 'package:b_go/auth/auth_services.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
-import 'package:capstone_project/pages/terms_and_conditions_page.dart';
+import 'package:b_go/pages/terms_and_conditions_page.dart';
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback showLoginPage;

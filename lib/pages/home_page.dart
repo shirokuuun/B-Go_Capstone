@@ -14,7 +14,20 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Signed in successfully: ' + user!.email!),
+            MaterialButton(onPressed: (){
+              FirebaseAuth.instance.signOut();
+            },
+           color: Color(0xFF0091AD),
+            child: Text('Sign Out'),
+            )
+          ],
+        )
+      ),
     );
   }
 }

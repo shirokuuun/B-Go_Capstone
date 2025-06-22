@@ -260,13 +260,49 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 10),
 
                     // sign in with Google
-                    ElevatedButton(
-                      onPressed: () => AuthServices().SignInWithGoogle(),
-                      child: Image.asset(
-                        'assets/google-icon.png', 
-                        height: 24, 
-                        width: 24,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center, 
+                      children: [
+                        ElevatedButton(
+                          onPressed: () async {
+                            try {
+                            final userCredential = await _authServices.SignInWithGoogle();
+                            if (userCredential == null) {
+                              // User cancelled sign-in, do nothing 
+                              return;
+                            }
+                            // if there is an error, it will be caught by the catch block
+                          } catch (e) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text("Google Sign-In Failed"),
+                                content: Text(e.toString()),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: Text("OK"),
+                                  )
+                                ],
+                              ),
+                            );
+                          }
+                          },
+                          child: Image.asset(
+                            'assets/google-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),
+                        /*ElevatedButton(
+                          onPressed: () => AuthServices().SignInWithFacebook(),
+                          child: Image.asset(
+                            'assets/facebook-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),*/
+                      ],
                     ),
 
                     SizedBox(height: 40),

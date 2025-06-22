@@ -7,17 +7,17 @@ class AuthServices {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   //Google Sign In
-  SignInWithGoogle() async {
+  Future<UserCredential?> SignInWithGoogle() async {
     // pop up a Google Sign In window
     final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
     // if the user cancels the sign in, return null
     if (googleUser == null) {
-      return; // The user canceled the sign-in
+      return null; 
     }
 
     //obtain details from the Google sign in
-    final GoogleSignInAuthentication googleAuth = await googleUser!.authentication;
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
     // create a new credential
     final credential = GoogleAuthProvider.credential(
@@ -25,7 +25,20 @@ class AuthServices {
       idToken: googleAuth.idToken,
     );
 
-    return await _auth.signInWithCredential(credential);
+    UserCredential userCredential = await _auth.signInWithCredential(credential);
+
+     // Save user info to Firestore
+    final user = userCredential.user;
+    if (user != null) {
+      final email = user.email ?? googleUser.email;
+      final name = email.split('@')[0]; // Name = email before "@"
+      await _firestore.collection('users').doc(user.uid).set({
+        'name': name,
+        'email': email,
+      }, SetOptions(merge: true));
+    }
+
+    return userCredential;
   }
 
   // Email/Password Sign In

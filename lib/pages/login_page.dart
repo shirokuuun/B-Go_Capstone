@@ -1,6 +1,6 @@
-import 'package:capstone_project/auth/auth_services.dart';
+import 'package:b_go/auth/auth_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:capstone_project/pages/forgotPassword_page.dart';
+import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -260,13 +260,49 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 10),
 
                     // sign in with Google
-                    ElevatedButton(
-                      onPressed: () => AuthServices().SignInWithGoogle(),
-                      child: Image.asset(
-                        'assets/google-icon.png', 
-                        height: 24, 
-                        width: 24,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center, 
+                      children: [
+                        ElevatedButton(
+                          onPressed: () async {
+                            try {
+                            final userCredential = await _authServices.SignInWithGoogle();
+                            if (userCredential == null) {
+                              // User cancelled sign-in, do nothing 
+                              return;
+                            }
+                            // if there is an error, it will be caught by the catch block
+                          } catch (e) {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text("Google Sign-In Failed"),
+                                content: Text(e.toString()),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: Text("OK"),
+                                  )
+                                ],
+                              ),
+                            );
+                          }
+                          },
+                          child: Image.asset(
+                            'assets/google-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),
+                        /*ElevatedButton(
+                          onPressed: () => AuthServices().SignInWithFacebook(),
+                          child: Image.asset(
+                            'assets/facebook-icon.png', 
+                            height: 24, 
+                            width: 24,
+                          ),
+                        ),*/
+                      ],
                     ),
 
                     SizedBox(height: 40),

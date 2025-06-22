@@ -1,4 +1,5 @@
-import 'package:capstone_project/pages/get_started.dart';
+import 'package:b_go/auth/main_page.dart';
+import 'package:b_go/pages/get_started.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 //import 'firebase_options.dart';
@@ -19,6 +20,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      //home: MainPage(),
       home: GetStartedPage(),
     );
   }

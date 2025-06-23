@@ -27,7 +27,6 @@ class _RegisterPageState extends State<RegisterPage> {
   final AuthServices _authServices = AuthServices();
 
   bool agreedToTerms = false;
-  
 
   @override
   void dispose() {
@@ -38,11 +37,12 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-   Future<void> signUpWithTerms() async {
+  Future<void> signUpWithTerms() async {
     if (!agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('You must agree to the Terms and Conditions to sign up.'),
+          content:
+              Text('You must agree to the Terms and Conditions to sign up.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -63,43 +63,44 @@ class _RegisterPageState extends State<RegisterPage> {
           backgroundColor: Colors.red,
         ),
       );
-    } 
+    }
   }
 
   Future addUsername(String uid, String name, String email) async {
-  await FirebaseFirestore.instance.collection('users').doc(uid).set({
-    'name': name,
-    'email': email,
-  });
-}
-
-  Future<void> signUp() async {
-  if (!agreedToTerms) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('You must agree to the Terms and Conditions to sign up.'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
+    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+      'name': name,
+      'email': email,
+    });
   }
 
-  final errorMessage = await _authServices.signUpWithEmail(
-    name: nameController.text,
-    email: emailController.text,
-    password: passwordController.text,
-    confirmPassword: confirmPasswordController.text,
-  );
+  Future<void> signUp() async {
+    if (!agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('You must agree to the Terms and Conditions to sign up.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
-  if (errorMessage != null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(errorMessage),
-        backgroundColor: Colors.red,
-      ),
+    final errorMessage = await _authServices.signUpWithEmail(
+      name: nameController.text,
+      email: emailController.text,
+      password: passwordController.text,
+      confirmPassword: confirmPasswordController.text,
     );
-  } 
-}
+
+    if (errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -115,10 +116,11 @@ class _RegisterPageState extends State<RegisterPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                double logoWidth =
+                    math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
-                  offset: Offset(0, -50), 
+                  offset: Offset(0, -50),
                   child: Center(
                     child: Image.asset(
                       'assets/batrasco-logo.png',
@@ -135,7 +137,8 @@ class _RegisterPageState extends State<RegisterPage> {
             alignment: Alignment.bottomCenter,
             child: SingleChildScrollView(
               child: Container(
-                margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.24),
+                margin: EdgeInsets.only(
+                    top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -148,7 +151,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -163,7 +167,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               fontSize: 55,
                             ),
                           ),
-                          
                           Text(
                             "Register Here!",
                             style: TextStyle(
@@ -269,7 +272,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ),
                     ),
-
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: Row(
@@ -296,17 +298,19 @@ class _RegisterPageState extends State<RegisterPage> {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
+                                            builder: (context) =>
+                                                TermsAndConditionsPage(
+                                                    showRegisterPage: () {}),
                                           ),
                                         );
                                       },
-                                    child: Text(
-                                    'Terms and Conditions',
-                                    style: TextStyle(
-                                      color: Colors.blue,
-                                      decoration: TextDecoration.underline,
-                                    ),
-                                  ),
+                                      child: Text(
+                                        'Terms and Conditions',
+                                        style: TextStyle(
+                                          color: Colors.blue,
+                                          decoration: TextDecoration.underline,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -316,9 +320,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                     ),
-
                     SizedBox(height: 20),
-
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: ElevatedButton(
@@ -345,7 +347,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                     SizedBox(height: 30),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -367,7 +368,6 @@ class _RegisterPageState extends State<RegisterPage> {
                         )
                       ],
                     ),
-
                   ],
                 ),
               ),

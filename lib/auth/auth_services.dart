@@ -13,11 +13,12 @@ class AuthServices {
 
     // if the user cancels the sign in, return null
     if (googleUser == null) {
-      return null; 
+      return null;
     }
 
     //obtain details from the Google sign in
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    final GoogleSignInAuthentication googleAuth =
+        await googleUser.authentication;
 
     // create a new credential
     final credential = GoogleAuthProvider.credential(
@@ -25,9 +26,10 @@ class AuthServices {
       idToken: googleAuth.idToken,
     );
 
-    UserCredential userCredential = await _auth.signInWithCredential(credential);
+    UserCredential userCredential =
+        await _auth.signInWithCredential(credential);
 
-     // Save user info to Firestore
+    // Save user info to Firestore
     final user = userCredential.user;
     if (user != null) {
       final email = user.email ?? googleUser.email;
@@ -63,7 +65,8 @@ class AuthServices {
       return "Passwords do not match.";
     }
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+      UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password.trim(),
       );
@@ -80,5 +83,10 @@ class AuthServices {
     } catch (e) {
       return "An error occurred.";
     }
+  }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+    await GoogleSignIn().signOut();
   }
 }

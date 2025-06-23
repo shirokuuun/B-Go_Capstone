@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../pages/register_page.dart';
 
-class AuthPage extends StatefulWidget{
+class AuthPage extends StatefulWidget {
   const AuthPage({Key? key}) : super(key: key);
 
   @override
@@ -13,7 +13,7 @@ class AuthPage extends StatefulWidget{
 class _AuthPageState extends State<AuthPage> {
   bool showLoginPage = true;
 
-  void toggleScreen(){
+  void toggleScreen() {
     setState(() {
       showLoginPage = !showLoginPage;
     });
@@ -23,9 +23,8 @@ class _AuthPageState extends State<AuthPage> {
   Widget build(BuildContext context) {
     if (showLoginPage) {
       return LoginPage(showRegisterPage: toggleScreen);
-    }else {
-      return  RegisterPage(showLoginPage: toggleScreen);
+    } else {
+      return RegisterPage(showLoginPage: toggleScreen);
     }
   }
-
 }

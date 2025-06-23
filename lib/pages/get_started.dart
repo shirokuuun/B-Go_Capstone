@@ -78,7 +78,6 @@ class _GetStartedPageState extends State<GetStartedPage> {
     });
   }
 
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -136,7 +135,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                         height: 80,
                       ),
                     ),
-                    
+
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
@@ -168,7 +167,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                           );
                         },
                       ),
-                    ),                    
+                    ),
                   ],
                 ),
               ),
@@ -176,7 +175,8 @@ class _GetStartedPageState extends State<GetStartedPage> {
 
             // Title and subtitle to match the screenshot
             Container(
-              margin: const EdgeInsets.only(top: 10), // Adjust this value as needed
+              margin:
+                  const EdgeInsets.only(top: 10), // Adjust this value as needed
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Column(
                 children: [
@@ -190,9 +190,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-
                   const SizedBox(height: 5),
-                  
                   Text(
                     'Travel with Confidence',
                     style: TextStyle(
@@ -241,5 +239,4 @@ class _GetStartedPageState extends State<GetStartedPage> {
       ),
     );
   }
-
 }

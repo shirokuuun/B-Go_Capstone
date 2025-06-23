@@ -19,29 +19,29 @@ class _LoginPageState extends State<LoginPage> {
   final AuthServices _authServices = AuthServices();
 
   Future signIn() async {
-  try {
-    await _authServices.signInWithEmailAndPassword(
-      email: emailController.text,
-      password: passwordController.text,
-    );
-    // Optionally, navigate to another page or show success
-  } on FirebaseAuthException catch (e) {
-    // Show error to user
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Login Failed"),
-        content: Text(e.message ?? "Unknown error"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text("OK"),
-          )
-        ],
-      ),
-    );
+    try {
+      await _authServices.signInWithEmailAndPassword(
+        email: emailController.text,
+        password: passwordController.text,
+      );
+      // Optionally, navigate to another page or show success
+    } on FirebaseAuthException catch (e) {
+      // Show error to user
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text("Login Failed"),
+          content: Text(e.message ?? "Unknown error"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text("OK"),
+            )
+          ],
+        ),
+      );
+    }
   }
-}
 
   @override
   void dispose() {
@@ -61,16 +61,15 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               color: Color(0xFFE5E9F0),
             ),
-            padding: const EdgeInsets.only(left: 10,  bottom: 35),
+            padding: const EdgeInsets.only(left: 10, bottom: 35),
             alignment: Alignment.topLeft,
-
             child: Center(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
                   'assets/batrasco-logo.png', // Replace with your logo asset
                   width: 150,
-                  
+
                   fit: BoxFit.cover,
                 ),
               ),
@@ -81,10 +80,11 @@ class _LoginPageState extends State<LoginPage> {
           Align(
             alignment: Alignment.bottomCenter,
             child: SingleChildScrollView(
-                  child: Container(
-                    margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.24),
-                    width: double.infinity,
-                    decoration: const BoxDecoration(
+              child: Container(
+                margin: EdgeInsets.only(
+                    top: MediaQuery.of(context).size.height * 0.24),
+                width: double.infinity,
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
                   boxShadow: [
@@ -95,10 +95,11 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ],
                 ),
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     SizedBox(height: 20),
                     // --- LOGIN BOX ---
                     Center(
@@ -113,19 +114,19 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           Text(
-                          "WELCOME BACK!",
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.normal,
-                            color: Colors.black,
+                            "WELCOME BACK!",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.normal,
+                              color: Colors.black,
+                            ),
                           ),
-                        ),
                         ],
                       ),
                     ),
-                    
+
                     SizedBox(height: 40),
-                          
+
                     // Email
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -138,21 +139,19 @@ class _LoginPageState extends State<LoginPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: emailController,
-                            style: TextStyle(
-                                color: Colors.black),
+                            style: TextStyle(color: Colors.black),
                             decoration: InputDecoration(
-                                border: InputBorder.none, 
-                                hintText: "Email",
-                                hintStyle: TextStyle(
+                              border: InputBorder.none,
+                              hintText: "Email",
+                              hintStyle: TextStyle(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700
-                                ),
+                                  fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                    ),
-                          
+
                     // Password
                     SizedBox(height: 30),
                     Padding(
@@ -169,19 +168,18 @@ class _LoginPageState extends State<LoginPage> {
                             obscureText: true,
                             style: TextStyle(color: Colors.black),
                             decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Password",
-                                hintStyle: TextStyle(
+                              border: InputBorder.none,
+                              hintText: "Password",
+                              hintStyle: TextStyle(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700
-                                ),
-                                ),
+                                  fontWeight: FontWeight.w700),
+                            ),
                           ),
                         ),
                       ),
                     ),
                     SizedBox(height: 10),
-                          
+
                     // Forgot Password
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -193,7 +191,7 @@ class _LoginPageState extends State<LoginPage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                   builder: (context) => ForgotPasswordPage(),
+                                  builder: (context) => ForgotPasswordPage(),
                                 ),
                               );
                             },
@@ -208,7 +206,7 @@ class _LoginPageState extends State<LoginPage> {
                         ],
                       ),
                     ),
-                          
+
                     // Sign in button
                     SizedBox(height: 20),
                     Padding(
@@ -221,7 +219,7 @@ class _LoginPageState extends State<LoginPage> {
                             color: const Color(0xFF1D2B53),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Center( 
+                          child: Center(
                             child: Text(
                               'Sign In',
                               style: TextStyle(
@@ -235,9 +233,9 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     SizedBox(height: 10),
-                                
+
                     // --- OUTSIDE THE BOX ---
-                          
+
                     // Or divider
                     Row(
                       children: [
@@ -261,36 +259,38 @@ class _LoginPageState extends State<LoginPage> {
 
                     // sign in with Google
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center, 
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         ElevatedButton(
                           onPressed: () async {
                             try {
-                            final userCredential = await _authServices.SignInWithGoogle();
-                            if (userCredential == null) {
-                              // User cancelled sign-in, do nothing 
-                              return;
+                              final userCredential =
+                                  await _authServices.SignInWithGoogle();
+                              if (userCredential == null) {
+                                // User cancelled sign-in, do nothing
+                                return;
+                              }
+                              // if there is an error, it will be caught by the catch block
+                            } catch (e) {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text("Google Sign-In Failed"),
+                                  content: Text(e.toString()),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: Text("OK"),
+                                    )
+                                  ],
+                                ),
+                              );
                             }
-                            // if there is an error, it will be caught by the catch block
-                          } catch (e) {
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text("Google Sign-In Failed"),
-                                content: Text(e.toString()),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(),
-                                    child: Text("OK"),
-                                  )
-                                ],
-                              ),
-                            );
-                          }
                           },
                           child: Image.asset(
-                            'assets/google-icon.png', 
-                            height: 24, 
+                            'assets/google-icon.png',
+                            height: 24,
                             width: 24,
                           ),
                         ),
@@ -306,7 +306,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
 
                     SizedBox(height: 40),
-                                
+
                     // Register section
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -328,13 +328,13 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ],
                     ),
-                    ],
-                     ),
-                  ),
+                  ],
+                ),
+              ),
             ),
-            ), 
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 }

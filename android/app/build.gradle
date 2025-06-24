@@ -8,6 +8,12 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def localProps = new Properties()
+def localPropsFile = rootProject.file("local.properties")
+if (localPropsFile.exists()) {
+    localPropsFile.withReader("UTF-8") { reader -> localProps.load(reader) }
+}
+
 android {
     namespace = "com.example.capstone_project"
     compileSdk = flutter.compileSdkVersion
@@ -31,12 +37,17 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        manifestPlaceholders = [
+            GOOGLE_MAPS_API_KEY: localProps['GOOGLE_MAPS_ANDROID_KEY'],
+            applicationName: ".MainActivity"
+        ]
     }
 
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // Signing with the debug keys for now, so flutter run --release works.
             signingConfig = signingConfigs.debug
         }
     }

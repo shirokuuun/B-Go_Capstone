@@ -42,19 +42,26 @@ class _ConductorFromState extends State<ConductorFrom> {
                 padding: const EdgeInsets.only(top: 15.0, right: 8.0),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.sos, color: Colors.redAccent),
-                      iconSize: 30,
-                      onPressed: () {
-                        // TODO: SOS action
+                    GestureDetector(
+                      onTap: () {
+                        // Your SOS action
                       },
+                      child: Image.asset(
+                        'assets/sos-button.png',    
+                        width: 40,
+                        height: 30,
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.camera_alt, color: Colors.white),
-                      iconSize: 30,
-                      onPressed: () {
-                        // TODO: Camera action
+                    SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        // Your Camera action
                       },
+                      child: Image.asset(
+                        'assets/photo-camera.png', 
+                        width: 30,
+                        height: 30,
+                      ),
                     ),
                   ],
                 ),

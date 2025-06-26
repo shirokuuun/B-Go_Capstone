@@ -1,4 +1,7 @@
 import 'package:b_go/pages/get_started.dart';
+import 'package:b_go/pages/login_page.dart';
+import 'package:b_go/pages/register_page.dart';
+import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -19,7 +22,16 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       //home: MainPage(),
       home: GetStartedPage(),
+      routes: {
+        '/login': (context) =>
+            LoginPage(showRegisterPage: () {
+              Navigator.pushReplacementNamed(context, '/register');
+            }),
+        '/register': (context) => RegisterPage(showLoginPage: () {
+          Navigator.pushReplacementNamed(context, '/login');
+        }),
+        '/user_selection': (context) => UserSelection(),
+      },
     );
   }
 }
-

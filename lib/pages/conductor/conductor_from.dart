@@ -4,7 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 
 class ConductorFrom extends StatefulWidget {
-  const ConductorFrom({Key? key}) : super(key: key);
+  final String role;
+  const ConductorFrom({Key? key, required this.role}) : super(key: key);
 
   @override
   State<ConductorFrom> createState() => _ConductorFromState();

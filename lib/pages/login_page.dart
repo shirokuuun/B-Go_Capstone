@@ -26,6 +26,8 @@ class _LoginPageState extends State<LoginPage> {
         password: passwordController.text,
       );
       // Optionally, navigate to another page or show success
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/user_selection');
     } on FirebaseAuthException catch (e) {
       // Show error to user
       showDialog(
@@ -298,13 +300,15 @@ class _LoginPageState extends State<LoginPage> {
                         ElevatedButton(
                           onPressed: () {
                             Navigator.push(
-                              context, 
-                              MaterialPageRoute(builder: (context) => ConductorFrom())
-                            );
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ConductorFrom(role: 'Conductor'),
+                                ));
                           },
                           child: Image.asset(
-                            'assets/facebook-icon.png', 
-                            height: 24, 
+                            'assets/facebook-icon.png',
+                            height: 24,
                             width: 24,
                           ),
                         ),

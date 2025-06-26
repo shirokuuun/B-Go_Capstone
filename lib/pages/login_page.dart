@@ -1,4 +1,5 @@
 import 'package:b_go/auth/auth_services.dart';
+import 'package:b_go/pages/conductor/conductor_from.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
@@ -294,14 +295,19 @@ class _LoginPageState extends State<LoginPage> {
                             width: 24,
                           ),
                         ),
-                        /*ElevatedButton(
-                          onPressed: () => AuthServices().SignInWithFacebook(),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(builder: (context) => ConductorFrom())
+                            );
+                          },
                           child: Image.asset(
                             'assets/facebook-icon.png', 
                             height: 24, 
                             width: 24,
                           ),
-                        ),*/
+                        ),
                       ],
                     ),
 

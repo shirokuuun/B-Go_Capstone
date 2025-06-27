@@ -4,8 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 
 class ConductorFrom extends StatefulWidget {
+  final String route;
   final String role;
-  const ConductorFrom({Key? key, required this.role}) : super(key: key);
+
+  const ConductorFrom({Key? key, 
+  required this.role, required this.route
+  }) : super(key: key);
 
   @override
   State<ConductorFrom> createState() => _ConductorFromState();
@@ -17,7 +21,7 @@ class _ConductorFromState extends State<ConductorFrom> {
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces();
+    placesFuture = RouteService.fetchPlaces(widget.route);
   }
 
   @override
@@ -97,7 +101,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                    FutureBuilder<String>(
-                    future: RouteService.fetchRoutePlaceName(),
+                    future: RouteService.fetchRoutePlaceName(widget.route),
                     builder: (context, snapshot){
                         String placeName = '';
                         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -191,7 +195,12 @@ class _ConductorFromState extends State<ConductorFrom> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ConductorTo(),
+                                    builder: (context) => ConductorTo(
+                                      route: widget.route,
+                                      role: widget.role,
+                                      from: item['name'],
+                                      startKm: item['km'],
+                                    ),
                                   ),
                                 );
                               },

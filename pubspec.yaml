@@ -41,6 +41,7 @@ dependencies:
   google_fonts: ^6.2.1
   google_sign_in: ^6.3.0
   google_maps_flutter: ^2.12.3
+  flutter_facebook_auth: ^7.1.2
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +78,7 @@ flutter:
     - assets/facebook-icon.png
     - assets/sos-button.png
     - assets/photo-camera.png
+    - assets/phone-call.png
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

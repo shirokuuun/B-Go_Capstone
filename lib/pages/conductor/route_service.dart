@@ -57,21 +57,32 @@ class RouteService {
     required String to,
     required num startKm,
     required num endKm,
+    required int quantity,
+    required double discount,
   }) async {
     final totalKm = endKm - startKm;
-    await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .add({
-          'from': from,
-          'to': to,
-          'startKm': startKm,
-          'endKm': endKm,
-          'totalKm': totalKm,
-          'timestamp': FieldValue.serverTimestamp(),
-          'active': true,
-        });
+
+    //customize trip document name
+    final tripsCollection = FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips');
+
+      final snapshot = await tripsCollection.get();
+      final tripNumber = snapshot.docs.length + 1;
+      final tripDocName = "trip $tripNumber";
+
+    await tripsCollection.doc(tripDocName).set({
+      'from': from,
+      'to': to,
+      'startKm': startKm,
+      'endKm': endKm,
+      'totalKm': totalKm,
+      'timestamp': FieldValue.serverTimestamp(),
+      'active': true,
+      'quantity': quantity,
+      'discount': discount.toStringAsFixed(2),
+    });
   }
 
 }

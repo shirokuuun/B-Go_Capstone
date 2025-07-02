@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:b_go/pages/conductor/quantity_selection.dart';
+import 'package:b_go/pages/conductor/conductor_ticket.dart';
+import 'package:b_go/main.dart';
+
 
 class ConductorTo extends StatefulWidget {
   final String route;
   final String role;
   final String from;
   final num startKm;
+  
 
   const ConductorTo({Key? key, 
   required this.route, 
@@ -198,21 +203,60 @@ class _ConductorToState extends State<ConductorTo> {
                               onPressed: () async {
                                 final to = item['name'];
                                 final endKm = item['km'];
-                                await RouteService.saveTrip(
-                                  route: widget.route,
-                                  from: widget.from,
-                                  to: to,
-                                  startKm: widget.startKm,
-                                  endKm: endKm,
-                                );
-                                // Optionally
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Trip saved!')),
-                                );
-                                Navigator.of(context).popUntil((route) => route.isFirst);
-                              },
 
-                               child: Column(
+                                final result = await showGeneralDialog<Map<String, dynamic>>(
+                                  context: context,
+                                  barrierDismissible: true,
+                                  barrierLabel: "Quantity",
+                                  barrierColor: Colors.black.withOpacity(0.3), 
+                                  transitionDuration: Duration(milliseconds: 200),
+                                  pageBuilder: (context, anim1, anim2) {
+                                    return QuantitySelection(
+                                      onConfirm: (quantity) {
+                                        Navigator.of(context).pop({
+                                          'quantity': quantity,
+                                        });
+                                      },
+                                    );
+                                  },
+                                  transitionBuilder: (context, anim1, anim2, child) {
+                                    return FadeTransition(
+                                      opacity: anim1,
+                                      child: child,
+                                    );
+                                  },
+                                );
+
+                                if (result != null) {
+                                  final discount = await showDialog<double>(
+                                    context: context,
+                                    builder: (context) => DiscountSelection(),
+                                  );
+
+                                  if (discount != null) {
+                                    await RouteService.saveTrip(
+                                      route: widget.route,
+                                      from: widget.from,
+                                      to: to,
+                                      startKm: widget.startKm,
+                                      endKm: endKm,
+                                      quantity: result['quantity'],
+                                      discount: discount,
+                                    );
+
+                              rootNavigatorKey.currentState?.pushReplacement(
+                                    MaterialPageRoute(
+                                    builder: (context) => ConductorTicket(route: widget.route),
+                                    ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Discount not selected')),
+                                    );          
+                                  }
+                                }
+                              },
+                              child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(

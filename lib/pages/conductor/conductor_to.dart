@@ -3,7 +3,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 
 class ConductorTo extends StatefulWidget {
-  const ConductorTo ({Key? key}) : super(key: key);
+  final String route;
+  final String role;
+  final String from;
+  final num startKm;
+
+  const ConductorTo({Key? key, 
+  required this.route, 
+  required this.role, 
+  required this.from, 
+  required this.startKm
+  }) : super(key: key);
 
   @override
   State<ConductorTo> createState() => _ConductorToState();
@@ -15,7 +25,7 @@ class _ConductorToState extends State<ConductorTo> {
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces();
+    placesFuture = RouteService.fetchPlaces(widget.route);
   }
 
   @override
@@ -95,7 +105,7 @@ class _ConductorToState extends State<ConductorTo> {
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                    FutureBuilder<String>(
-                    future: RouteService.fetchRoutePlaceName(),
+                    future: RouteService.fetchRoutePlaceName(widget.route),
                     builder: (context, snapshot){
                         String placeName = '';
                         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -144,7 +154,7 @@ class _ConductorToState extends State<ConductorTo> {
                     Padding(
                       padding: const EdgeInsets.only(left: 10),
                       child: Text(
-                        "From:",
+                        "To:",
                         style: GoogleFonts.bebasNeue(
                           fontSize: 25,
                           color: Colors.black87,
@@ -185,14 +195,23 @@ class _ConductorToState extends State<ConductorTo> {
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                               ),
-                              onPressed: () {
-                                /*Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ConductorTo(),
-                                  ),
-                                );*/
+                              onPressed: () async {
+                                final to = item['name'];
+                                final endKm = item['km'];
+                                await RouteService.saveTrip(
+                                  route: widget.route,
+                                  from: widget.from,
+                                  to: to,
+                                  startKm: widget.startKm,
+                                  endKm: endKm,
+                                );
+                                // Optionally
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Trip saved!')),
+                                );
+                                Navigator.of(context).popUntil((route) => route.isFirst);
                               },
+
                                child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -25,13 +26,37 @@ class _LoginPageState extends State<LoginPage> {
         email: emailController.text,
         password: passwordController.text,
       );
-      // Optionally, navigate to another page or show success
+      
       if (!mounted) return;
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      String email = user.email!; // e.g., Batangas_1@gmail.com
+      String username = email.split('@').first; // "Batangas_1
+      String conductorDocId = username[0].toUpperCase() + username.substring(1);
+
+      final conductorDoc = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .get();
+
+      if (conductorDoc.exists) {
+      final route = conductorDoc.data()?['route'] ?? '';
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+        ),
+      );
+    } else {
+      // Not a conductor, navigate as a normal user
       Navigator.pushReplacementNamed(context, '/user_selection');
-    } on FirebaseAuthException catch (e) {
-      // Show error to user
-      showDialog(
-        context: context,
+    }
+  } on FirebaseAuthException catch (e) {
+    // Show error to user
+    showDialog(
+      context: context,
         builder: (context) => AlertDialog(
           title: Text("Login Failed"),
           content: Text(e.message ?? "Unknown error"),
@@ -214,22 +239,23 @@ class _LoginPageState extends State<LoginPage> {
                     SizedBox(height: 20),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: GestureDetector(
-                        onTap: signIn,
-                        child: Container(
-                          padding: EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1D2B53),
-                            borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1D2B53),
+                            padding: EdgeInsets.all(20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          child: Center(
-                            child: Text(
-                              'Sign In',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          onPressed: signIn,
+                          child: Text(
+                            'Sign In',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -297,20 +323,10 @@ class _LoginPageState extends State<LoginPage> {
                             width: 24,
                           ),
                         ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      ConductorFrom(role: 'Conductor'),
-                                ));
-                          },
-                          child: Image.asset(
-                            'assets/facebook-icon.png',
-                            height: 24,
-                            width: 24,
-                          ),
+                        Image.asset(
+                          'assets/facebook-icon.png',
+                          height: 24,
+                          width: 24,
                         ),
                       ],
                     ),

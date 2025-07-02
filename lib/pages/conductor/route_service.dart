@@ -1,36 +1,35 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RouteService {
-
-  // get ROUTE
-  static Future<String> fetchRoutePlaceName() async {
+  // Get ROUTE place name
+  static Future<String> fetchRoutePlaceName(String route) async {
     final doc = await FirebaseFirestore.instance
         .collection('Destinations')
-        .doc('Batangas')
+        .doc(route.trim()) 
         .collection('Place')
-        .doc('Batangas City')
+        .doc('${route.trim()} City')
         .get();
 
     if (doc.exists) {
       final data = doc.data();
-      final name = data?['Name'] ?? 'Batangas City Proper';
+      final name = data?['Name'] ?? '${route.trim()} City Proper';
 
       // Custom display if Batangas City Proper is detected
-      if (name == 'Batangas City Proper') {
-        return 'SM City Lipa - Batangas City';
+      if (name == '${route.trim()} City Proper') {
+        return 'SM City Lipa - ${route.trim()} City';
       }
       // Default for other names
-      return 'Batangas - $name';
+      return '${route.trim()} - $name';
     } else {
       return 'Route not found';
     }
   }
 
-  // get PLACES
-  static Future<List<Map<String, dynamic>>> fetchPlaces() async {
+  // Get PLACES from route
+  static Future<List<Map<String, dynamic>>> fetchPlaces(String route) async {
     var snapshot = await FirebaseFirestore.instance
         .collection('Destinations')
-        .doc('Batangas')
+        .doc(route.trim())
         .collection('Place')
         .get();
 
@@ -38,11 +37,10 @@ class RouteService {
       final data = doc.data();
       return {
         'name': data['Name']?.toString() ?? doc.id,
-        'km': data['km'], // keep as number if possible
+        'km': data['km'],
       };
     }).toList();
 
-    // Sort by 'km', treating null or missing as a high value (so they go last)
     places.sort((a, b) {
       num akm = a['km'] ?? double.infinity;
       num bkm = b['km'] ?? double.infinity;
@@ -51,4 +49,29 @@ class RouteService {
 
     return places;
   }
+
+  //To save trip details
+   static Future<void> saveTrip({
+    required String route,
+    required String from,
+    required String to,
+    required num startKm,
+    required num endKm,
+  }) async {
+    final totalKm = endKm - startKm;
+    await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(route)
+        .collection('trips')
+        .add({
+          'from': from,
+          'to': to,
+          'startKm': startKm,
+          'endKm': endKm,
+          'totalKm': totalKm,
+          'timestamp': FieldValue.serverTimestamp(),
+          'active': true,
+        });
+  }
+
 }

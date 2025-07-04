@@ -116,11 +116,11 @@ class _RegisterPageState extends State<RegisterPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth =
-                    math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                double logoWidth = 150;
+                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
-                  offset: Offset(0, -50),
+                  offset: Offset(0, -20),
                   child: Center(
                     child: Image.asset(
                       'assets/batrasco-logo.png',
@@ -320,7 +320,33 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+
+                    SizedBox(height: 10),
+
+                    // Add phone registration button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 27.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(context, '/phone_register');
+                            },
+                            child: Text(
+                              'Use Phone Number',
+                              style: TextStyle(
+                                color: Color(0xFF1D2B53),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 10),
+
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: ElevatedButton(

@@ -234,7 +234,7 @@ class _ConductorToState extends State<ConductorTo> {
                                   );
 
                                   if (discount != null) {
-                                    await RouteService.saveTrip(
+                                    final tripDocName = await RouteService.saveTrip(
                                       route: widget.route,
                                       from: widget.from,
                                       to: to,
@@ -246,7 +246,11 @@ class _ConductorToState extends State<ConductorTo> {
 
                               rootNavigatorKey.currentState?.pushReplacement(
                                     MaterialPageRoute(
-                                    builder: (context) => ConductorTicket(route: widget.route),
+                                    builder: (context) => ConductorTicket(
+                                      route: widget.route,
+                                      tripDocName: tripDocName,
+
+                                      ),
                                     ),
                                     );
                                   } else {

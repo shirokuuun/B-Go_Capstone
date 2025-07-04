@@ -226,7 +226,7 @@ class DiscountOption extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: selected ? Colors.green : Colors.white24,
+          color: selected ? Color(0xFF10B981) : Colors.white24,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(

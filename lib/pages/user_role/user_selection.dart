@@ -1,4 +1,4 @@
-import 'package:b_go/pages/home_page.dart';
+import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
 
 class UserSelection extends StatefulWidget {

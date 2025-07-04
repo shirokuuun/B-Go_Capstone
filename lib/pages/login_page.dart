@@ -332,7 +332,6 @@ class _LoginPageState extends State<LoginPage> {
                         // Phone Sign-In Icon
                         GestureDetector(
                           onTap: () {
-                            // TODO: Navigate to your phone login/register page
                             Navigator.pushNamed(context,
                                 '/phone_login'); 
                           },

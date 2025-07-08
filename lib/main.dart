@@ -5,12 +5,15 @@ import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:b_go/pages/passenger/passenger_service.dart';
 import 'package:b_go/pages/passenger/passenger_shell_page.dart';
 import 'package:b_go/pages/passenger/profile.dart';
+import 'package:b_go/pages/passenger/services/pre_ticket.dart';
 import 'package:b_go/pages/register_page.dart';
 import 'package:b_go/pages/register_phone_page.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +28,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: rootNavigatorKey,
       debugShowCheckedModeBanner: false,
       //home: MainPage(),
       home: GetStartedPage(),
@@ -42,6 +46,7 @@ class MyApp extends StatelessWidget {
         '/home': (context) => HomePage(role: 'Passenger'),
         '/passenger_service': (context) => PassengerService(),
         '/profile': (context) => ProfilePage(),
+        '/pre_ticket': (context) => PreTicket(),
       },
     );
   }

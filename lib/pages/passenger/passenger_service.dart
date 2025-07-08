@@ -16,7 +16,9 @@ class PassengerService extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
               child: InkWell(
-                onTap: () {}, // TODO: Add navigation or logic
+                onTap: () {
+                  Navigator.pushNamed(context, '/pre_ticket');
+                }, // TODO: Add navigation or logic
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   width: double.infinity,

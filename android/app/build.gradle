@@ -15,7 +15,7 @@ if (localPropsFile.exists()) {
 }
 
 android {
-    namespace = "com.example.capstone_project"
+    namespace 'com.example.capstone_project'
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

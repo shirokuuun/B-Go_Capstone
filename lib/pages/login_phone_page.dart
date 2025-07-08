@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:math' as math;
 
 class LoginPhonePage extends StatefulWidget {
   const LoginPhonePage({Key? key}) : super(key: key);

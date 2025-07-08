@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
 
 class RegisterPhonePage extends StatefulWidget {

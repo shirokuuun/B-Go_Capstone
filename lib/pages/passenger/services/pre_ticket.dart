@@ -114,29 +114,26 @@ class _PreTicketState extends State<PreTicket> {
             floating: true,
             backgroundColor: const Color(0xFF1D2B53),
             leading: Padding(
-              padding: const EdgeInsets.only(top: 18.0, left: 8.0),
+              padding: const EdgeInsets.only(left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            title: Padding(
-              padding: const EdgeInsets.only(top: 22.0),
-              child: Text(
-                'Pre-Ticketing',
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 25,
-                  color: Colors.white,
-                ),
+            title: Text(
+              'Pre-Ticketing',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                color: Colors.white,
               ),
             ),
             actions: [
               Padding(
-                padding: const EdgeInsets.only(top: 18.0, right: 16.0),
+                padding: const EdgeInsets.only(right: 10.0),
                 child: DropdownButton<String>(
                   value: selectedRoute,
                   dropdownColor: const Color(0xFF1D2B53),
-                  style: GoogleFonts.bebasNeue(fontSize: 16, color: Colors.white),
+                  style: GoogleFonts.outfit(fontSize: 11, color: Colors.white),
                   iconEnabledColor: Colors.white,
                   underline: Container(),
                   items: routeChoices.map((route) => DropdownMenuItem(
@@ -173,8 +170,8 @@ class _PreTicketState extends State<PreTicket> {
                       padding: const EdgeInsets.only(left: 10),
                       child: Text(
                         "Select Location:",
-                        style: GoogleFonts.bebasNeue(
-                          fontSize: 25,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
                           color: Colors.black87,
                         ),
                       ),
@@ -218,7 +215,7 @@ class _PreTicketState extends State<PreTicket> {
                                 children: [
                                   Text(
                                     item['name'] ?? '',
-                                    style: GoogleFonts.bebasNeue(fontSize: 16, color: Colors.white),
+                                    style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
                                     textAlign: TextAlign.center,
                                   ),
                                   if (item['km'] != null)
@@ -255,7 +252,7 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Select Quantity', style: GoogleFonts.bebasNeue(fontSize: 22)),
+      title: Text('Select Quantity', style: GoogleFonts.outfit(fontSize: 20)),
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -263,7 +260,7 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
             icon: Icon(Icons.remove),
             onPressed: quantity > 1 ? () => setState(() => quantity--) : null,
           ),
-          Text('$quantity', style: GoogleFonts.bebasNeue(fontSize: 28)),
+          Text('$quantity', style: GoogleFonts.outfit(fontSize: 20)),
           IconButton(
             icon: Icon(Icons.add),
             onPressed: () => setState(() => quantity++),
@@ -273,11 +270,11 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel'),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(quantity),
-          child: Text('Confirm'),
+          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14)),
         ),
       ],
     );
@@ -305,20 +302,20 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Assign Fare Type:', style: GoogleFonts.bebasNeue(fontSize: 22)),
+      title: Text('Assign Fare Type:', style: GoogleFonts.outfit(fontSize: 20)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           for (int i = 0; i < widget.quantity; i++)
             Row(
               children: [
-                Text('Passenger ${i + 1}:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('Passenger ${i + 1}:', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500)),
                 SizedBox(width: 10),
                 DropdownButton<String>(
                   value: selectedTypes[i],
                   items: fareTypes.map((type) => DropdownMenuItem(
                     value: type,
-                    child: Text(type),
+                    child: Text(type, style: GoogleFonts.outfit(fontSize: 14)),
                   )).toList(),
                   onChanged: (val) {
                     setState(() {
@@ -333,11 +330,11 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel'),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(selectedTypes),
-          child: Text('Confirm'),
+          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14)),
         ),
       ],
     );
@@ -349,16 +346,16 @@ class _ConfirmationModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Are you sure with the Pre-Ticketing?', style: GoogleFonts.bebasNeue(fontSize: 22)),
-      content: Text('Do you wish to proceed?'),
+      title: Text('Are you sure with the Pre-Ticketing?', style: GoogleFonts.outfit(fontSize: 20)),
+      content: Text('Do you wish to proceed?', style: GoogleFonts.outfit(fontSize: 14)),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: Text('Cancel'),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text('Yes'),
+          child: Text('Yes', style: GoogleFonts.outfit(fontSize: 14)),
         ),
       ],
     );
@@ -425,24 +422,24 @@ class _ReceiptModal extends StatelessWidget {
       'discountBreakdown': discountBreakdown,
     };
     return AlertDialog(
-      title: Text('Receipt', style: GoogleFonts.bebasNeue(fontSize: 22)),
+      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Route: $route'),
-            Text('Date: $formattedDate'),
-            Text('Time: $formattedTime'),
-            Text('From: ${fromPlace['name']}'),
-            Text('To: ${toPlace['name']}'),
-            Text('From KM: ${fromPlace['km']}'),
-            Text('To KM: ${toPlace['km']}'),
-            Text('Base Fare: ${baseFare.toStringAsFixed(2)}'),
-            Text('Quantity: $quantity'),
-            Text('Amount: ${totalAmount.toStringAsFixed(2)}'),
+            Text('Route: $route', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From: ${fromPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To: ${toPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From KM: ${fromPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To KM: ${toPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Base Fare: ${baseFare.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Amount: ${totalAmount.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 14)),
             SizedBox(height: 16),
-            Text('Discounts:', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...discountBreakdown.map((e) => Text(e)),
+            Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
+            ...discountBreakdown.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
           ],
         ),
       ),
@@ -463,11 +460,11 @@ class _ReceiptModal extends StatelessWidget {
               ),
             );
           },
-          child: Text('Show generated QR code'),
+          child: Text('Show generated QR code', style: GoogleFonts.outfit(fontSize: 14)),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close'),
+          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14)),
         ),
       ],
     );
@@ -482,35 +479,35 @@ class ToSelectionPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     return Scaffold(
-      backgroundColor: const Color(0xFF1D2B53),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             floating: true,
             backgroundColor: const Color(0xFF1D2B53),
             leading: Padding(
-              padding: const EdgeInsets.only(top: 18.0, left: 8.0),
+              padding: const EdgeInsets.only(left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
-            title: Padding(
-              padding: const EdgeInsets.only(top: 22.0),
-              child: Text(
-                'Select Drop-off',
-                style: GoogleFonts.bebasNeue(
-                  fontSize: 25,
+            title: Text(
+                'Drop-off',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
                   color: Colors.white,
                 ),
               ),
-            ),
+            // No actions/dropdown for To page
           ),
           SliverToBoxAdapter(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                margin: EdgeInsets.only(top: size.height * 0.02),
+                margin: EdgeInsets.only(
+                  top: size.height * 0.02,
+                  bottom: size.height * 0.08,
+                ),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -530,54 +527,53 @@ class ToSelectionPage extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(left: 10),
                       child: Text(
-                        "Select Drop-off:",
-                        style: GoogleFonts.bebasNeue(
-                          fontSize: 25,
+                        "Select Your Drop-off:",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
                           color: Colors.black87,
                         ),
                       ),
                     ),
-                    SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.6, // 60% of screen height
-                      child: GridView.builder(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 2.2,
-                        ),
-                        itemCount: toPlaces.length,
-                        itemBuilder: (context, index) {
-                          final place = toPlaces[index];
-                          return ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1D2B53),
-                              elevation: 0,
-                              side: BorderSide.none,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                            ),
-                            onPressed: () => Navigator.of(context).pop(place),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  place['name'] ?? '',
-                                  style: GoogleFonts.bebasNeue(fontSize: 16, color: Colors.white),
-                                  textAlign: TextAlign.center,
-                                ),
-                                if (place['km'] != null)
-                                  Text(
-                                    '${place['km']} km',
-                                    style: TextStyle(fontSize: 12, color: Colors.white70),
-                                  ),
-                              ],
-                            ),
-                          );
-                        },
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 2.2,
                       ),
+                      itemCount: toPlaces.length,
+                      itemBuilder: (context, index) {
+                        final place = toPlaces[index];
+                        return ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1D2B53),
+                            elevation: 0,
+                            side: BorderSide.none,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          ),
+                          onPressed: () => Navigator.of(context).pop(place),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                place['name'] ?? '',
+                                style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (place['km'] != null)
+                                Text(
+                                  '${place['km']} km',
+                                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -624,7 +620,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
           icon: Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('QR Code', style: GoogleFonts.bebasNeue(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 22)),
+        title: Text('QR Code', style: GoogleFonts.outfit(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16)),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -646,7 +642,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
             SizedBox(height: 16),
             Text(
               'Show your generated QR code to the conductor',
-              style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+              style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -655,17 +651,17 @@ class QRCodeFullScreenPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Details:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text('Details:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
                   SizedBox(height: 8),
-                  Text('From: $from', style: TextStyle(fontSize: 15)),
-                  Text('To: $to', style: TextStyle(fontSize: 15)),
-                  Text('KM: $km', style: TextStyle(fontSize: 15)),
-                  Text('Fare: $fare Pesos', style: TextStyle(fontSize: 15)),
-                  Text('Total Passengers: $quantity', style: TextStyle(fontSize: 15)),
+                  Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('Fare: $fare Pesos', style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('Total Passengers: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
                   if (discountBreakdown != null) ...[
                     SizedBox(height: 12),
-                    Text('Discounts:', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ...discountBreakdown!.map((e) => Text(e, style: TextStyle(fontSize: 14))),
+                    Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
+                    ...discountBreakdown!.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
                   ],
                 ],
               ),
@@ -680,11 +676,11 @@ class QRCodeFullScreenPage extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(32),
                     ),
                   ),
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancel', style: TextStyle(color: Colors.white, fontSize: 18)),
+                  child: Text('Cancel', style: GoogleFonts.outfit(color: Colors.white, fontSize: 17)),
                 ),
               ),
             ),

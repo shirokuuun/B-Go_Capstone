@@ -138,16 +138,16 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            "HELLO!",
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 55,
+                            "Hello!",
+                            style: GoogleFonts.outfit(
+                              fontSize: 45,
                             ),
                           ),
                           Text(
                             "Register Here!",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.normal,
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
                           ),
@@ -172,7 +172,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                   items: countries.map((country) {
                                     return DropdownMenuItem<String>(
                                       value: country['code'],
-                                      child: Text(country['code']!, style: TextStyle(fontWeight: FontWeight.bold)),
+                                      child: Text(country['code']!, style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
                                     );
                                   }).toList(),
                                   onChanged: !_otpSent
@@ -190,12 +190,16 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                 controller: phoneController,
                                 keyboardType: TextInputType.phone,
                                 enabled: !_otpSent,
-                                style: TextStyle(
+                                style: GoogleFonts.outfit(
                                   color: Colors.black,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
-                                  hintText: "Phone Number (e.g. 9166567972)",
+                                  hintText: "Phone Number",
+                                  hintStyle: GoogleFonts.outfit(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
@@ -217,12 +221,16 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                             child: TextField(
                               controller: otpController,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                 color: Colors.black,
                               ),
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Enter OTP",
+                                hintStyle: GoogleFonts.outfit(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
@@ -243,7 +251,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           Flexible(
                             child: RichText(
                               text: TextSpan(
-                                style: TextStyle(color: Colors.black),
+                                style: GoogleFonts.outfit(color: Colors.black),
                                 children: [
                                   TextSpan(
                                     text: 'I agree to the ',
@@ -260,9 +268,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                       },
                                       child: Text(
                                         'Terms and Conditions',
-                                        style: TextStyle(
+                                        style: GoogleFonts.outfit(
                                           color: Colors.blue,
                                           decoration: TextDecoration.underline,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ),
@@ -292,10 +301,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                   : null,
                               child: Text(
                                 _otpSent ? 'Verify OTP' : 'Send OTP',
-                                style: TextStyle(
+                                style: GoogleFonts.outfit(
                                   color: Colors.white,
                                   fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
@@ -306,8 +315,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       children: [
                         Text(
                           'Already have an account?',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         GestureDetector(
@@ -316,9 +325,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           },
                           child: Text(
                             ' Login',
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         )

@@ -144,16 +144,15 @@ class _LoginPageState extends State<LoginPage> {
                         children: [
                           Text(
                             "Login",
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 55,
+                            style: GoogleFonts.outfit(
+                              fontSize: 45,
                             ),
                           ),
                           Text(
-                            "WELCOME BACK!",
-                            style: TextStyle(
+                            "Welcome Back!",
+                            style: GoogleFonts.outfit(
                               fontSize: 20,
-                              fontWeight: FontWeight.normal,
-                              color: Colors.black,
+                              color: const Color.fromARGB(255, 0, 0, 0),
                             ),
                           ),
                         ],
@@ -174,11 +173,11 @@ class _LoginPageState extends State<LoginPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: emailController,
-                            style: TextStyle(color: Colors.black),
+                            style: GoogleFonts.outfit(color: Colors.black),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Email",
-                              hintStyle: TextStyle(
+                              hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
                                   fontWeight: FontWeight.w700),
                             ),
@@ -201,11 +200,11 @@ class _LoginPageState extends State<LoginPage> {
                           child: TextField(
                             controller: passwordController,
                             obscureText: true,
-                            style: TextStyle(color: Colors.black),
+                            style: GoogleFonts.outfit(color: Colors.black),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Password",
-                              hintStyle: TextStyle(
+                              hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
                                   fontWeight: FontWeight.w700),
                             ),
@@ -232,9 +231,9 @@ class _LoginPageState extends State<LoginPage> {
                             },
                             child: Text(
                               'Forgot Password?',
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                 color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
@@ -259,10 +258,9 @@ class _LoginPageState extends State<LoginPage> {
                           onPressed: signIn,
                           child: Text(
                             'Sign In',
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.white,
                               fontSize: 20,
-                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),
@@ -281,10 +279,10 @@ class _LoginPageState extends State<LoginPage> {
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           child: Text("Or",
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                   fontSize: 20,
                                   color: Colors.grey[700],
-                                  fontWeight: FontWeight.w600)),
+                                  fontWeight: FontWeight.w500)),
                         ),
                         const Expanded(
                             child: Divider(
@@ -352,15 +350,14 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Text(
                           "Don't have an account? ",
-                          style: TextStyle(fontSize: 15),
+                          style: GoogleFonts.outfit(fontSize: 15),
                         ),
                         GestureDetector(
                           onTap: widget.showRegisterPage,
                           child: Text(
                             "Sign Up",
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Color(0xFF2397f3),
-                              fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
                           ),

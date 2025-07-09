@@ -1,5 +1,7 @@
+import 'package:b_go/pages/passenger/passenger_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class HomePage extends StatefulWidget {
@@ -28,7 +30,10 @@ class _HomePageState extends State<HomePage> {
         Navigator.pushNamed(context, '/home');
         break;
       case 1:
-        Navigator.pushNamed(context, '/passenger_service');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => PassengerService()),
+        );
         break;
       case 2:
         Navigator.pushNamed(context, '/profile');
@@ -40,7 +45,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Welcome"),
+        title: Text(
+          "Welcome",
+          style: GoogleFonts.outfit(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
         backgroundColor: const Color(0xFF0091AD),
       ),
       drawer: Drawer(
@@ -53,15 +64,21 @@ class _HomePageState extends State<HomePage> {
               ),
               child: Text(
                 'Menu',
-                style: TextStyle(
+                style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: 48,
+                  fontSize: 30,
                 ),
               ),
             ),
             ListTile(
               leading: Icon(Icons.schedule),
-              title: Text('Trip Schedules'),
+              title: Text(
+                'Trip Schedules',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onTap: () {
                 // TODO: Navigate to Trip Schedules page
                 Navigator.pop(context);
@@ -69,7 +86,13 @@ class _HomePageState extends State<HomePage> {
             ),
             ListTile(
               leading: Icon(Icons.map),
-              title: Text('Batrasco Routes'),
+              title: Text(
+                'Batrasco Routes',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
               onTap: () {
                 // TODO: Navigate to Batrasco Routes page
                 Navigator.pop(context);

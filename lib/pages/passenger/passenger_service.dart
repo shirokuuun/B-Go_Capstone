@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class PassengerService extends StatelessWidget {
   const PassengerService({super.key});
@@ -18,7 +19,7 @@ class PassengerService extends StatelessWidget {
               child: InkWell(
                 onTap: () {
                   Navigator.pushNamed(context, '/pre_ticket');
-                }, // TODO: Add navigation or logic
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   width: double.infinity,
@@ -35,17 +36,17 @@ class PassengerService extends StatelessWidget {
                       SizedBox(height: 16),
                       Text(
                         'Pre-Ticketing',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
                           color: Colors.black,
                         ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         '(Boarding)',
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
                           color: Colors.grey,
                           fontWeight: FontWeight.w500,
                         ),
@@ -60,9 +61,9 @@ class PassengerService extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               child: Text(
                 'OR',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
+                style: GoogleFonts.outfit(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w500,
                   color: Colors.black,
                 ),
               ),
@@ -88,17 +89,17 @@ class PassengerService extends StatelessWidget {
                       SizedBox(height: 16),
                       Text(
                         'Pre-Booking',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w500,
                           color: Colors.black,
                         ),
                       ),
                       SizedBox(height: 4),
                       Text(
                         '(Reservation)',
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
                           color: Colors.grey,
                           fontWeight: FontWeight.w500,
                         ),

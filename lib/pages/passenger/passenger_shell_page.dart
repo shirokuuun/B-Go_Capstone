@@ -1,6 +1,6 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:b_go/pages/passenger/passenger_service.dart';
-import 'package:b_go/pages/passenger/profile.dart';
+import 'package:b_go/pages/passenger/profile/profile.dart';
 import 'package:flutter/material.dart';
 
 class PassengerShellPage extends StatefulWidget {
@@ -33,10 +33,19 @@ class _PassengerShellPageState extends State<PassengerShellPage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.directions_bus), label: 'Passenger Service'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        items: [
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.directions_bus),
+            label: 'Passenger Service',
+          ),
+          BottomNavigationBarItem(
+            icon: const Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
         selectedItemColor: Color(0xFF0091AD),
       ),

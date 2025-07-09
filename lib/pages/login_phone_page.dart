@@ -126,16 +126,16 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            "HELLO!",
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 55,
+                            "Hello!",
+                            style: GoogleFonts.outfit(
+                              fontSize: 45,
                             ),
                           ),
                           Text(
-                            "Login with Phone",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.normal,
+                            "Login with Phone Number",
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
                           ),
@@ -160,7 +160,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                   items: countries.map((country) {
                                     return DropdownMenuItem<String>(
                                       value: country['code'],
-                                      child: Text(country['code']!, style: TextStyle(fontWeight: FontWeight.bold)),
+                                      child: Text(country['code']!, style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
                                     );
                                   }).toList(),
                                   onChanged: !_otpSent
@@ -178,12 +178,16 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                 controller: phoneController,
                                 keyboardType: TextInputType.phone,
                                 enabled: !_otpSent,
-                                style: TextStyle(
+                                style: GoogleFonts.outfit(
                                   color: Colors.black,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
-                                  hintText: "Phone Number (e.g. 9166567972)",
+                                  hintText: "Phone Number",
+                                  hintStyle: GoogleFonts.outfit(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
@@ -205,12 +209,16 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                             child: TextField(
                               controller: otpController,
                               keyboardType: TextInputType.number,
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                 color: Colors.black,
                               ),
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Enter OTP",
+                                hintStyle: GoogleFonts.outfit(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
@@ -232,10 +240,10 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                               onPressed: _otpSent ? _verifyOTP : _sendOTP,
                               child: Text(
                                 _otpSent ? 'Verify OTP' : 'Send OTP',
-                                style: TextStyle(
+                                style: GoogleFonts.outfit(
                                   color: Colors.white,
                                   fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
@@ -246,8 +254,9 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                       children: [
                         Text(
                           'Use email instead?',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
+                            fontSize: 15,
                           ),
                         ),
                         GestureDetector(
@@ -256,9 +265,10 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                           },
                           child: Text(
                             ' Login',
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 15,
                             ),
                           ),
                         )

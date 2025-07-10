@@ -221,12 +221,12 @@ class _ConductorToState extends State<ConductorTo> {
                                 );
 
                                 if (result != null) {
-                                  final discount = await showDialog<double>(
-                                    context: context,
-                                    builder: (context) => DiscountSelection(),
-                                  );
+                                  final discounts = await showDialog<List<double>>(
+                                  context: context,
+                                  builder: (context) => DiscountSelection(quantity: result['quantity']),
+                                );
 
-                                  if (discount != null) {
+                                  if (discounts != null) {
                                     final tripDocName = await RouteService.saveTrip(
                                       route: widget.route,
                                       from: widget.from,
@@ -234,7 +234,7 @@ class _ConductorToState extends State<ConductorTo> {
                                       startKm: widget.startKm,
                                       endKm: endKm,
                                       quantity: result['quantity'],
-                                      discount: discount,
+                                      discountList: discounts,
                                     );
 
                               rootNavigatorKey.currentState?.pushReplacement(

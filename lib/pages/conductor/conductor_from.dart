@@ -144,6 +144,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                               style: GoogleFonts.bebasNeue(
                                 fontSize: 30,
                                 color: Colors.white,
+                                
                               ),
                             ),
                           );

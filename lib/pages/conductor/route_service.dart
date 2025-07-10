@@ -58,21 +58,34 @@ class RouteService {
   required num startKm,
   required num endKm,
   required int quantity,
-  required double discount,
+  required List<double> discountList,
 }) async {
   final totalKm = endKm - startKm;
 
-  //compute fare
-  double fare = 15.0; // Minimum fare for up to 4km
+  // base fare calculation, isa isa
+  double baseFare = 15.0;
   if (totalKm > 4) {
-    fare += (totalKm - 4) * 2.20;
+    baseFare += (totalKm - 4) * 2.20;
   }
 
-  // Apply discount
-  double discountedFare = fare * (1 - discount);
+  // Calculate discounted fare per passenger
+  List<double> discountedFares = discountList.map((discount) {
+    return baseFare * (1 - discount);
+  }).toList();
 
-  // Multiply by quantity
-  double totalFare = discountedFare * quantity;
+  // Total fare
+  double totalFare = discountedFares.fold(0.0, (sum, fare) => sum + fare);
+
+  // Total discount amount
+  double totalDiscountAmount = discountList.fold(0.0, (sum, discount) {
+    return sum + (baseFare * discount);
+  });
+
+  // Convert for Firestore storage
+  List<String> formattedFares = discountedFares.map((f) => f.toStringAsFixed(2)).toList();
+  String totalDiscountStr = totalDiscountAmount.toStringAsFixed(2);
+  String totalFareStr = totalFare.toStringAsFixed(2);
+
 
   final tripsCollection = FirebaseFirestore.instance
       .collection('trips')
@@ -93,18 +106,19 @@ class RouteService {
   final tripDocName = "trip $tripNumber";
 
   await tripsCollection.doc(tripDocName).set({
-    'from': from,
-    'to': to,
-    'startKm': startKm,
-    'endKm': endKm,
-    'totalKm': totalKm,
-    'timestamp': FieldValue.serverTimestamp(),
-    'active': true,
-    'quantity': quantity,
-    'discountAmount': (fare * discount).toStringAsFixed(2),
-    'farePerPassenger': discountedFare.toStringAsFixed(2),
-    'totalFare': totalFare.toStringAsFixed(2),
-  });
+  'from': from,
+  'to': to,
+  'startKm': startKm,
+  'endKm': endKm,
+  'totalKm': totalKm,
+  'timestamp': FieldValue.serverTimestamp(),
+  'active': true,
+  'quantity': quantity,
+  'farePerPassenger': formattedFares,
+  'totalFare': totalFareStr,
+  'discountAmount': totalDiscountStr,
+  'discountList': discountList,
+});
 
   return tripDocName; 
 }

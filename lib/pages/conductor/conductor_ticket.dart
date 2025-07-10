@@ -7,11 +7,12 @@ import 'package:b_go/pages/conductor/conductor_from.dart';
 class ConductorTicket extends StatefulWidget {
   final String route;
   final String tripDocName;
- 
+  final String placeCollection; // Default value, can be changed based on the route
 
   ConductorTicket({Key? key, 
   required this.route, 
   required this.tripDocName,
+  required this.placeCollection
  }) : super(key: key);
 
   @override
@@ -19,6 +20,18 @@ class ConductorTicket extends StatefulWidget {
 }
 
 class _ConductorTicketState extends State<ConductorTicket> {
+
+   String getRouteLabel(String placeCollection) {
+  switch (placeCollection) {
+    case 'Place':
+      return 'SM City Lipa - Batangas City';
+    case 'Place 2':
+      return 'Batangas City - SM City Lipa';
+    default:
+      return 'Unknown Route';
+  }
+}
+
   String from = '';
   String to = '';
   num startKm = 0;
@@ -62,7 +75,17 @@ class _ConductorTicketState extends State<ConductorTicket> {
               padding: const EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+               onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ConductorFrom(
+                      route: widget.route,
+                      role: 'conductor',
+                    ),
+                  ),
+                );
+              },
               ),
             ),
             title: Padding(
@@ -122,26 +145,19 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    FutureBuilder<String>(
-                      future: RouteService.fetchRoutePlaceName(widget.route),
-                      builder: (context, snapshot) {
-                        String placeName = '';
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          placeName = '...';
-                        } else if (snapshot.hasError) {
-                          placeName = 'Error';
-                        } else if (snapshot.hasData) {
-                          placeName = snapshot.data!;
-                        }
-                        return Text(
-                          'ROUTE: $placeName',
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
+                    SizedBox(
+                    height: 40,
+                     child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        getRouteLabel(widget.placeCollection),
+                        style: GoogleFonts.bebasNeue(
+                          fontSize: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                                       ),
+                   ),
                   ],
                 ),
               ),

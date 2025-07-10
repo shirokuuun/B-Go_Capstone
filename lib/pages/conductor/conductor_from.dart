@@ -1,4 +1,5 @@
 import 'package:b_go/pages/conductor/conductor_to.dart';
+import 'package:b_go/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
@@ -8,7 +9,8 @@ class ConductorFrom extends StatefulWidget {
   final String role;
 
   const ConductorFrom({Key? key, 
-  required this.role, required this.route
+  required this.role, required this.route,
+
   }) : super(key: key);
 
   @override
@@ -18,10 +20,17 @@ class ConductorFrom extends StatefulWidget {
 class _ConductorFromState extends State<ConductorFrom> {
   late Future<List<Map<String, dynamic>>> placesFuture;
 
+  String selectedPlaceCollection = 'Place'; 
+
+  List<Map<String, String>> routeDirections = [
+    {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
+    {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
+  ];
+
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(widget.route);
+    placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
   }
 
   @override
@@ -39,7 +48,12 @@ class _ConductorFromState extends State<ConductorFrom> {
               padding: const EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => LoginPage(showRegisterPage: () {  },)),
+                    (Route<dynamic> route) => false,
+                  );
+                },
               ),
             ),
             title: Padding(
@@ -100,26 +114,35 @@ class _ConductorFromState extends State<ConductorFrom> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                   FutureBuilder<String>(
-                    future: RouteService.fetchRoutePlaceName(widget.route),
-                    builder: (context, snapshot){
-                        String placeName = '';
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          placeName = '...';
-                        } else if (snapshot.hasError) {
-                          placeName = 'Error';
-                        } else if (snapshot.hasData) {
-                          placeName = snapshot.data!;
-                        }
-                        return Text(
-                          'ROUTE: $placeName',
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
+                    SizedBox(
+                      height: 40,
+                      child: DropdownButton<String>(
+                        value: selectedPlaceCollection,
+                        dropdownColor: const Color(0xFF1D2B53),
+                        iconEnabledColor: Colors.white,
+                        items: routeDirections.map((route) {
+                          return DropdownMenuItem<String>(
+                            value: route['collection'],
+                            child: Text(
+                              route['label']!,
+                              style: GoogleFonts.bebasNeue(
+                                fontSize: 30,
+                                color: Colors.white,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedPlaceCollection = newValue;
+                              placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
+                            });
+                          }
+                        },
+                      ),
                     ),
+
                   ],
                 ),
               ),
@@ -200,6 +223,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                                       role: widget.role,
                                       from: item['name'],
                                       startKm: item['km'],
+                                      placeCollection: selectedPlaceCollection,
                                     ),
                                   ),
                                 );

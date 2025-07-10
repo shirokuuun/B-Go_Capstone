@@ -26,11 +26,11 @@ class RouteService {
   }
 
   // Get PLACES from route
-  static Future<List<Map<String, dynamic>>> fetchPlaces(String route) async {
+  static Future<List<Map<String, dynamic>>> fetchPlaces(String route, {String placeCollection = 'Place'}) async {
     var snapshot = await FirebaseFirestore.instance
         .collection('Destinations')
         .doc(route.trim())
-        .collection('Place')
+        .collection(placeCollection)
         .get();
 
     List<Map<String, dynamic>> places = snapshot.docs.map((doc) {

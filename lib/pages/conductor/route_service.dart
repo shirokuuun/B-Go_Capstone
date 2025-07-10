@@ -63,7 +63,7 @@ class RouteService {
   final totalKm = endKm - startKm;
 
   //compute fare
-  double fare = 15.0; // Minimum fucking fare for up to 4km
+  double fare = 15.0; // Minimum fare for up to 4km
   if (totalKm > 4) {
     fare += (totalKm - 4) * 2.20;
   }

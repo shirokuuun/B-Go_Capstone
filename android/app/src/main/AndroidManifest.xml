@@ -1,6 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
-        android:label="com.example.capstone_project"
+        android:label="B-Go"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"

@@ -3,6 +3,10 @@ import 'package:b_go/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert'; // Added for jsonDecode
+import 'package:permission_handler/permission_handler.dart';
 
 class ConductorFrom extends StatefulWidget {
   final String route;
@@ -67,41 +71,53 @@ class _ConductorFromState extends State<ConductorFrom> {
               ),
             ),
            actions: [
-            Padding(
-              padding: const EdgeInsets.only(top: 15.0, right: 8.0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      // SOS action
-                    },
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Image.asset(
-                        'assets/sos-button.png',
-                        fit: BoxFit.contain, // Ensures the image scales as needed
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 20),
-                  GestureDetector(
-                    onTap: () {
-                      // Camera action
-                    },
-                    child: SizedBox(
-                      width: 40,
-                      height: 30,
-                      child: Image.asset(
-                        'assets/photo-camera.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+  Padding(
+    padding: const EdgeInsets.only(top: 15.0, right: 8.0),
+    child: Row(
+      children: [
+        GestureDetector(
+          onTap: () {
+            // SOS action
+          },
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Image.asset(
+              'assets/sos-button.png',
+              fit: BoxFit.contain,
             ),
-          ],
+          ),
+        ),
+        SizedBox(width: 20),
+        GestureDetector(
+          onTap: () async {
+            // Camera action
+            if (await Permission.camera.request().isGranted) {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => QRScanPage()),
+              );
+              if (result == true) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pre-ticket stored successfully!')));
+              } else if (result == false) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to store pre-ticket.')));
+              }
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Camera permission is required to scan QR codes.')));
+            }
+          },
+          child: SizedBox(
+            width: 40,
+            height: 30,
+            child: Image.asset(
+              'assets/photo-camera.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+],
           ),
 
           SliverAppBar(
@@ -257,4 +273,68 @@ class _ConductorFromState extends State<ConductorFrom> {
       ),
     );
   }
+}
+
+class QRScanPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: MobileScanner(
+        onDetect: (capture) async {
+          final barcode = capture.barcodes.first;
+          final qrData = barcode.rawValue;
+          if (qrData != null) {
+            try {
+              final data = parseQRData(qrData);
+              await storePreTicketToFirestore(data);
+              Navigator.of(context).pop(true);
+            } catch (e) {
+              Navigator.of(context).pop(false);
+            }
+          }
+        },
+      ),
+    );
+  }
+}
+
+Map<String, dynamic> parseQRData(String qrData) {
+  return Map<String, dynamic>.from(jsonDecode(qrData));
+}
+
+Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
+  final route = data['route'];
+  final tripsCollection = FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips');
+
+  final snapshot = await tripsCollection.get();
+  int maxTripNumber = 0;
+  for (var doc in snapshot.docs) {
+    final tripName = doc.id;
+    final parts = tripName.split(' ');
+    if (parts.length == 2 && int.tryParse(parts[1]) != null) {
+      final num = int.parse(parts[1]);
+      if (num > maxTripNumber) maxTripNumber = num;
+    }
+  }
+  final tripNumber = maxTripNumber + 1;
+  final tripDocName = "trip $tripNumber";
+
+  await tripsCollection.doc(tripDocName).set({
+    'from': data['from'],
+    'to': data['to'],
+    'startKm': data['fromKm'],
+    'endKm': data['toKm'],
+    'totalKm': (data['toKm'] as num) - (data['fromKm'] as num),
+    'timestamp': FieldValue.serverTimestamp(),
+    'active': true,
+    'quantity': data['quantity'],
+    'discountAmount': '',
+    'farePerPassenger': data['fare'],
+    'totalFare': data['amount'],
+    'fareTypes': data['fareTypes'],
+    'discountBreakdown': data['discountBreakdown'],
+  });
 }

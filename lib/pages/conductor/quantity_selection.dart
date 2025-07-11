@@ -217,7 +217,10 @@ class _DiscountSelectionState extends State<DiscountSelection> {
                         ),
                         onPressed: () {
                           List<double> discounts = selectedLabels.map(getDiscountValue).toList();
-                          Navigator.of(context).pop(discounts);
+                         Navigator.of(context).pop({
+                              'discounts': discounts,
+                              'fareTypes': selectedLabels,
+                            });
                         },
                         child: const Text("Confirm", style: TextStyle(color: Colors.white)),
                       ),

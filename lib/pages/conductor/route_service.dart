@@ -1,13 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RouteService {
-  // Get ROUTE place name
+
+
   static Future<String> fetchRoutePlaceName(String route) async {
+
     final doc = await FirebaseFirestore.instance
         .collection('Destinations')
         .doc(route.trim()) 
         .collection('Place')
-        .doc('${route.trim()} City')
+        .doc('${route.trim()} City Proper') // Adjusted to use the route name directly
         .get();
 
     if (doc.exists) {
@@ -17,6 +19,10 @@ class RouteService {
       // Custom display if Batangas City Proper is detected
       if (name == '${route.trim()} City Proper') {
         return 'SM City Lipa - ${route.trim()} City';
+      } else if (name == '${route.trim()} Proper') {
+        return 'SM City Lipa - ${route.trim()}';
+      } else if (name ==  'Mataas na Kahoy Terminal') {
+        return 'SM City Lipa - Mataas na Kahoy Terminal';
       }
       // Default for other names
       return '${route.trim()} - $name';
@@ -59,6 +65,7 @@ class RouteService {
   required num endKm,
   required int quantity,
   required List<double> discountList,
+  required List<String> fareTypes, 
 }) async {
   final totalKm = endKm - startKm;
 
@@ -86,6 +93,24 @@ class RouteService {
   String totalDiscountStr = totalDiscountAmount.toStringAsFixed(2);
   String totalFareStr = totalFare.toStringAsFixed(2);
 
+  //discount breakdown
+  List<String> discountBreakdown = [];
+
+  for (int i = 0; i < discountList.length; i++) {
+    final discount = discountList[i];
+    final type = fareTypes[i]; // e.g. 'regular', 'student', etc.
+
+    if (discount > 0) {
+      final discountAmount = baseFare * discount;
+      discountBreakdown.add(
+        'Passenger ${i + 1}: $type (₱${discountAmount.toStringAsFixed(2)} discount)',
+      );
+    } else {
+      discountBreakdown.add(
+        'Passenger ${i + 1}: Regular (No discount)',
+      );
+    }
+  }
 
   final tripsCollection = FirebaseFirestore.instance
       .collection('trips')
@@ -118,6 +143,7 @@ class RouteService {
   'totalFare': totalFareStr,
   'discountAmount': totalDiscountStr,
   'discountList': discountList,
+  'discountBreakdown': discountBreakdown, 
 });
 
   return tripDocName; 
@@ -156,6 +182,7 @@ class RouteService {
         'quantity': data?['quantity'],
         'farePerPassenger': data?['farePerPassenger'],
         'totalFare': data?['totalFare'],
+        'discountBreakdown': List<String>.from(data?['discountBreakdown'] ?? []),
       };
     }
     return null;

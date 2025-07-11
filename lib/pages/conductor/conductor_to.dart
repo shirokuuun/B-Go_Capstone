@@ -33,16 +33,33 @@ class _ConductorToState extends State<ConductorTo> {
   late Future<List<Map<String, dynamic>>> placesFuture;
 
   String getRouteLabel(String placeCollection) {
-  switch (placeCollection) {
-    case 'Place':
-      return 'SM City Lipa - Batangas City';
-    case 'Place 2':
-      return 'Batangas City - SM City Lipa';
-    default:
-      return 'Unknown Route';
-  }
-}
+    final route = widget.route.trim();
 
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    }
+
+    return 'Unknown Route';
+  }
 
   @override
   void initState() {
@@ -221,12 +238,14 @@ class _ConductorToState extends State<ConductorTo> {
                                 );
 
                                 if (result != null) {
-                                  final discounts = await showDialog<List<double>>(
-                                  context: context,
-                                  builder: (context) => DiscountSelection(quantity: result['quantity']),
-                                );
+                                  final discountResult = await showDialog<Map<String, dynamic>>(
+                                    context: context,
+                                    builder: (context) => DiscountSelection(quantity: result['quantity']),
+                                  );
 
-                                  if (discounts != null) {
+                                  if (discountResult != null) {
+                                    final List<double> discounts = List<double>.from(discountResult['discounts']);
+                                    final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
                                     final tripDocName = await RouteService.saveTrip(
                                       route: widget.route,
                                       from: widget.from,
@@ -235,6 +254,7 @@ class _ConductorToState extends State<ConductorTo> {
                                       endKm: endKm,
                                       quantity: result['quantity'],
                                       discountList: discounts,
+                                      fareTypes: selectedLabels,
                                     );
 
                               rootNavigatorKey.currentState?.pushReplacement(

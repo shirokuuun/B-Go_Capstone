@@ -26,17 +26,39 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   String selectedPlaceCollection = 'Place'; 
 
-  List<Map<String, String>> routeDirections = [
-    {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
-    {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
-  ];
+  late List<Map<String, String>> routeDirections;
 
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
+    
+    if ('${widget.route.trim()}' == 'Rosario') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Rosario', 'collection': 'Place'},
+      {'label': 'Rosario - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  } else if ('${widget.route.trim()}' == 'Batangas') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
+      {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  }  else if ('${widget.route.trim()}' == 'Mataas na Kahoy') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
+      {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  }  else {
+    // Default fallback
+    routeDirections = [
+      {'label': 'SM City Lipa - Unknown', 'collection': 'Place'},
+      {'label': 'Unknown - SM City Lipa', 'collection': 'Place 2'},
+    ];
   }
 
+  placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
+  }
+
+  
   @override
   Widget build(BuildContext context) {
     

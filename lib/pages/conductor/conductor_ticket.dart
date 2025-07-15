@@ -45,6 +45,13 @@ class _ConductorTicketState extends State<ConductorTicket> {
         case 'Place 2':
           return 'Mataas na Kahoy - SM City Lipa';
       }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
     }
 
   return 'Unknown Route';
@@ -314,7 +321,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                                                   children: [
                                                     TextSpan(
                                                       text:
-                                                          'Route: ${widget.route}\n',
+                                                          'Route: ${getRouteLabel(widget.placeCollection)}\n',
                                                       style:
                                                           GoogleFonts.outfit(
                                                         fontSize: 18,

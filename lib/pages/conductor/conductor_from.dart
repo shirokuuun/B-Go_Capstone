@@ -3,6 +3,7 @@ import 'package:b_go/pages/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert'; // Added for jsonDecode
@@ -47,6 +48,11 @@ class _ConductorFromState extends State<ConductorFrom> {
       {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
       {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
     ];
+  } else if ('${widget.route.trim()}' == 'Tiaong') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Tiaong', 'collection': 'Place'},
+      {'label': 'Tiaong - SM City Lipa', 'collection': 'Place 2'},
+    ];
   }  else {
     // Default fallback
     routeDirections = [
@@ -75,9 +81,14 @@ class _ConductorFromState extends State<ConductorFrom> {
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => LoginPage(showRegisterPage: () {  },)),
-                    (Route<dynamic> route) => false,
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => ConductorHome(
+                        route: widget.route,
+                        role: widget.role,
+                        selectedIndex: 0, // go back to Home
+                      ),
+                    ),
                   );
                 },
               ),
@@ -86,7 +97,7 @@ class _ConductorFromState extends State<ConductorFrom> {
               padding: const EdgeInsets.only(top: 22.0),
               child: Text(
                 'Ticketing',
-                style: GoogleFonts.bebasNeue(
+                style: GoogleFonts.outfit(
                   fontSize: 25,
                   color: Colors.white,
                 ),

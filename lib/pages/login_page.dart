@@ -1,5 +1,6 @@
 import 'package:b_go/auth/auth_services.dart';
 import 'package:b_go/pages/conductor/conductor_from.dart';
+import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
@@ -47,8 +48,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                ConductorFrom(role: 'Conductor', route: route),
+            builder: (context) => ConductorFrom(role: 'Conductor', route: route),
           ),
         );
       } else {

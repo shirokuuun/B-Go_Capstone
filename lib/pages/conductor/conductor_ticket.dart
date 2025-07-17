@@ -6,13 +6,15 @@ import 'package:b_go/pages/conductor/conductor_from.dart';
 
 class ConductorTicket extends StatefulWidget {
   final String route;
-  final String tripDocName;
+  final String ticketDocName;
   final String placeCollection; 
+  final String date;
 
   ConductorTicket({Key? key, 
   required this.route, 
-  required this.tripDocName,
-  required this.placeCollection
+  required this.ticketDocName,
+  required this.placeCollection,
+  required this.date
  }) : super(key: key);
 
   @override
@@ -75,7 +77,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
 
   void fetchLatestTrip() async {
     final tripData =
-        await RouteService.fetchTrip(widget.route, widget.tripDocName);
+        await RouteService.fetchTrip(widget.route, widget.date, widget.ticketDocName);
     setState(() {
       latestTrip = tripData;
     });

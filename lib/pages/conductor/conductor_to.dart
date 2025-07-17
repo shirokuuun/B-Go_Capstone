@@ -6,6 +6,7 @@ import 'package:b_go/pages/conductor/conductor_ticket.dart';
 import 'package:b_go/main.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; 
 import 'dart:convert'; // Added for jsonDecode
 
 
@@ -31,6 +32,8 @@ class ConductorTo extends StatefulWidget {
 
 class _ConductorToState extends State<ConductorTo> {
   late Future<List<Map<String, dynamic>>> placesFuture;
+  
+  String get date => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
   String getRouteLabel(String placeCollection) {
     final route = widget.route.trim();
@@ -253,7 +256,7 @@ class _ConductorToState extends State<ConductorTo> {
                                   if (discountResult != null) {
                                     final List<double> discounts = List<double>.from(discountResult['discounts']);
                                     final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
-                                    final tripDocName = await RouteService.saveTrip(
+                                    final ticketDocName = await RouteService.saveTrip(
                                       route: widget.route,
                                       from: widget.from,
                                       to: to,
@@ -268,8 +271,9 @@ class _ConductorToState extends State<ConductorTo> {
                                     MaterialPageRoute(
                                     builder: (context) => ConductorTicket(
                                       route: widget.route,
-                                      tripDocName: tripDocName,
+                                      ticketDocName: ticketDocName,
                                       placeCollection: widget.placeCollection,  
+                                      date: date,
                                       ),
                                     ),
                                     );
@@ -356,9 +360,9 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
     }
   }
   final tripNumber = maxTripNumber + 1;
-  final tripDocName = "trip $tripNumber";
+  final ticketDocName = "ticket $tripNumber";
 
-  await tripsCollection.doc(tripDocName).set({
+  await tripsCollection.doc(ticketDocName).set({
     'from': data['from'],
     'to': data['to'],
     'startKm': data['fromKm'],

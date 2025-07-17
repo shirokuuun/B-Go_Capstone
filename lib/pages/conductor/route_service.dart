@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class RouteService {
 
@@ -9,7 +10,7 @@ class RouteService {
         .collection('Destinations')
         .doc(route.trim()) 
         .collection('Place')
-        .doc('${route.trim()} City Proper') // Adjusted to use the route name directly
+        .doc('${route.trim()} City Proper') 
         .get();
 
     if (doc.exists) {
@@ -66,6 +67,7 @@ class RouteService {
   required int quantity,
   required List<double> discountList,
   required List<String> fareTypes, 
+  String? date,
 }) async {
   final totalKm = endKm - startKm;
 
@@ -112,10 +114,15 @@ class RouteService {
     }
   }
 
+  final now = DateTime.now();
+  String formattedDate = date ?? DateFormat('yyyy-MM-dd').format(now);
+
   final tripsCollection = FirebaseFirestore.instance
       .collection('trips')
       .doc(route)
-      .collection('trips');
+      .collection('trips')
+      .doc(formattedDate)
+      .collection('tickets');
 
   final snapshot = await tripsCollection.get();
   int maxTripNumber = 0;
@@ -128,7 +135,7 @@ class RouteService {
     }
   }
   final tripNumber = maxTripNumber + 1;
-  final tripDocName = "trip $tripNumber";
+  final tripDocName = "ticket $tripNumber";
 
   await tripsCollection.doc(tripDocName).set({
   'from': from,
@@ -150,24 +157,29 @@ class RouteService {
 }
 
   // To update trip status
-  static Future<void> updateTripStatus(String route, String tripDocName, bool isActive) async {
+  static Future<void> updateTripStatus(String route, String date, String ticketDocName, bool isActive) async {
     final tripDoc = FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .doc(tripDocName);
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketDocName);
+
 
     await tripDoc.update({'active': isActive});
   }
 
   // To fetch trip details for the ticket
-  static Future<Map<String, dynamic>?> fetchTrip(String route, String tripDocName) async {
+  static Future<Map<String, dynamic>?> fetchTrip(String route, String date, String ticketDocName) async {
     final doc = await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .doc(tripDocName)
-        .get();
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketDocName)
+      .get();
 
     if (doc.exists) {
       final data = doc.data();

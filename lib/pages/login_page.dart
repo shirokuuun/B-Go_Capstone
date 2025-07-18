@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -33,7 +34,11 @@ class _LoginPageState extends State<LoginPage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      String email = user.email!; // e.g., Batangas_1@gmail.com
+      String? email = user.email;
+      if (email == null) {
+        // Show error or handle gracefully
+        return;
+      }
       String username = email.split('@').first; // "Batangas_1
       String conductorDocId = username[0].toUpperCase() + username.substring(1);
 
@@ -102,302 +107,306 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height * 0.38,
-            decoration: BoxDecoration(
-              color: Color(0xFFE5E9F0),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = 150;
-                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
-                // Use Center to make sure the logo always stays in the middle, even if alignment changes
-                return Transform.translate(
-                  offset: Offset(0, -20),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/batrasco-logo.png',
-                      width: logoWidth,
-                      fit: BoxFit.contain,
+    if (kIsWeb) {
+      return Placeholder(); // or a static image, or a message
+    } else {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            Container(
+              height: MediaQuery.of(context).size.height * 0.38,
+              decoration: BoxDecoration(
+                color: Color(0xFFE5E9F0),
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  double maxLogoWidth = 400.0; // Adjust this value as needed
+                  double logoWidth = 150;
+                  math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                  // Use Center to make sure the logo always stays in the middle, even if alignment changes
+                  return Transform.translate(
+                    offset: Offset(0, -20),
+                    child: Center(
+                      child: Image.asset(
+                        'assets/batrasco-logo.png',
+                        width: logoWidth,
+                        fit: BoxFit.contain,
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
 
-          // --- LOGIN BOX ---
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.24),
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: 20),
-                    // --- LOGIN BOX ---
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+            // --- LOGIN BOX ---
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: SingleChildScrollView(
+                child: Container(
+                  margin: EdgeInsets.only(
+                      top: MediaQuery.of(context).size.height * 0.24),
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 16,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(height: 20),
+                      // --- LOGIN BOX ---
+                      Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Login",
+                              style: GoogleFonts.outfit(
+                                fontSize: 45,
+                              ),
+                            ),
+                            Text(
+                              "Welcome Back!",
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                color: const Color.fromARGB(255, 0, 0, 0),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      SizedBox(height: 40),
+
+                      // Email
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Color(0xFFE5E9F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 20.0),
+                            child: TextField(
+                              controller: emailController,
+                              style: GoogleFonts.outfit(color: Colors.black),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Email",
+                                hintStyle: GoogleFonts.outfit(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Password
+                      SizedBox(height: 30),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Color(0xFFE5E9F0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 20.0),
+                            child: TextField(
+                              controller: passwordController,
+                              obscureText: true,
+                              style: GoogleFonts.outfit(color: Colors.black),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Password",
+                                hintStyle: GoogleFonts.outfit(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+
+                      // Forgot Password
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ForgotPasswordPage(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                'Forgot Password?',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Sign in button
+                      SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF1D2B53),
+                              padding: EdgeInsets.all(20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: signIn,
+                            child: Text(
+                              'Sign In',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 10),
+
+                      // --- OUTSIDE THE BOX ---
+
+                      // Or divider
+                      Row(
                         children: [
-                          Text(
-                            "Login",
-                            style: GoogleFonts.outfit(
-                              fontSize: 45,
-                            ),
+                          const Expanded(
+                              child: Divider(
+                                  thickness: 2, color: Color(0xFFE7E7E7))),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text("Or",
+                                style: GoogleFonts.outfit(
+                                    fontSize: 20,
+                                    color: Colors.grey[700],
+                                    fontWeight: FontWeight.w500)),
                           ),
-                          Text(
-                            "Welcome Back!",
-                            style: GoogleFonts.outfit(
-                              fontSize: 20,
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                            ),
-                          ),
+                          const Expanded(
+                              child: Divider(
+                                  thickness: 1.5, color: Color(0xFFE7E7E7))),
                         ],
                       ),
-                    ),
+                      SizedBox(height: 30),
 
-                    SizedBox(height: 40),
-
-                    // Email
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
-                          child: TextField(
-                            controller: emailController,
-                            style: GoogleFonts.outfit(color: Colors.black),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Email",
-                              hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Password
-                    SizedBox(height: 30),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
-                          child: TextField(
-                            controller: passwordController,
-                            obscureText: true,
-                            style: GoogleFonts.outfit(color: Colors.black),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Password",
-                              hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // Forgot Password
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                      // sign in with Google
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ForgotPasswordPage(),
-                                ),
-                              );
+                            onTap: () async {
+                              try {
+                                final userCredential =
+                                    await _authServices.SignInWithGoogle();
+                                if (userCredential == null) return;
+                              } catch (e) {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text("Google Sign-In Failed"),
+                                    content: Text(e.toString()),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                        child: Text("OK"),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
                             },
+                            child: Image.asset(
+                              'assets/google-icon.png',
+                              height: 40,
+                              width: 40,
+                            ),
+                          ),
+
+                          SizedBox(width: 5),
+
+                          // Phone Sign-In Icon
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(context,
+                                  '/phone_login'); 
+                            },
+                            child: Image.asset(
+                              'assets/phone-call.png',
+                              height: 40,
+                              width: 40,
+                            ),
+                          ), 
+                        ],
+                      ),
+
+                      SizedBox(height: 25),
+
+                      // Register section
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account? ",
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w500,),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/register');
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4), // Increase tap area
+                              minimumSize: Size(0, 0), // Remove min size if needed
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                             child: Text(
-                              'Forgot Password?',
+                              "Sign Up",
                               style: GoogleFonts.outfit(
-                                color: Colors.black,
+                                color: Color(0xFF2397f3),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-
-                    // Sign in button
-                    SizedBox(height: 20),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D2B53),
-                            padding: EdgeInsets.all(20),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: signIn,
-                          child: Text(
-                            'Sign In',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // --- OUTSIDE THE BOX ---
-
-                    // Or divider
-                    Row(
-                      children: [
-                        const Expanded(
-                            child: Divider(
-                                thickness: 2, color: Color(0xFFE7E7E7))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text("Or",
-                              style: GoogleFonts.outfit(
-                                  fontSize: 20,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500)),
-                        ),
-                        const Expanded(
-                            child: Divider(
-                                thickness: 1.5, color: Color(0xFFE7E7E7))),
-                      ],
-                    ),
-                    SizedBox(height: 30),
-
-                    // sign in with Google
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              final userCredential =
-                                  await _authServices.SignInWithGoogle();
-                              if (userCredential == null) return;
-                            } catch (e) {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text("Google Sign-In Failed"),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: Text("OK"),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }
-                          },
-                          child: Image.asset(
-                            'assets/google-icon.png',
-                            height: 40,
-                            width: 40,
-                          ),
-                        ),
-
-                        SizedBox(width: 5),
-
-                        // Phone Sign-In Icon
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(context,
-                                '/phone_login'); 
-                          },
-                          child: Image.asset(
-                            'assets/phone-call.png',
-                            height: 40,
-                            width: 40,
-                          ),
-                        ), 
-                      ],
-                    ),
-
-                    SizedBox(height: 25),
-
-                    // Register section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500,),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/register');
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4), // Increase tap area
-                            minimumSize: Size(0, 0), // Remove min size if needed
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            "Sign Up",
-                            style: GoogleFonts.outfit(
-                              color: Color(0xFF2397f3),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    }
   }
 }

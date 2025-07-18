@@ -81,7 +81,7 @@ class _LoginPageState extends State<LoginPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Login Failed"),
-          content: Text(message),
+          content: Text(e.message ?? "Unknown error"),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

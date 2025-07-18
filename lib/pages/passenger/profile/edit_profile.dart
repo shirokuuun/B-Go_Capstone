@@ -104,6 +104,10 @@ class _EditProfileState extends State<EditProfile> {
                         label: 'Phone No.',
                         icon: Icons.phone,
                         keyboardType: TextInputType.phone,
+                        prefix: Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Text('+63', style: GoogleFonts.outfit()),
+                        ),
                       ),
                       SizedBox(height: 16),
                       _ProfileTextField(
@@ -121,29 +125,53 @@ class _EditProfileState extends State<EditProfile> {
                     if (_formKey.currentState!.validate()) {
                       final user = FirebaseAuth.instance.currentUser;
                       if (user != null) {
-                        // Update Firestore
-                        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                          'name': _nameController.text,
-                          'email': _emailController.text,
-                          // Add phone if you store it in Firestore
-                          'phone': _phoneController.text,
-                        });
-
+                        String newEmail = _emailController.text.trim();
+                        String newPhone = _phoneController.text.trim();
+                        // Ensure phone starts with +63
+                        if (!newPhone.startsWith('+63')) {
+                          if (newPhone.startsWith('0')) {
+                            newPhone = '+63' + newPhone.substring(1);
+                          } else {
+                            newPhone = '+63' + newPhone;
+                          }
+                        }
                         // Update Firebase Auth profile
                         await user.updateDisplayName(_nameController.text);
-                        if (_emailController.text != user.email) {
-                          await user.verifyBeforeUpdateEmail(_emailController.text);
+                        if (newEmail != user.email) {
+                          try {
+                            await user.updateEmail(newEmail);
+                          } on FirebaseAuthException catch (e) {
+                            String message;
+                            switch (e.code) {
+                              case 'requires-recent-login':
+                                message = 'Please re-authenticate to change your email.';
+                                break;
+                              case 'invalid-email':
+                                message = 'Please enter a valid email address.';
+                                break;
+                              case 'email-already-in-use':
+                                message = 'This email is already in use.';
+                                break;
+                              default:
+                                message = 'Failed to update email. Please try again.';
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(message)),
+                            );
+                            return;
+                          }
                         }
+                        // Update Firestore (after Auth update to keep in sync)
+                        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                          'name': _nameController.text,
+                          'email': newEmail,
+                          'phone': newPhone,
+                        });
                         // Optionally update password
                         if (_passwordController.text.isNotEmpty) {
                           await user.updatePassword(_passwordController.text);
                         }
-
-                        // Optionally update photoURL if you add image picking
-
-                        // Refresh user data
                         await user.reload();
-
                         if (mounted) {
                           Navigator.pop(context); // Go back to profile page
                         }
@@ -180,6 +208,7 @@ class _ProfileTextField extends StatelessWidget {
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
+  final Widget? prefix;
 
   const _ProfileTextField({
     required this.controller,
@@ -187,6 +216,7 @@ class _ProfileTextField extends StatelessWidget {
     required this.icon,
     this.obscureText = false,
     this.keyboardType,
+    this.prefix,
   });
 
   @override
@@ -198,6 +228,7 @@ class _ProfileTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.black),
+        prefix: prefix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
         ),

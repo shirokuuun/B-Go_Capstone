@@ -1,6 +1,5 @@
 import 'package:b_go/auth/auth_services.dart';
 import 'package:b_go/pages/conductor/conductor_from.dart';
-import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:b_go/pages/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
@@ -43,6 +42,8 @@ class _LoginPageState extends State<LoginPage> {
           .doc(conductorDocId)
           .get();
 
+      if (!mounted) return; // <--- Add this before using context
+
       if (conductorDoc.exists) {
         final route = conductorDoc.data()?['route'] ?? '';
         Navigator.pushReplacement(
@@ -51,17 +52,36 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => ConductorFrom(role: 'Conductor', route: route),
           ),
         );
+        return; // <--- Add this to stop the function after navigation
       } else {
         // Not a conductor, navigate as a normal user
         Navigator.pushReplacementNamed(context, '/user_selection');
+        return; // <--- Add this to stop the function after navigation
       }
     } on FirebaseAuthException catch (e) {
-      // Show error to user
+      if (!mounted) return;
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No account found for that email.';
+          break;
+        case 'wrong-password':
+          message = 'Incorrect password. Please try again.';
+          break;
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'user-disabled':
+          message = 'This account has been disabled.';
+          break;
+        default:
+          message = 'Login failed. Please try again.';
+      }
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Login Failed"),
-          content: Text(e.message ?? "Unknown error"),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -342,7 +362,7 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
 
-                    SizedBox(height: 35),
+                    SizedBox(height: 25),
 
                     // Register section
                     Row(
@@ -350,15 +370,22 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Text(
                           "Don't have an account? ",
-                          style: GoogleFonts.outfit(fontSize: 15),
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500,),
                         ),
-                        GestureDetector(
-                          onTap: widget.showRegisterPage,
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/register');
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4), // Increase tap area
+                            minimumSize: Size(0, 0), // Remove min size if needed
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                           child: Text(
                             "Sign Up",
                             style: GoogleFonts.outfit(
                               color: Color(0xFF2397f3),
-                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),

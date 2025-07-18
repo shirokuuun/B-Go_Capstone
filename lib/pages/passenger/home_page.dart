@@ -1,4 +1,4 @@
-import 'package:b_go/pages/passenger/passenger_service.dart';
+import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -46,13 +46,14 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          "Welcome",
+          "B-Go Map",
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,
           ),
         ),
         backgroundColor: const Color(0xFF0091AD),
+        centerTitle: true, // <-- This centers the title
       ),
       drawer: Drawer(
         child: ListView(

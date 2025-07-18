@@ -2,7 +2,7 @@ import 'package:b_go/pages/get_started.dart';
 import 'package:b_go/pages/login_page.dart';
 import 'package:b_go/pages/login_phone_page.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
-import 'package:b_go/pages/passenger/passenger_service.dart';
+import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/profile/edit_profile.dart';
 import 'package:b_go/pages/passenger/profile/profile.dart';
 import 'package:b_go/pages/passenger/services/pre_ticket.dart';

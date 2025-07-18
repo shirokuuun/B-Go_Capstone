@@ -12,13 +12,12 @@ class QuantitySelection extends StatefulWidget {
 }
 
 class _QuantitySelectionState extends State<QuantitySelection> {
-
   int quantity = 1;
 
   @override
   Widget build(BuildContext context) {
-    return Center (
-     child: ClipRRect(
+    return Center(
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -32,41 +31,32 @@ class _QuantitySelectionState extends State<QuantitySelection> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: 'No. of Passengers:',
-                        style: GoogleFonts.bebasNeue(
-                          fontSize: 25,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Select Quantity',
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    color: Colors.white,
+                    decoration: TextDecoration.none,
                   ),
                 ),
+                const SizedBox(height: 16),
 
-                SizedBox(height: 16),
-
+                // Quantity Row
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
                       icon: Icon(Icons.remove, color: Colors.white),
-                      onPressed: () {
-                        if (quantity > 1) setState(() => quantity--);
-                      },
+                      onPressed: quantity > 1
+                          ? () => setState(() => quantity--)
+                          : null,
                     ),
-                    Container(
-                      width: 40,
-                      alignment: Alignment.center,
-                      child: Text(
-                        quantity.toString(),
-                        style: TextStyle(
-                          fontSize: 18, 
-                          color: Colors.white,
-                          decoration: TextDecoration.none
-                          ),
+                    Text(
+                      '$quantity',
+                      style: GoogleFonts.outfit(
+                        fontSize: 20,
+                        color: Colors.white,
+                        decoration: TextDecoration.none,
                       ),
                     ),
                     IconButton(
@@ -75,20 +65,40 @@ class _QuantitySelectionState extends State<QuantitySelection> {
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF10B981),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+
+                const SizedBox(height: 24),
+
+                // Actions Row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                    onPressed: () {
-                      widget.onConfirm(quantity);
-                      Navigator.of(context).pop();
-                    },
-                    child: Text("Confirm", style: TextStyle(color: Colors.white)),
-                  ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF10B981),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () {
+                        widget.onConfirm(quantity);
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        'Confirm',
+                        style: GoogleFonts.outfit(color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -100,23 +110,25 @@ class _QuantitySelectionState extends State<QuantitySelection> {
 }
 
 class DiscountSelection extends StatefulWidget {
-  const DiscountSelection({super.key});
+  final int quantity;
+  const DiscountSelection({super.key, required this.quantity});
 
   @override
   State<DiscountSelection> createState() => _DiscountSelectionState();
 }
 
 class _DiscountSelectionState extends State<DiscountSelection> {
-  String selectedLabel = ''; 
+  final List<String> fareTypes = ['Regular', 'Student', 'PWDs', 'Senior'];
+  late List<String> selectedLabels;
 
   @override
   void initState() {
     super.initState();
-    selectedLabel = ''; // No pre-selection
+    selectedLabels = List.generate(widget.quantity, (index) => 'Regular');
   }
 
-  double getDiscountValue() {
-    switch(selectedLabel) {
+  double getDiscountValue(String type) {
+    switch (type) {
       case "Student":
       case "Senior":
       case "PWDs":
@@ -134,67 +146,89 @@ class _DiscountSelectionState extends State<DiscountSelection> {
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            width: 350,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1D2B53).withOpacity(0.85),
-              borderRadius: BorderRadius.circular(24),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Select Discount',
-                  style: GoogleFonts.bebasNeue(fontSize: 25, color: Colors.white),
-                ),
-                SizedBox(height: 16),
-                Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Material(
+             color: Colors.transparent,
+            child: Container(
+              width: 350,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1D2B53).withOpacity(0.85),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  DiscountOption(
-                    label: "Student",
-                    value: 0.20,
-                    selected: selectedLabel == "Student",
-                    onTap: () => setState(() { selectedLabel = "Student"; }),
+                  Text(
+                    'Select Discount',
+                    style: GoogleFonts.bebasNeue(fontSize: 25, color: Colors.white),
                   ),
-                  DiscountOption(
-                    label: "Senior",
-                    value: 0.20,
-                    selected: selectedLabel == "Senior",
-                    onTap: () => setState(() { selectedLabel = "Senior"; }),
-                  ),
-                  DiscountOption(
-                    label: "PWDs",
-                    value: 0.20,
-                    selected: selectedLabel == "PWDs",
-                    onTap: () => setState(() { selectedLabel = "PWDs"; }),
-                  ),
-                  DiscountOption(
-                    label: "Regular",
-                    value: 0.0,
-                    selected: selectedLabel == "Regular",
-                    onTap: () => setState(() { selectedLabel = "Regular"; }),
-                  ),
-                ],
-                              ),
-
-                SizedBox(height: 16),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF10B981),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  const SizedBox(height: 16),
+                  for (int i = 0; i < widget.quantity; i++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6.0),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Passenger ${i + 1}:',
+                            style: GoogleFonts.outfit(fontSize: 16, color: Colors.white),
+                          ),
+                          const SizedBox(width: 10),
+                          DropdownButton<String>(
+                            dropdownColor: const Color(0xFF1D2B53),
+                            value: selectedLabels[i],
+                            iconEnabledColor: Colors.white,
+                            style: GoogleFonts.outfit(color: Colors.white),
+                            underline: Container(),
+                            items: fareTypes.map((type) => DropdownMenuItem(
+                              value: type,
+                              child: Text(type),
+                            )).toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                selectedLabels[i] = val!;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                    onPressed: () {
-                      Navigator.of(context).pop(getDiscountValue());
-                    },
-                    child: Text("Confirm", style: TextStyle(color: Colors.white)),
-                  ),
+                  const SizedBox(height: 16),
+                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(
+                          "Cancel",
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          List<double> discounts = selectedLabels.map(getDiscountValue).toList();
+                         Navigator.of(context).pop({
+                              'discounts': discounts,
+                              'fareTypes': selectedLabels,
+                            });
+                        },
+                        child: const Text("Confirm", style: TextStyle(color: Colors.white)),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -203,40 +237,4 @@ class _DiscountSelectionState extends State<DiscountSelection> {
   }
 }
 
-class DiscountOption extends StatelessWidget {
-  final String label;
-  final double value;
-  final bool selected;
-  final VoidCallback onTap;
 
-  const DiscountOption({
-    Key? key,
-    required this.label,
-    required this.value,
-    required this.selected,
-    required this.onTap,
-  }) : super(key: key);
-
-  
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: selected ? Color(0xFF10B981) : Colors.white24,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : Colors.white70,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
-}

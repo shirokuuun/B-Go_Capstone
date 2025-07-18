@@ -14,13 +14,15 @@ class ConductorTo extends StatefulWidget {
   final String role;
   final String from;
   final num startKm;
+  final String placeCollection;
   
 
   const ConductorTo({Key? key, 
   required this.route, 
   required this.role, 
   required this.from, 
-  required this.startKm
+  required this.startKm,
+  required this.placeCollection
   }) : super(key: key);
 
   @override
@@ -30,10 +32,46 @@ class ConductorTo extends StatefulWidget {
 class _ConductorToState extends State<ConductorTo> {
   late Future<List<Map<String, dynamic>>> placesFuture;
 
+  String getRouteLabel(String placeCollection) {
+    final route = widget.route.trim();
+
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
+    }
+
+    return 'Unknown Route';
+  }
+
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(widget.route);
+    placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: widget.placeCollection);
   }
 
   @override
@@ -77,26 +115,19 @@ class _ConductorToState extends State<ConductorTo> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                   FutureBuilder<String>(
-                    future: RouteService.fetchRoutePlaceName(widget.route),
-                    builder: (context, snapshot){
-                        String placeName = '';
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          placeName = '...';
-                        } else if (snapshot.hasError) {
-                          placeName = 'Error';
-                        } else if (snapshot.hasData) {
-                          placeName = snapshot.data!;
-                        }
-                        return Text(
-                          'ROUTE: $placeName',
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
+                   SizedBox(
+                    height: 40,
+                     child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        getRouteLabel(widget.placeCollection),
+                        style: GoogleFonts.bebasNeue(
+                          fontSize: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                                       ),
+                   ),
                   ],
                 ),
               ),
@@ -168,9 +199,27 @@ class _ConductorToState extends State<ConductorTo> {
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                               ),
+
                               onPressed: () async {
                                 final to = item['name'];
                                 final endKm = item['km'];
+
+                                if (widget.startKm >= endKm) {
+                                  showDialog(
+                                    context: context, 
+                                    builder: (context) => AlertDialog(
+                                      title: Text('Invalid Destination'),
+                                      content: Text('The destination must be farther than the origin.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text('OK'),
+                                        )
+                                      ],
+                                    )
+                                    );
+                                    return;
+                                }
 
                                 final result = await showGeneralDialog<Map<String, dynamic>>(
                                   context: context,
@@ -196,12 +245,14 @@ class _ConductorToState extends State<ConductorTo> {
                                 );
 
                                 if (result != null) {
-                                  final discount = await showDialog<double>(
+                                  final discountResult = await showDialog<Map<String, dynamic>>(
                                     context: context,
-                                    builder: (context) => DiscountSelection(),
+                                    builder: (context) => DiscountSelection(quantity: result['quantity']),
                                   );
 
-                                  if (discount != null) {
+                                  if (discountResult != null) {
+                                    final List<double> discounts = List<double>.from(discountResult['discounts']);
+                                    final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
                                     final tripDocName = await RouteService.saveTrip(
                                       route: widget.route,
                                       from: widget.from,
@@ -209,7 +260,8 @@ class _ConductorToState extends State<ConductorTo> {
                                       startKm: widget.startKm,
                                       endKm: endKm,
                                       quantity: result['quantity'],
-                                      discount: discount,
+                                      discountList: discounts,
+                                      fareTypes: selectedLabels,
                                     );
 
                               rootNavigatorKey.currentState?.pushReplacement(
@@ -217,7 +269,7 @@ class _ConductorToState extends State<ConductorTo> {
                                     builder: (context) => ConductorTicket(
                                       route: widget.route,
                                       tripDocName: tripDocName,
-
+                                      placeCollection: widget.placeCollection,  
                                       ),
                                     ),
                                     );

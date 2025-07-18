@@ -7,18 +7,57 @@ import 'package:b_go/pages/conductor/conductor_from.dart';
 class ConductorTicket extends StatefulWidget {
   final String route;
   final String tripDocName;
+  final String placeCollection; 
 
-  ConductorTicket({
-    Key? key,
-    required this.route,
-    required this.tripDocName,
-  }) : super(key: key);
+  ConductorTicket({Key? key, 
+  required this.route, 
+  required this.tripDocName,
+  required this.placeCollection
+ }) : super(key: key);
 
   @override
   State<ConductorTicket> createState() => _ConductorTicketState();
 }
 
 class _ConductorTicketState extends State<ConductorTicket> {
+
+   String getRouteLabel(String placeCollection) {
+  final route = widget.route.trim();
+
+  if (route == 'Rosario') {
+    switch (placeCollection) {
+      case 'Place':
+        return 'SM City Lipa - Rosario';
+      case 'Place 2':
+        return 'Rosario - SM City Lipa';
+    }
+  } else if (route == 'Batangas') {
+    switch (placeCollection) {
+      case 'Place':
+        return 'SM City Lipa - Batangas City';
+      case 'Place 2':
+        return 'Batangas City - SM City Lipa';
+    }
+  } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
+    }
+
+  return 'Unknown Route';
+}
+
+
   String from = '';
   String to = '';
   num startKm = 0;
@@ -44,6 +83,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
 
   @override
   Widget build(BuildContext context) {
+    final List<dynamic>? discountBreakdown = latestTrip?['discountBreakdown'];
     final timestamp = latestTrip?['timestamp'];
     final formattedDate = timestamp != null
         ? '${timestamp.toDate().toLocal().toString().split(' ')[0]}'
@@ -64,7 +104,17 @@ class _ConductorTicketState extends State<ConductorTicket> {
               padding: const EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+               onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ConductorFrom(
+                      route: widget.route,
+                      role: 'conductor',
+                    ),
+                  ),
+                );
+              },
               ),
             ),
             title: Padding(
@@ -125,27 +175,19 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                    FutureBuilder<String>(
-                      future: RouteService.fetchRoutePlaceName(widget.route),
-                      builder: (context, snapshot) {
-                        String placeName = '';
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          placeName = '...';
-                        } else if (snapshot.hasError) {
-                          placeName = 'Error';
-                        } else if (snapshot.hasData) {
-                          placeName = snapshot.data!;
-                        }
-                        return Text(
-                          'ROUTE: $placeName',
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
+                    SizedBox(
+                    height: 40,
+                     child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        getRouteLabel(widget.placeCollection),
+                        style: GoogleFonts.bebasNeue(
+                          fontSize: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                                       ),
+                   ),
                   ],
                 ),
               ),
@@ -203,7 +245,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 30),
+                   
                     Center(
                       child: latestTrip == null
                           ? Text(
@@ -216,10 +258,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
                           : Padding(
                               padding: const EdgeInsets.only(top: 20.0),
                               child: ElevatedTicketWidget(
-                                height: 400,
-                                width: 270,
+                                width: MediaQuery.of(context).size.width * 0.9,
                                 elevation: 2,
                                 backgroundColor: Colors.white,
+                                height: MediaQuery.of(context).size.height * 0.6,
                                 child: Padding(
                                   padding: const EdgeInsets.all(20.0),
                                   child: SingleChildScrollView(
@@ -245,7 +287,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                                               child: Center(
                                                 child: Text(
                                                   'Ticket:',
-                                                  style: GoogleFonts.bebasNeue(
+                                                  style: GoogleFonts.outfit(
                                                     fontSize: 15,
                                                     color: Color(0xFF10B981),
                                                   ),
@@ -257,8 +299,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
                                         SizedBox(height: 2),
                                         Text(
                                           'BATRASCO',
-                                          style: GoogleFonts.bebasNeue(
-                                            fontSize: 28,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 25,
                                             color: Colors.black,
                                           ),
                                         ),
@@ -267,6 +309,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.center,
                                             children: [
+                                              
                                               const SizedBox(height: 20),
                                               Text.rich(
                                                 TextSpan(
@@ -278,43 +321,84 @@ class _ConductorTicketState extends State<ConductorTicket> {
                                                   children: [
                                                     TextSpan(
                                                       text:
-                                                          'Route: ${widget.route}',
+                                                          'Route: ${getRouteLabel(widget.placeCollection)}\n',
                                                       style:
-                                                          GoogleFonts.bebasNeue(
-                                                        fontSize: 22,
+                                                          GoogleFonts.outfit(
+                                                        fontSize: 18,
                                                       ),
                                                     ),
                                                     TextSpan(
                                                         text:
-                                                            'Date: $formattedDate\n'),
+                                                            'Date: $formattedDate\n',
+                                                            style:
+                                                              GoogleFonts.outfit(
+                                                            fontSize: 18,
+                                                          ),
+                                                            ),
                                                     TextSpan(
                                                         text:
-                                                            'Time: $formattedTime\n'),
+                                                            'Time: $formattedTime\n',
+                                                            style:
+                                                              GoogleFonts.outfit(
+                                                            fontSize: 18,
+                                                          ),),
                                                     TextSpan(
                                                         text:
-                                                            'From: ${latestTrip!['from']}\n'),
+                                                            'From: ${latestTrip!['from']}\n',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                          fontSize: 18,
+                                                        ),),
                                                     TextSpan(
                                                         text:
-                                                            'To: ${latestTrip!['to']}\n'),
+                                                            'To: ${latestTrip!['to']}\n',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                          fontSize: 18,
+                                                        ),),
                                                     TextSpan(
                                                         text:
-                                                            'Regular: ${latestTrip!['farePerPassenger']}\n'),
+                                                            'Regular: ${latestTrip!['farePerPassenger']}\n',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                          fontSize: 18,
+                                                        ),),
                                                     TextSpan(
                                                         text:
-                                                            'Discount: ${double.tryParse(latestTrip!['discountAmount'].toString())?.toStringAsFixed(2) ?? '0.00'}\n'),
+                                                            'Discount: ${double.tryParse(latestTrip!['discountAmount'].toString())?.toStringAsFixed(2) ?? '0.00'}\n',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                          fontSize: 18,
+                                                        ),),
                                                     TextSpan(
                                                         text:
-                                                            'Quantity: ${latestTrip!['quantity']}\n'),
+                                                            'Quantity: ${latestTrip!['quantity']}\n',
+                                                        style:
+                                                            GoogleFonts.outfit(
+                                                          fontSize: 18,
+                                                        ),),
                                                     TextSpan(
                                                       text:
                                                           'Amount: ${latestTrip!['totalFare']}\n',
                                                       style:
-                                                          GoogleFonts.bebasNeue(
+                                                          GoogleFonts.outfit(
                                                         fontSize:
-                                                            24, // 👈 Increase size here
+                                                            24,
                                                         color: Colors.black,
                                                       ),
                                                     ),
+                              
+                                                     if (discountBreakdown != null) ...[
+                                                      TextSpan(
+                                                        text: '\nDiscount Breakdown:\n',
+                                                        style: GoogleFonts.outfit(fontSize: 20, color: Colors.black),
+                                                      ),
+                                                      for (var line in discountBreakdown)
+                                                        TextSpan(
+                                                          text: '$line\n',
+                                                          style: GoogleFonts.outfit(fontSize: 16, color: Colors.black87),
+                                                        ),
+                                                    ],
                                                   ],
                                                 ),
                                                 textAlign: TextAlign.start,

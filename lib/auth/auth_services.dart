@@ -61,8 +61,28 @@ class AuthServices {
     required String password,
     required String confirmPassword,
   }) async {
+    if (name.trim().isEmpty) {
+      return "Please enter your full name.";
+    }
+    if (email.trim().isEmpty) {
+      return "Please enter your email address.";
+    }
+    if (password.trim().isEmpty) {
+      return "Please enter a password.";
+    }
+    if (confirmPassword.trim().isEmpty) {
+      return "Please confirm your password.";
+    }
     if (password.trim() != confirmPassword.trim()) {
       return "Passwords do not match.";
+    }
+    // Basic email format check
+    final emailRegex = RegExp(r"^[^@\s]+@[^@\s]+\.[^@\s]+");
+    if (!emailRegex.hasMatch(email.trim())) {
+      return "Please enter a valid email address.";
+    }
+    if (password.length < 6) {
+      return "Password must be at least 6 characters long.";
     }
     try {
       UserCredential userCredential =
@@ -79,9 +99,23 @@ class AuthServices {
       }
       return null; // success
     } on FirebaseAuthException catch (e) {
-      return e.message ?? "An error occurred.";
+      String message;
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = 'This email is already in use.';
+          break;
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'weak-password':
+          message = 'Password is too weak.';
+          break;
+        default:
+          message = 'Registration failed. Please try again.';
+      }
+      return message;
     } catch (e) {
-      return "An error occurred.";
+      return "An error occurred. Please try again.";
     }
   }
 

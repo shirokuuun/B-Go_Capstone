@@ -116,11 +116,11 @@ class _RegisterPageState extends State<RegisterPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth =
-                    math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                double logoWidth = 150;
+                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
-                  offset: Offset(0, -50),
+                  offset: Offset(0, -20),
                   child: Center(
                     child: Image.asset(
                       'assets/batrasco-logo.png',
@@ -162,16 +162,16 @@ class _RegisterPageState extends State<RegisterPage> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            "HELLO!",
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 55,
+                            "Hello!",
+                            style: GoogleFonts.outfit(
+                              fontSize: 45,
                             ),
                           ),
                           Text(
                             "Register Here!",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.normal,
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
                           ),
@@ -190,7 +190,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: nameController,
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
@@ -213,7 +213,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: emailController,
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
@@ -237,7 +237,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           child: TextField(
                             controller: passwordController,
                             obscureText: true,
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
@@ -261,7 +261,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           child: TextField(
                             controller: confirmPasswordController,
                             obscureText: true,
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
@@ -287,7 +287,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           Flexible(
                             child: RichText(
                               text: TextSpan(
-                                style: TextStyle(color: Colors.black),
+                                style: GoogleFonts.outfit(color: Colors.black),
                                 children: [
                                   TextSpan(
                                     text: 'I agree to the ',
@@ -306,7 +306,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                       },
                                       child: Text(
                                         'Terms and Conditions',
-                                        style: TextStyle(
+                                        style: GoogleFonts.outfit(
                                           color: Colors.blue,
                                           decoration: TextDecoration.underline,
                                         ),
@@ -320,7 +320,33 @@ class _RegisterPageState extends State<RegisterPage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+
+                    SizedBox(height: 10),
+
+                    // Add phone registration button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 27.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.pushNamed(context, '/phone_register');
+                            },
+                            child: Text(
+                              'Use Phone Number',
+                              style: GoogleFonts.outfit(
+                                color: Color(0xFF1D2B53),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    SizedBox(height: 10),
+
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: ElevatedButton(
@@ -338,10 +364,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             : null,
                         child: Text(
                           'Sign Up',
-                          style: TextStyle(
+                          style: GoogleFonts.outfit(
                             color: Colors.white,
                             fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -352,22 +378,23 @@ class _RegisterPageState extends State<RegisterPage> {
                       children: [
                         Text(
                           'Already have an account?',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         GestureDetector(
                           onTap: widget.showLoginPage,
                           child: Text(
                             ' Login',
-                            style: TextStyle(
+                            style: GoogleFonts.outfit(
                               color: Colors.blue,
-                              fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         )
                       ],
                     ),
+                    SizedBox(height: 7),
                   ],
                 ),
               ),

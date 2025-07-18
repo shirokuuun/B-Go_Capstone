@@ -1,9 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:b_go/pages/conductor/quantity_selection.dart';
+import 'package:b_go/pages/conductor/conductor_ticket.dart';
+import 'package:b_go/main.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert'; // Added for jsonDecode
+
 
 class ConductorTo extends StatefulWidget {
-  const ConductorTo ({Key? key}) : super(key: key);
+  final String route;
+  final String role;
+  final String from;
+  final num startKm;
+  final String placeCollection;
+  
+
+  const ConductorTo({Key? key, 
+  required this.route, 
+  required this.role, 
+  required this.from, 
+  required this.startKm,
+  required this.placeCollection
+  }) : super(key: key);
 
   @override
   State<ConductorTo> createState() => _ConductorToState();
@@ -12,10 +32,46 @@ class ConductorTo extends StatefulWidget {
 class _ConductorToState extends State<ConductorTo> {
   late Future<List<Map<String, dynamic>>> placesFuture;
 
+  String getRouteLabel(String placeCollection) {
+    final route = widget.route.trim();
+
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
+    }
+
+    return 'Unknown Route';
+  }
+
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces();
+    placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: widget.placeCollection);
   }
 
   @override
@@ -46,42 +102,7 @@ class _ConductorToState extends State<ConductorTo> {
                 ),
               ),
             ),
-           actions: [
-            Padding(
-              padding: const EdgeInsets.only(top: 15.0, right: 8.0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      // SOS action
-                    },
-                    child: SizedBox(
-                      width: 40,
-                      height: 40,
-                      child: Image.asset(
-                        'assets/sos-button.png',
-                        fit: BoxFit.contain, // Ensures the image scales as needed
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 20),
-                  GestureDetector(
-                    onTap: () {
-                      // Camera action
-                    },
-                    child: SizedBox(
-                      width: 40,
-                      height: 30,
-                      child: Image.asset(
-                        'assets/photo-camera.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+           actions: [],
           ),
 
           SliverAppBar(
@@ -94,26 +115,19 @@ class _ConductorToState extends State<ConductorTo> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                   FutureBuilder<String>(
-                    future: RouteService.fetchRoutePlaceName(),
-                    builder: (context, snapshot){
-                        String placeName = '';
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          placeName = '...';
-                        } else if (snapshot.hasError) {
-                          placeName = 'Error';
-                        } else if (snapshot.hasData) {
-                          placeName = snapshot.data!;
-                        }
-                        return Text(
-                          'ROUTE: $placeName',
-                          style: GoogleFonts.bebasNeue(
-                            fontSize: 25,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
+                   SizedBox(
+                    height: 40,
+                     child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        getRouteLabel(widget.placeCollection),
+                        style: GoogleFonts.bebasNeue(
+                          fontSize: 30,
+                          color: Colors.white,
+                        ),
+                      ),
+                                       ),
+                   ),
                   ],
                 ),
               ),
@@ -144,7 +158,7 @@ class _ConductorToState extends State<ConductorTo> {
                     Padding(
                       padding: const EdgeInsets.only(left: 10),
                       child: Text(
-                        "From:",
+                        "To:",
                         style: GoogleFonts.bebasNeue(
                           fontSize: 25,
                           color: Colors.black87,
@@ -185,15 +199,88 @@ class _ConductorToState extends State<ConductorTo> {
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                               ),
-                              onPressed: () {
-                                /*Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ConductorTo(),
-                                  ),
-                                );*/
+
+                              onPressed: () async {
+                                final to = item['name'];
+                                final endKm = item['km'];
+
+                                if (widget.startKm >= endKm) {
+                                  showDialog(
+                                    context: context, 
+                                    builder: (context) => AlertDialog(
+                                      title: Text('Invalid Destination'),
+                                      content: Text('The destination must be farther than the origin.'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: Text('OK'),
+                                        )
+                                      ],
+                                    )
+                                    );
+                                    return;
+                                }
+
+                                final result = await showGeneralDialog<Map<String, dynamic>>(
+                                  context: context,
+                                  barrierDismissible: true,
+                                  barrierLabel: "Quantity",
+                                  barrierColor: Colors.black.withOpacity(0.3), 
+                                  transitionDuration: Duration(milliseconds: 200),
+                                  pageBuilder: (context, anim1, anim2) {
+                                    return QuantitySelection(
+                                      onConfirm: (quantity) {
+                                        Navigator.of(context).pop({
+                                          'quantity': quantity,
+                                        });
+                                      },
+                                    );
+                                  },
+                                  transitionBuilder: (context, anim1, anim2, child) {
+                                    return FadeTransition(
+                                      opacity: anim1,
+                                      child: child,
+                                    );
+                                  },
+                                );
+
+                                if (result != null) {
+                                  final discountResult = await showDialog<Map<String, dynamic>>(
+                                    context: context,
+                                    builder: (context) => DiscountSelection(quantity: result['quantity']),
+                                  );
+
+                                  if (discountResult != null) {
+                                    final List<double> discounts = List<double>.from(discountResult['discounts']);
+                                    final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
+                                    final tripDocName = await RouteService.saveTrip(
+                                      route: widget.route,
+                                      from: widget.from,
+                                      to: to,
+                                      startKm: widget.startKm,
+                                      endKm: endKm,
+                                      quantity: result['quantity'],
+                                      discountList: discounts,
+                                      fareTypes: selectedLabels,
+                                    );
+
+                              rootNavigatorKey.currentState?.pushReplacement(
+                                    MaterialPageRoute(
+                                    builder: (context) => ConductorTicket(
+                                      route: widget.route,
+                                      tripDocName: tripDocName,
+                                      placeCollection: widget.placeCollection,  
+                                      ),
+                                    ),
+                                    );
+                                  } else {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Discount not selected')),
+                                    );          
+                                  }
+                                }
                               },
-                               child: Column(
+                              child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
@@ -222,4 +309,68 @@ class _ConductorToState extends State<ConductorTo> {
       ),
     );
   }
+}
+
+class QRScanPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: MobileScanner(
+        onDetect: (capture) async {
+          final barcode = capture.barcodes.first;
+          final qrData = barcode.rawValue;
+          if (qrData != null) {
+            try {
+              final data = parseQRData(qrData);
+              await storePreTicketToFirestore(data);
+              Navigator.of(context).pop(true);
+            } catch (e) {
+              Navigator.of(context).pop(false);
+            }
+          }
+        },
+      ),
+    );
+  }
+}
+
+Map<String, dynamic> parseQRData(String qrData) {
+  return Map<String, dynamic>.from(jsonDecode(qrData));
+}
+
+Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
+  final route = data['route'];
+  final tripsCollection = FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips');
+
+  final snapshot = await tripsCollection.get();
+  int maxTripNumber = 0;
+  for (var doc in snapshot.docs) {
+    final tripName = doc.id;
+    final parts = tripName.split(' ');
+    if (parts.length == 2 && int.tryParse(parts[1]) != null) {
+      final num = int.parse(parts[1]);
+      if (num > maxTripNumber) maxTripNumber = num;
+    }
+  }
+  final tripNumber = maxTripNumber + 1;
+  final tripDocName = "trip $tripNumber";
+
+  await tripsCollection.doc(tripDocName).set({
+    'from': data['from'],
+    'to': data['to'],
+    'startKm': data['fromKm'],
+    'endKm': data['toKm'],
+    'totalKm': (data['toKm'] as num) - (data['fromKm'] as num),
+    'timestamp': FieldValue.serverTimestamp(),
+    'active': true,
+    'quantity': data['quantity'],
+    'discountAmount': '',
+    'farePerPassenger': data['fare'],
+    'totalFare': data['amount'],
+    'fareTypes': data['fareTypes'],
+    'discountBreakdown': data['discountBreakdown'],
+  });
 }

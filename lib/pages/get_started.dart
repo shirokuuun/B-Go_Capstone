@@ -181,22 +181,21 @@ class _GetStartedPageState extends State<GetStartedPage> {
               child: Column(
                 children: [
                   Text(
-                    'b_go',
-                    style: TextStyle(
-                      fontSize: 70,
-                      fontWeight: FontWeight.bold,
+                    'B-Go',
+                    style: GoogleFonts.outfit(
+                      fontSize: 60,
+                      fontWeight: FontWeight.w500,
                       height: 1.5,
-                      fontFamily: GoogleFonts.bebasNeue().fontFamily,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 5),
                   Text(
                     'Travel with Confidence',
-                    style: TextStyle(
-                      fontSize: 25,
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
                       color: Colors.grey,
-                      fontFamily: GoogleFonts.bebasNeue().fontFamily,
+                      fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -225,10 +224,10 @@ class _GetStartedPageState extends State<GetStartedPage> {
                 ),
                 child: Text(
                   'Get Started',
-                  style: TextStyle(
-                    fontSize: 22,
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
                     color: Colors.white,
-                    fontFamily: GoogleFonts.bebasNeue().fontFamily,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),

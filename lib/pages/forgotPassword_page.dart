@@ -23,7 +23,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: emailController.text.trim(),
       );
-      // If no error, show this dialog:
       showDialog(
         context: context,
         builder: (context) {
@@ -34,12 +33,35 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         },
       );
     } on FirebaseAuthException catch (e) {
-      // If error, show this dialog:
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No account found for that email.';
+          break;
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'missing-email':
+          message = 'Please enter your email address.';
+          break;
+        default:
+          message = 'Something went wrong. Please try again later.';
+      }
       showDialog(
         context: context,
         builder: (context) {
           return AlertDialog(
-            content: Text(e.message.toString()),
+            content: Text(message),
+          );
+        },
+      );
+    } catch (e) {
+      // For any other errors
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            content: Text('Something went wrong. Please try again later.'),
           );
         },
       );
@@ -52,12 +74,9 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
     return Scaffold(
         appBar: AppBar(
-          title: Padding(
-            padding: const EdgeInsets.only(top: 8.0),
-            child: Text(
-              'Forgot Password',
-              style: GoogleFonts.bebasNeue(fontSize: 25, color: Colors.white),
-            ),
+          title: Text(
+            'Forgot Password',
+            style: GoogleFonts.outfit(fontSize: 18, color: Colors.white),
           ),
           backgroundColor: Color(0xFF1D2B53),
           elevation: 0,
@@ -117,15 +136,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           children: [
                             Text(
                               'Enter your email to reset your password',
-                              style: GoogleFonts.bebasNeue(
+                              style: GoogleFonts.outfit(
                                 fontSize: 24,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             SizedBox(height: 10),
                             Center(
                               child: Text(
                                 'Make sure to enter the email you used to register',
-                                style: GoogleFonts.bebasNeue(
+                                style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   color: Colors.grey.shade600,
                                 ),
@@ -135,7 +155,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                       ),
 
-                      SizedBox(height: 50),
+                      SizedBox(height: 35),
 
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -152,13 +172,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Email",
+                                hintStyle: GoogleFonts.outfit(
+                                  color: Colors.grey.shade600,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
 
-                      SizedBox(height: 300),
+                      SizedBox(height: responsive.height * 0.10),
 
                       Center(
                         child: MaterialButton(
@@ -171,8 +194,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           ),
                           child: Text(
                             'Reset Password',
-                            style: GoogleFonts.bebasNeue(
-                              fontSize: 25,
+                            style: GoogleFonts.outfit(
+                              fontSize: 21,
                               color: Colors.white,
                             ),
                           ),

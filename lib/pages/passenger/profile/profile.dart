@@ -20,7 +20,15 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect to login or user selection
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+    } else {
+      _fetchUserData();
+    }
   }
 
   Future<void> _fetchUserData() async {
@@ -45,6 +53,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect
+      Future.microtask(() {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+      return SizedBox.shrink(); // Or a loading indicator
+    }
     return Scaffold(
       backgroundColor: Color(0xFFF6F6F6),
       appBar: AppBar(

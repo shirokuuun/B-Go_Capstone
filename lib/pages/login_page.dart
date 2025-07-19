@@ -31,26 +31,21 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.emailVerified) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final firestoreEmail = doc.data()?['email'];
+        if (firestoreEmail != user.email) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'email': user.email,
+          });
+        }
+      }
+
       if (user == null) return;
 
-      // Check if email is verified (should be redundant, but double check)
-      if (!user.emailVerified) {
-        await FirebaseAuth.instance.signOut();
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text("Email Not Verified"),
-            content: Text("Please verify your email address using the link sent to your inbox before logging in."),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text("OK"),
-              )
-            ],
-          ),
-        );
-        return;
-      }
+      // Only clear fields after successful login
+      emailController.clear();
+      passwordController.clear();
 
       String email = user.email!; // e.g., Batangas_1@gmail.com
       String username = email.split('@').first; // "Batangas_1
@@ -71,11 +66,17 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => ConductorFrom(role: 'Conductor', route: route),
           ),
         );
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       } else {
         // Not a conductor, navigate as a normal user
         Navigator.pushReplacementNamed(context, '/user_selection');
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -112,6 +113,7 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       );
+      // Do NOT clear fields on failed login
     }
   }
 

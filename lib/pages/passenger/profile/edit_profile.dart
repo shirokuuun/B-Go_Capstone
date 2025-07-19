@@ -153,31 +153,70 @@ class _EditProfileState extends State<EditProfile> {
                           // Update Firebase Auth profile first
                           await user.updateDisplayName(_nameController.text);
 
-                          // If email changed, update and send verification, then log out
+                          // If email changed, use verifyBeforeUpdateEmail for secure update
                           if (newEmail != user.email) {
-                            await user.updateEmail(newEmail);
-                            await user.sendEmailVerification();
-                            // Close loading dialog
-                            Navigator.of(context).pop();
-                            await showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text('Verify your email'),
-                                content: Text('A verification link has been sent to $newEmail. Please verify your new email address, then log in again.'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.of(context).pop(),
-                                    child: Text('OK'),
+                            try {
+                              // Require re-authentication
+                              // (You may want to prompt for password or use a re-auth flow here)
+                              // Example for email/password:
+                              // final cred = EmailAuthProvider.credential(email: user.email!, password: passwordController.text);
+                              // await user.reauthenticateWithCredential(cred);
+
+                              await user.verifyBeforeUpdateEmail(newEmail);
+                              // Close loading dialog
+                              Navigator.of(context).pop();
+                              await showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('Verify your new email'),
+                                  content: Text('A verification link has been sent to $newEmail.\n\nTo complete the change, please:\n1. Open your new email inbox.\n2. Click the verification link.\n3. Log in again with your new email to see your updated profile.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              // Log out the user
+                              await FirebaseAuth.instance.signOut();
+                              if (mounted) {
+                                Navigator.of(context).popUntil((route) => route.isFirst);
+                              }
+                              return;
+                            } on FirebaseAuthException catch (e) {
+                              Navigator.of(context).pop();
+                              print('FirebaseAuthException: ${e.code} - ${e.message}');
+                              if (e.code == 'requires-recent-login') {
+                                await showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Re-authentication Required'),
+                                    content: Text('For security reasons, please log in again to change your email.'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: Text('OK'),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            );
-                            // Log out the user
-                            await FirebaseAuth.instance.signOut();
-                            if (mounted) {
-                              Navigator.of(context).popUntil((route) => route.isFirst);
+                                );
+                                await FirebaseAuth.instance.signOut();
+                                if (mounted) {
+                                  Navigator.of(context).popUntil((route) => route.isFirst);
+                                }
+                                return;
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to update email: ${e.message}'),
+                                    backgroundColor: Colors.red,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                                return;
+                              }
                             }
-                            return;
                           }
 
                           // Update Firestore with all user data

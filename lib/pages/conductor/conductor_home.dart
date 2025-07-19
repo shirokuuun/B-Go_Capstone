@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/pages/conductor/trip_page.dart';
-import 'package:b_go/pages/conductor/conductor_from.dart';
+import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
+import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
+import 'package:b_go/pages/conductor/route_service.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
   String role;
+  String placeCollection;
   final int selectedIndex;
 
-  ConductorHome({Key? key, required this.route, required this.role, this.selectedIndex = 0}) : super(key: key);
+  ConductorHome({Key? key, required this.route, required this.role, this.selectedIndex = 0, required this.placeCollection}) : super(key: key);
 
   @override
   _ConductorHomeState createState() => _ConductorHomeState();
@@ -30,7 +32,11 @@ class _ConductorHomeState extends State<ConductorHome> {
       role: widget.role,
     ),
     Container(),
-    TripsPage(),
+    TripsPage(
+      route: widget.route,
+      role: widget.role,
+      placeCollection: widget.placeCollection,
+    ),
   ];
   }
 
@@ -56,11 +62,6 @@ class _ConductorHomeState extends State<ConductorHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Conductor Home'),
-        backgroundColor: const Color(0xFF1D2B53),
-        foregroundColor: Colors.white,
-      ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[

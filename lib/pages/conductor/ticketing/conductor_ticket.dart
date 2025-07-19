@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:elevated_ticket_widget/elevated_ticket_widget.dart';
-import 'package:b_go/pages/conductor/conductor_from.dart';
+import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 
 class ConductorTicket extends StatefulWidget {
   final String route;
@@ -123,7 +123,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
               padding: const EdgeInsets.only(top: 22.0),
               child: Text(
                 'Ticketing',
-                style: GoogleFonts.bebasNeue(
+                style: GoogleFonts.outfit(
                   fontSize: 25,
                   color: Colors.white,
                 ),
@@ -183,12 +183,12 @@ class _ConductorTicketState extends State<ConductorTicket> {
                       alignment: Alignment.center,
                       child: Text(
                         getRouteLabel(widget.placeCollection),
-                        style: GoogleFonts.bebasNeue(
-                          fontSize: 30,
+                        style: GoogleFonts.outfit(
+                          fontSize: 24,
                           color: Colors.white,
                         ),
                       ),
-                                       ),
+                     ),
                    ),
                   ],
                 ),
@@ -232,7 +232,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         icon: Icon(Icons.add, color: Colors.white),
                         label: Text(
                           'New Ticket',
-                          style: GoogleFonts.bebasNeue(
+                          style: GoogleFonts.outfit(
                             fontSize: 20,
                             color: Colors.white,
                           ),

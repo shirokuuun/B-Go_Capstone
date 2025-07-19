@@ -1,82 +1,69 @@
+import 'package:b_go/pages/conductor/ticketing/conductor_to.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
-import 'package:b_go/pages/conductor/quantity_selection.dart';
-import 'package:b_go/pages/conductor/conductor_ticket.dart';
-import 'package:b_go/main.dart';
+import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; 
-import 'dart:convert'; // Added for jsonDecode
+import 'dart:convert'; 
+import 'package:permission_handler/permission_handler.dart';
 
-
-class ConductorTo extends StatefulWidget {
+class ConductorFrom extends StatefulWidget {
   final String route;
   final String role;
-  final String from;
-  final num startKm;
-  final String placeCollection;
-  
 
-  const ConductorTo({Key? key, 
-  required this.route, 
-  required this.role, 
-  required this.from, 
-  required this.startKm,
-  required this.placeCollection
+  const ConductorFrom({Key? key, 
+  required this.role, required this.route,
+
   }) : super(key: key);
 
   @override
-  State<ConductorTo> createState() => _ConductorToState();
+  State<ConductorFrom> createState() => _ConductorFromState();
 }
 
-class _ConductorToState extends State<ConductorTo> {
+class _ConductorFromState extends State<ConductorFrom> {
   late Future<List<Map<String, dynamic>>> placesFuture;
-  
-  String get date => DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-  String getRouteLabel(String placeCollection) {
-    final route = widget.route.trim();
+  String selectedPlaceCollection = 'Place'; 
 
-    if (route == 'Rosario') {
-      switch (placeCollection) {
-        case 'Place':
-          return 'SM City Lipa - Rosario';
-        case 'Place 2':
-          return 'Rosario - SM City Lipa';
-      }
-    } else if (route == 'Batangas') {
-      switch (placeCollection) {
-        case 'Place':
-          return 'SM City Lipa - Batangas City';
-        case 'Place 2':
-          return 'Batangas City - SM City Lipa';
-      }
-    } else if (route == 'Mataas na Kahoy') {
-      switch (placeCollection) {
-        case 'Place':
-          return 'SM City Lipa - Mataas na Kahoy';
-        case 'Place 2':
-          return 'Mataas na Kahoy - SM City Lipa';
-      }
-    } else if (route == 'Tiaong') {
-      switch (placeCollection) {
-        case 'Place':
-          return 'SM City Lipa - Tiaong';
-        case 'Place 2':
-          return 'Tiaong - SM City Lipa';
-      }
-    }
-
-    return 'Unknown Route';
-  }
+  late List<Map<String, String>> routeDirections;
 
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: widget.placeCollection);
+    
+    if ('${widget.route.trim()}' == 'Rosario') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Rosario', 'collection': 'Place'},
+      {'label': 'Rosario - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  } else if ('${widget.route.trim()}' == 'Batangas') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
+      {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  }  else if ('${widget.route.trim()}' == 'Mataas na Kahoy') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
+      {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  } else if ('${widget.route.trim()}' == 'Tiaong') {
+    routeDirections = [
+      {'label': 'SM City Lipa - Tiaong', 'collection': 'Place'},
+      {'label': 'Tiaong - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  }  else {
+    // Default fallback
+    routeDirections = [
+      {'label': 'SM City Lipa - Unknown', 'collection': 'Place'},
+      {'label': 'Unknown - SM City Lipa', 'collection': 'Place 2'},
+    ];
   }
 
+  placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
+  }
+
+  
   @override
   Widget build(BuildContext context) {
     
@@ -92,20 +79,78 @@ class _ConductorToState extends State<ConductorTo> {
               padding: const EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => ConductorHome(
+                        route: widget.route,
+                        role: widget.role,
+                        placeCollection: selectedPlaceCollection,
+                        selectedIndex: 0, // go back to Home
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
             title: Padding(
               padding: const EdgeInsets.only(top: 22.0),
               child: Text(
                 'Ticketing',
-                style: GoogleFonts.bebasNeue(
+                style: GoogleFonts.outfit(
                   fontSize: 25,
                   color: Colors.white,
                 ),
               ),
             ),
-           actions: [],
+           actions: [
+            Padding(
+              padding: const EdgeInsets.only(top: 15.0, right: 8.0),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      // SOS action
+                    },
+                    child: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Image.asset(
+                        'assets/sos-button.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 20),
+                  GestureDetector(
+                    onTap: () async {
+                      // Camera action
+                      if (await Permission.camera.request().isGranted) {
+                        final result = await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => QRScanPage()),
+                        );
+                        if (result == true) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Pre-ticket stored successfully!')));
+                        } else if (result == false) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to store pre-ticket.')));
+                        }
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Camera permission is required to scan QR codes.')));
+                      }
+                    },
+                    child: SizedBox(
+                      width: 40,
+                      height: 30,
+                      child: Image.asset(
+                        'assets/photo-camera.png',
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           ),
 
           SliverAppBar(
@@ -118,19 +163,36 @@ class _ConductorToState extends State<ConductorTo> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
-                   SizedBox(
-                    height: 40,
-                     child: Align(
-                      alignment: Alignment.center,
-                      child: Text(
-                        getRouteLabel(widget.placeCollection),
-                        style: GoogleFonts.bebasNeue(
-                          fontSize: 30,
-                          color: Colors.white,
-                        ),
+                    SizedBox(
+                      height: 40,
+                      child: DropdownButton<String>(
+                        value: selectedPlaceCollection,
+                        dropdownColor: const Color(0xFF1D2B53),
+                        iconEnabledColor: Colors.white,
+                        items: routeDirections.map((route) {
+                          return DropdownMenuItem<String>(
+                            value: route['collection'],
+                            child: Text(
+                              route['label']!,
+                              style: GoogleFonts.outfit(
+                                fontSize: 24,
+                                color: Colors.white,
+                                
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (String? newValue) {
+                          if (newValue != null) {
+                            setState(() {
+                              selectedPlaceCollection = newValue;
+                              placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
+                            });
+                          }
+                        },
                       ),
-                                       ),
-                   ),
+                    ),
+
                   ],
                 ),
               ),
@@ -161,8 +223,8 @@ class _ConductorToState extends State<ConductorTo> {
                     Padding(
                       padding: const EdgeInsets.only(left: 10),
                       child: Text(
-                        "To:",
-                        style: GoogleFonts.bebasNeue(
+                        "From:",
+                        style: GoogleFonts.outfit(
                           fontSize: 25,
                           color: Colors.black87,
                         ),
@@ -202,100 +264,32 @@ class _ConductorToState extends State<ConductorTo> {
                                 ),
                                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                               ),
-
-                              onPressed: () async {
-                                final to = item['name'];
-                                final endKm = item['km'];
-
-                                if (widget.startKm >= endKm) {
-                                  showDialog(
-                                    context: context, 
-                                    builder: (context) => AlertDialog(
-                                      title: Text('Invalid Destination'),
-                                      content: Text('The destination must be farther than the origin.'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: Text('OK'),
-                                        )
-                                      ],
-                                    )
-                                    );
-                                    return;
-                                }
-
-                                final result = await showGeneralDialog<Map<String, dynamic>>(
-                                  context: context,
-                                  barrierDismissible: true,
-                                  barrierLabel: "Quantity",
-                                  barrierColor: Colors.black.withOpacity(0.3), 
-                                  transitionDuration: Duration(milliseconds: 200),
-                                  pageBuilder: (context, anim1, anim2) {
-                                    return QuantitySelection(
-                                      onConfirm: (quantity) {
-                                        Navigator.of(context).pop({
-                                          'quantity': quantity,
-                                        });
-                                      },
-                                    );
-                                  },
-                                  transitionBuilder: (context, anim1, anim2, child) {
-                                    return FadeTransition(
-                                      opacity: anim1,
-                                      child: child,
-                                    );
-                                  },
-                                );
-
-                                if (result != null) {
-                                  final discountResult = await showDialog<Map<String, dynamic>>(
-                                    context: context,
-                                    builder: (context) => DiscountSelection(quantity: result['quantity']),
-                                  );
-
-                                  if (discountResult != null) {
-                                    final List<double> discounts = List<double>.from(discountResult['discounts']);
-                                    final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
-                                    final ticketDocName = await RouteService.saveTrip(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ConductorTo(
                                       route: widget.route,
-                                      from: widget.from,
-                                      to: to,
-                                      startKm: widget.startKm,
-                                      endKm: endKm,
-                                      quantity: result['quantity'],
-                                      discountList: discounts,
-                                      fareTypes: selectedLabels,
-                                    );
-
-                              rootNavigatorKey.currentState?.pushReplacement(
-                                    MaterialPageRoute(
-                                    builder: (context) => ConductorTicket(
-                                      route: widget.route,
-                                      ticketDocName: ticketDocName,
-                                      placeCollection: widget.placeCollection,  
-                                      date: date,
-                                      ),
+                                      role: widget.role,
+                                      from: item['name'],
+                                      startKm: item['km'],
+                                      placeCollection: selectedPlaceCollection,
                                     ),
-                                    );
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Discount not selected')),
-                                    );          
-                                  }
-                                }
+                                  ),
+                                );
                               },
-                              child: Column(
+                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     item['name'] ?? '',
-                                    style: GoogleFonts.bebasNeue(fontSize: 16, color: Colors.white),
+                                    style: GoogleFonts.outfit(fontSize: 15, color: Colors.white),
                                     textAlign: TextAlign.center,
                                   ),
                                   if (item['km'] != null)
                                     Text(
                                       '${item['km']} km',
-                                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                                      style: TextStyle(fontSize: 11, color: Colors.white70),
                                     ),
                                 ],
                               ),
@@ -360,9 +354,9 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
     }
   }
   final tripNumber = maxTripNumber + 1;
-  final ticketDocName = "ticket $tripNumber";
+  final tripDocName = "trip $tripNumber";
 
-  await tripsCollection.doc(ticketDocName).set({
+  await tripsCollection.doc(tripDocName).set({
     'from': data['from'],
     'to': data['to'],
     'startKm': data['fromKm'],

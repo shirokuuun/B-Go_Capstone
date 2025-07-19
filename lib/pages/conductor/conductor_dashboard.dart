@@ -9,11 +9,25 @@ class ConductorDashboard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        'Welcome, $role!\nRoute: $route',
-        textAlign: TextAlign.center,
-        style: GoogleFonts.outfit(fontSize: 24),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          "B-Go Map",
+          style: GoogleFonts.outfit(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        backgroundColor: Color(0xFF0091AD),
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Text(
+          'Welcome, $role!\nRoute: $route',
+          textAlign: TextAlign.center,
+          style: GoogleFonts.outfit(fontSize: 24),
+        ),
       ),
     );
   }

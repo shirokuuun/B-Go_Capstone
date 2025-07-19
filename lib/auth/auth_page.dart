@@ -1,7 +1,7 @@
-import 'package:b_go/pages/login_page.dart';
+import 'package:b_go/auth/login_page.dart';
 import 'package:flutter/material.dart';
 
-import '../pages/register_page.dart';
+import 'register_page.dart';
 
 class AuthPage extends StatefulWidget {
   const AuthPage({Key? key}) : super(key: key);

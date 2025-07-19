@@ -303,29 +303,35 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text('Assign Fare Type:', style: GoogleFonts.outfit(fontSize: 20)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (int i = 0; i < widget.quantity; i++)
-            Row(
-              children: [
-                Text('Passenger ${i + 1}:', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500)),
-                SizedBox(width: 10),
-                DropdownButton<String>(
-                  value: selectedTypes[i],
-                  items: fareTypes.map((type) => DropdownMenuItem(
-                    value: type,
-                    child: Text(type, style: GoogleFonts.outfit(fontSize: 14)),
-                  )).toList(),
-                  onChanged: (val) {
-                    setState(() {
-                      selectedTypes[i] = val!;
-                    });
-                  },
+      content: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.5, // or a fixed value like 350
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (int i = 0; i < widget.quantity; i++)
+                Row(
+                  children: [
+                    Text('Passenger ${i + 1}:', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500)),
+                    SizedBox(width: 10),
+                    DropdownButton<String>(
+                      value: selectedTypes[i],
+                      items: fareTypes.map((type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type, style: GoogleFonts.outfit(fontSize: 14)),
+                      )).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          selectedTypes[i] = val!;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
       actions: [
         TextButton(

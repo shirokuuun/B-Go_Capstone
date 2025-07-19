@@ -1,11 +1,12 @@
 import 'package:b_go/auth/auth_services.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:b_go/pages/forgotPassword_page.dart';
+import 'package:b_go/auth/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:b_go/auth/conductor_login.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -31,7 +32,21 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.emailVerified) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final firestoreEmail = doc.data()?['email'];
+        if (firestoreEmail != user.email) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'email': user.email,
+          });
+        }
+      }
+
       if (user == null) return;
+
+      // Only clear fields after successful login
+      emailController.clear();
+      passwordController.clear();
 
       String email = user.email!; // e.g., Batangas_1@gmail.com
       String username = email.split('@').first; // "Batangas_1
@@ -52,11 +67,17 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => ConductorFrom(role: 'Conductor', route: route),
           ),
         );
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       } else {
         // Not a conductor, navigate as a normal user
         Navigator.pushReplacementNamed(context, '/user_selection');
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -74,6 +95,9 @@ class _LoginPageState extends State<LoginPage> {
         case 'user-disabled':
           message = 'This account has been disabled.';
           break;
+        case 'email-not-verified':
+          message = 'Please verify your email address before logging in.';
+          break;
         default:
           message = 'Login failed. Please try again.';
       }
@@ -90,6 +114,7 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       );
+      // Do NOT clear fields on failed login
     }
   }
 
@@ -358,7 +383,34 @@ class _LoginPageState extends State<LoginPage> {
                             height: 40,
                             width: 40,
                           ),
-                        ), 
+                        ),
+
+                        SizedBox(width: 5),
+
+                        // Conductor Login Icon
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ConductorLogin(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            height: 40,
+                            width: 40,
+                            decoration: BoxDecoration(
+                              color: Color(0xFFE5E9F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.directions_bus,
+                              color: Color(0xFF1D2B53),
+                              size: 28,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
 

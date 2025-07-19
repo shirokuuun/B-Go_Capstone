@@ -1,6 +1,7 @@
-  import 'package:flutter/material.dart';
+  import 'package:b_go/auth/conductor_login.dart';
+import 'package:flutter/material.dart';
   import 'package:google_fonts/google_fonts.dart';
-  import 'package:b_go/pages/login_page.dart';
+  import 'package:b_go/auth/conductor_login.dart';
   import 'package:b_go/pages/conductor/conductor_home.dart';
   import 'package:b_go/pages/conductor/route_service.dart';
   import 'package:cloud_firestore/cloud_firestore.dart';
@@ -125,7 +126,7 @@
                   ),
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => LoginPage(showRegisterPage: () {  },)),
+                    MaterialPageRoute(builder: (context) => ConductorLogin()),
                     (route) => false, // Removes all previous routes
                   );
                 },
@@ -299,11 +300,21 @@
                                               style: TextStyle(color: Colors.red),
                                             ),
                                             onPressed: () async {
-                                              final docPath = ticket['docPath'];
-                                              if (docPath != null) {
-                                                await FirebaseFirestore.instance.doc(docPath).delete();
-                                                Navigator.of(context).pop();
-                                              }
+                                              await FirebaseFirestore.instance
+                                              .collection('trips')
+                                              .doc(widget.route)
+                                              .collection('trips')
+                                              .doc(selectedDate)
+                                              .collection('tickets')
+                                              .doc(ticket['id'])
+                                              .delete();
+
+                                            Navigator.of(context).pop();
+
+                                            // Optionally refresh the ticket list
+                                            setState(() {
+                                              tickets.removeAt(index);
+                                            });
                                             },
                                           ),
                                         ],

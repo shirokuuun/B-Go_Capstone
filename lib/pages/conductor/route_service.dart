@@ -5,7 +5,6 @@ class RouteService {
 
 
   static Future<String> fetchRoutePlaceName(String route) async {
-
     final doc = await FirebaseFirestore.instance
         .collection('Destinations')
         .doc(route.trim()) 
@@ -288,15 +287,20 @@ class RouteService {
 }
 
   // to delete ticket
-  static Future<void> deleteTicket(String route, String date, String ticketId, {required String placeCollection}) async {
-  await FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
-      .collection(placeCollection)
-      .doc(date)
-      .collection('tickets')
-      .doc(ticketId)
-      .delete();
-}
+  static Future<void> deleteTicket(
+    String route,
+    String date,
+    String ticketId, {
+    required String placeCollection, // you can still keep this for compatibility
+  }) async {
+    await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(route)
+        .collection('trips')
+        .doc(date)
+        .collection('tickets')
+        .doc(ticketId)
+        .delete();
+  }
 
 }

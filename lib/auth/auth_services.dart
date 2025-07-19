@@ -48,10 +48,19 @@ class AuthServices {
     required String email,
     required String password,
   }) async {
-    return await _auth.signInWithEmailAndPassword(
+    UserCredential credential = await _auth.signInWithEmailAndPassword(
       email: email.trim(),
       password: password.trim(),
     );
+    final user = credential.user;
+    if (user != null && !user.emailVerified) {
+      await _auth.signOut();
+      throw FirebaseAuthException(
+        code: 'email-not-verified',
+        message: 'Please verify your email address before logging in.',
+      );
+    }
+    return credential;
   }
 
   //register page

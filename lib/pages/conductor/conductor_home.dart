@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
-import 'package:b_go/pages/conductor/route_service.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
@@ -11,7 +10,7 @@ class ConductorHome extends StatefulWidget {
   String placeCollection;
   final int selectedIndex;
 
-  ConductorHome({Key? key, required this.route, required this.role, this.selectedIndex = 0, required this.placeCollection}) : super(key: key);
+  ConductorHome({Key? key, required this.route, required this.role, required this.placeCollection, this.selectedIndex = 0, }) : super(key: key);
 
   @override
   _ConductorHomeState createState() => _ConductorHomeState();

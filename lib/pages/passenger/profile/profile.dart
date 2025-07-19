@@ -20,7 +20,15 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect to login or user selection
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+    } else {
+      _fetchUserData();
+    }
   }
 
   Future<void> _fetchUserData() async {
@@ -45,6 +53,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect
+      Future.microtask(() {
+        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+      return SizedBox.shrink(); // Or a loading indicator
+    }
     return Scaffold(
       backgroundColor: Color(0xFFF6F6F6),
       appBar: AppBar(
@@ -113,7 +129,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       _fetchUserData(); // Refresh after editing
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF00CFFF),
+                      backgroundColor: Color(0xFF0091AD),
                       foregroundColor: const Color.fromARGB(255, 0, 0, 0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
@@ -190,7 +206,7 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Color(0xFF00CFFF),
+        backgroundColor: Color(0xFF0091AD),
         child: Icon(icon, color: Colors.black),
       ),
       title: Text(

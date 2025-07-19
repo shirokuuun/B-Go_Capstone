@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RegisterPage extends StatefulWidget {
   final VoidCallback showLoginPage;
@@ -99,6 +100,28 @@ class _RegisterPageState extends State<RegisterPage> {
           backgroundColor: Colors.red,
         ),
       );
+      return;
+    }
+
+    // If registration is successful, send verification email
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Verify your email'),
+          content: Text('A verification link has been sent to your email address. Please verify your email before logging in.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('OK'),
+            ),
+          ],
+        ),
+      );
+      await FirebaseAuth.instance.signOut();
+      widget.showLoginPage();
     }
   }
 

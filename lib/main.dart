@@ -1,13 +1,13 @@
 import 'package:b_go/pages/get_started.dart';
-import 'package:b_go/pages/login_page.dart';
-import 'package:b_go/pages/login_phone_page.dart';
+import 'package:b_go/auth/login_page.dart';
+import 'package:b_go/auth/login_phone_page.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/profile/edit_profile.dart';
 import 'package:b_go/pages/passenger/profile/profile.dart';
 import 'package:b_go/pages/passenger/services/pre_ticket.dart';
-import 'package:b_go/pages/register_page.dart';
-import 'package:b_go/pages/register_phone_page.dart';
+import 'package:b_go/auth/register_page.dart';
+import 'package:b_go/auth/register_phone_page.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';

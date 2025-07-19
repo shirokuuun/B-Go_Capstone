@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/trip_page.dart';
 import 'package:b_go/pages/conductor/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
+import 'package:b_go/auth/login_page.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
@@ -60,6 +61,21 @@ class _ConductorHomeState extends State<ConductorHome> {
         title: Text('Conductor Home'),
         backgroundColor: const Color(0xFF1D2B53),
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // Remove back arrow
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => LoginPage(showRegisterPage: () {}),
+                ),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(

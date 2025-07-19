@@ -1,11 +1,12 @@
 import 'package:b_go/auth/auth_services.dart';
 import 'package:b_go/pages/conductor/conductor_from.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:b_go/pages/forgotPassword_page.dart';
+import 'package:b_go/auth/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:b_go/auth/conductor_login.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -382,7 +383,34 @@ class _LoginPageState extends State<LoginPage> {
                             height: 40,
                             width: 40,
                           ),
-                        ), 
+                        ),
+
+                        SizedBox(width: 5),
+
+                        // Conductor Login Icon
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ConductorLogin(),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            height: 40,
+                            width: 40,
+                            decoration: BoxDecoration(
+                              color: Color(0xFFE5E9F0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.directions_bus,
+                              color: Color(0xFF1D2B53),
+                              size: 28,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
 

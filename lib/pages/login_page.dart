@@ -33,6 +33,25 @@ class _LoginPageState extends State<LoginPage> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
+      // Check if email is verified (should be redundant, but double check)
+      if (!user.emailVerified) {
+        await FirebaseAuth.instance.signOut();
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text("Email Not Verified"),
+            content: Text("Please verify your email address using the link sent to your inbox before logging in."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text("OK"),
+              )
+            ],
+          ),
+        );
+        return;
+      }
+
       String email = user.email!; // e.g., Batangas_1@gmail.com
       String username = email.split('@').first; // "Batangas_1
       String conductorDocId = username[0].toUpperCase() + username.substring(1);
@@ -74,6 +93,9 @@ class _LoginPageState extends State<LoginPage> {
         case 'user-disabled':
           message = 'This account has been disabled.';
           break;
+        case 'email-not-verified':
+          message = 'Please verify your email address before logging in.';
+          break;
         default:
           message = 'Login failed. Please try again.';
       }
@@ -81,7 +103,7 @@ class _LoginPageState extends State<LoginPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Login Failed"),
-          content: Text(e.message ?? "Unknown error"),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

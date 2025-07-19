@@ -125,55 +125,146 @@ class _EditProfileState extends State<EditProfile> {
                     if (_formKey.currentState!.validate()) {
                       final user = FirebaseAuth.instance.currentUser;
                       if (user != null) {
-                        String newEmail = _emailController.text.trim();
-                        String newPhone = _phoneController.text.trim();
-                        // Ensure phone starts with +63
-                        if (!newPhone.startsWith('+63')) {
-                          if (newPhone.startsWith('0')) {
-                            newPhone = '+63' + newPhone.substring(1);
-                          } else {
-                            newPhone = '+63' + newPhone;
-                          }
-                        }
-                        // Update Firebase Auth profile
-                        await user.updateDisplayName(_nameController.text);
-                        if (newEmail != user.email) {
-                          try {
-                            await user.updateEmail(newEmail);
-                          } on FirebaseAuthException catch (e) {
-                            String message;
-                            switch (e.code) {
-                              case 'requires-recent-login':
-                                message = 'Please re-authenticate to change your email.';
-                                break;
-                              case 'invalid-email':
-                                message = 'Please enter a valid email address.';
-                                break;
-                              case 'email-already-in-use':
-                                message = 'This email is already in use.';
-                                break;
-                              default:
-                                message = 'Failed to update email. Please try again.';
+                        try {
+                          String newEmail = _emailController.text.trim();
+                          String newPhone = _phoneController.text.trim();
+                          // Ensure phone starts with +63
+                          if (!newPhone.startsWith('+63')) {
+                            if (newPhone.startsWith('0')) {
+                              newPhone = '+63' + newPhone.substring(1);
+                            } else {
+                              newPhone = '+63' + newPhone;
                             }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(message)),
+                          }
+
+                          // Show loading indicator
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (BuildContext context) {
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00CFFF)),
+                                ),
+                              );
+                            },
+                          );
+
+                          // Update Firebase Auth profile first
+                          await user.updateDisplayName(_nameController.text);
+
+                          // If email changed, update and send verification, then log out
+                          if (newEmail != user.email) {
+                            await user.updateEmail(newEmail);
+                            await user.sendEmailVerification();
+                            // Close loading dialog
+                            Navigator.of(context).pop();
+                            await showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text('Verify your email'),
+                                content: Text('A verification link has been sent to $newEmail. Please verify your new email address, then log in again.'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: Text('OK'),
+                                  ),
+                                ],
+                              ),
                             );
+                            // Log out the user
+                            await FirebaseAuth.instance.signOut();
+                            if (mounted) {
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                            }
                             return;
                           }
-                        }
-                        // Update Firestore (after Auth update to keep in sync)
-                        await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
-                          'name': _nameController.text,
-                          'email': newEmail,
-                          'phone': newPhone,
-                        });
-                        // Optionally update password
-                        if (_passwordController.text.isNotEmpty) {
-                          await user.updatePassword(_passwordController.text);
-                        }
-                        await user.reload();
-                        if (mounted) {
-                          Navigator.pop(context); // Go back to profile page
+
+                          // Update Firestore with all user data
+                          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                            'name': _nameController.text,
+                            'email': newEmail,
+                            'phone': newPhone,
+                            'updatedAt': FieldValue.serverTimestamp(),
+                          });
+
+                          // Update password if provided
+                          if (_passwordController.text.isNotEmpty) {
+                            await user.updatePassword(_passwordController.text);
+                          }
+
+                          // Close loading dialog
+                          Navigator.of(context).pop();
+
+                          // Show success message
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Profile updated successfully!'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+
+                          // Navigate back to profile page
+                          if (mounted) {
+                            Navigator.pop(context);
+                          }
+
+                        } on FirebaseAuthException catch (e) {
+                          // Close loading dialog
+                          Navigator.of(context).pop();
+                          String message;
+                          if (e.code == 'requires-recent-login') {
+                            // Prompt user to reauthenticate and log out
+                            await showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text('Re-authentication Required'),
+                                content: Text('For security reasons, please log in again to change your email.'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(),
+                                    child: Text('OK'),
+                                  ),
+                                ],
+                              ),
+                            );
+                            await FirebaseAuth.instance.signOut();
+                            if (mounted) {
+                              Navigator.of(context).popUntil((route) => route.isFirst);
+                            }
+                            return;
+                          }
+                          switch (e.code) {
+                            case 'invalid-email':
+                              message = 'Please enter a valid email address.';
+                              break;
+                            case 'email-already-in-use':
+                              message = 'This email is already in use.';
+                              break;
+                            case 'weak-password':
+                              message = 'Password is too weak.';
+                              break;
+                            default:
+                              message = 'Failed to update profile. Please try again.';
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(message),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                        } catch (e) {
+                          // Close loading dialog
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('An unexpected error occurred. Please try again.'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
                         }
                       }
                     }

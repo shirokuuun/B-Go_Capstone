@@ -113,7 +113,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       _fetchUserData(); // Refresh after editing
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF00CFFF),
+                      backgroundColor: Color(0xFF0091AD),
                       foregroundColor: const Color.fromARGB(255, 0, 0, 0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
@@ -190,7 +190,7 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Color(0xFF00CFFF),
+        backgroundColor: Color(0xFF0091AD),
         child: Icon(icon, color: Colors.black),
       ),
       title: Text(

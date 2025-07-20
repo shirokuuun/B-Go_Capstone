@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:b_go/pages/conductor/conductor_home.dart';
+import 'package:b_go/pages/conductor/sos.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert'; 
@@ -110,7 +111,12 @@ class _ConductorFromState extends State<ConductorFrom> {
                 children: [
                   GestureDetector(
                     onTap: () {
-                      // SOS action
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SOSPage(route: widget.route),
+                        ),
+                      );
                     },
                     child: SizedBox(
                       width: 40,

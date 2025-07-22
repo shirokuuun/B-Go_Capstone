@@ -2,6 +2,8 @@ import 'package:b_go/pages/get_started.dart';
 import 'package:b_go/auth/login_page.dart';
 import 'package:b_go/auth/login_phone_page.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
+import 'package:b_go/pages/passenger/profile/Settings/settings.dart';
+import 'package:b_go/pages/passenger/sidebar/trip_sched.dart';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/profile/edit_profile.dart';
 import 'package:b_go/pages/passenger/profile/profile.dart';
@@ -48,6 +50,8 @@ class MyApp extends StatelessWidget {
         '/profile': (context) => ProfilePage(),
         '/pre_ticket': (context) => PreTicket(),
         '/edit_profile': (context) => EditProfile(),
+        '/trip_sched': (context) => TripSchedPage(),
+        '/settings': (context) => SettingsPage(),
       },
     );
   }

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:b_go/pages/passenger/sidebar/trip_sched.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -71,6 +72,20 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+                        ListTile(
+              leading: Icon(Icons.home),
+              title: Text(
+                'Home',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/home');
+              },
+            ),
             ListTile(
               leading: Icon(Icons.schedule),
               title: Text(
@@ -81,8 +96,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               onTap: () {
-                // TODO: Navigate to Trip Schedules page
                 Navigator.pop(context);
+                Navigator.pushNamed(context, '/trip_sched');
               },
             ),
             ListTile(

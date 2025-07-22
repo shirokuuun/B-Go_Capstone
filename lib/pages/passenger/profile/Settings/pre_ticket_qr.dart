@@ -24,7 +24,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
   Future<List<Map<String, dynamic>>> _fetchAndCleanTickets() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
-    final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // PH time
+    final now = DateTime.now(); // Use device local time
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     final tenPm = DateTime(now.year, now.month, now.day, 22);

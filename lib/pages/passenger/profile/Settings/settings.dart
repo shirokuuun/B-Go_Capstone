@@ -70,7 +70,11 @@ class SettingsPage extends StatelessWidget {
                 ),
               ),
               trailing: Icon(Icons.chevron_right, color: Colors.grey, size: iconSize + 6),
-              onTap: () {}, // Add navigation if needed
+              onTap: () {
+                if (opt.title == 'Pre-Ticket QRs') {
+                  Navigator.pushNamed(context, '/pre_ticket_qr');
+                }
+              }, // Add navigation if needed
             ),
           );
         },

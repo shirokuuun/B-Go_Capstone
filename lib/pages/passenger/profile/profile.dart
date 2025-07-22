@@ -20,13 +20,25 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect to login or user selection
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+    } else {
+      _fetchUserData();
+    }
   }
 
   Future<void> _fetchUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       setState(() {
         name = doc.data()?['name'] ?? user.displayName ?? 'John Doe';
         email = doc.data()?['email'] ?? user.email ?? 'No email found';
@@ -45,6 +57,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      // Not logged in, redirect
+      Future.microtask(() {
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/login', (route) => false);
+      });
+      return SizedBox.shrink(); // Or a loading indicator
+    }
     return Scaffold(
       backgroundColor: Color(0xFFF6F6F6),
       appBar: AppBar(
@@ -59,6 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
           style: GoogleFonts.outfit(
             color: const Color.fromARGB(255, 0, 0, 0),
             fontSize: 20,
+            fontWeight: FontWeight.w500,
           ),
         ),
         centerTitle: true,
@@ -86,7 +108,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         child: CircleAvatar(
                           radius: 16,
                           backgroundColor: Colors.black,
-                          child: Icon(Icons.edit, color: Colors.white, size: 16),
+                          child:
+                              Icon(Icons.edit, color: Colors.white, size: 16),
                         ),
                       ),
                     ],
@@ -113,28 +136,32 @@ class _ProfilePageState extends State<ProfilePage> {
                       _fetchUserData(); // Refresh after editing
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF00CFFF),
+                      backgroundColor: Color(0xFF0091AD),
                       foregroundColor: const Color.fromARGB(255, 0, 0, 0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 4,
-                      padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 32, vertical: 12),
                     ),
                     child: Text(
                       'Edit Profile',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 18, fontWeight: FontWeight.w500),
                     ),
                   ),
                   SizedBox(height: 32),
                   _ProfileRow(
                     icon: Icons.settings,
                     label: 'Settings',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.pushNamed(context, '/settings');
+                    },
                   ),
                   _ProfileRow(
                     icon: Icons.badge,
-                    label: 'ID Verification',
+                    label: 'Your ID',
                     onTap: () {},
                   ),
                   Spacer(),
@@ -144,7 +171,8 @@ class _ProfilePageState extends State<ProfilePage> {
                       onTap: () async {
                         await FirebaseAuth.instance.signOut();
                         if (context.mounted) {
-                          Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                          Navigator.pushNamedAndRemoveUntil(
+                              context, '/login', (route) => false);
                         }
                       },
                       child: Row(
@@ -153,7 +181,8 @@ class _ProfilePageState extends State<ProfilePage> {
                           CircleAvatar(
                             backgroundColor: Colors.black,
                             radius: 20,
-                            child: Icon(Icons.logout, color: Colors.red, size: 20),
+                            child:
+                                Icon(Icons.logout, color: Colors.red, size: 20),
                           ),
                           SizedBox(width: 8),
                           Text(
@@ -190,7 +219,7 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Color(0xFF00CFFF),
+        backgroundColor: Color(0xFF0091AD),
         child: Icon(icon, color: Colors.black),
       ),
       title: Text(

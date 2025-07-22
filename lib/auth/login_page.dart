@@ -1,12 +1,12 @@
 import 'package:b_go/auth/auth_services.dart';
 import 'package:b_go/pages/conductor/conductor_from.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:b_go/pages/forgotPassword_page.dart';
+import 'package:b_go/auth/forgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:b_go/auth/conductor_login.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -32,13 +32,23 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       final user = FirebaseAuth.instance.currentUser;
+      if (user != null && user.emailVerified) {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final firestoreEmail = doc.data()?['email'];
+        if (firestoreEmail != user.email) {
+          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+            'email': user.email,
+          });
+        }
+      }
+
       if (user == null) return;
 
-      String? email = user.email;
-      if (email == null) {
-        // Show error or handle gracefully
-        return;
-      }
+      // Only clear fields after successful login
+      emailController.clear();
+      passwordController.clear();
+
+      String email = user.email!; // e.g., Batangas_1@gmail.com
       String username = email.split('@').first; // "Batangas_1
       String conductorDocId = username[0].toUpperCase() + username.substring(1);
 
@@ -57,11 +67,17 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => ConductorFrom(role: 'Conductor', route: route),
           ),
         );
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       } else {
         // Not a conductor, navigate as a normal user
         Navigator.pushReplacementNamed(context, '/user_selection');
-        return; // <--- Add this to stop the function after navigation
+        // Only clear after navigation
+        emailController.clear();
+        passwordController.clear();
+        return;
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -79,6 +95,9 @@ class _LoginPageState extends State<LoginPage> {
         case 'user-disabled':
           message = 'This account has been disabled.';
           break;
+        case 'email-not-verified':
+          message = 'Please verify your email address before logging in.';
+          break;
         default:
           message = 'Login failed. Please try again.';
       }
@@ -86,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
         context: context,
         builder: (context) => AlertDialog(
           title: Text("Login Failed"),
-          content: Text(e.message ?? "Unknown error"),
+          content: Text(message),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -95,6 +114,7 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       );
+      // Do NOT clear fields on failed login
     }
   }
 
@@ -107,9 +127,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (kIsWeb) {
-      return Placeholder(); // or a static image, or a message
-    } else {
       return Scaffold(
         backgroundColor: Colors.white,
         body: Stack(
@@ -407,6 +424,6 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
       );
-    }
   }
 }
+

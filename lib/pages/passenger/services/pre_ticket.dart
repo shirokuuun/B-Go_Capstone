@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PreTicket extends StatefulWidget {
   const PreTicket({super.key});
@@ -25,7 +27,8 @@ class _PreTicketState extends State<PreTicket> {
   };
 
   String selectedRoute = 'SM Lipa to Batangas City';
-  late Future<List<Map<String, dynamic>>> placesFuture = RouteService.fetchPlaces('Batangas');
+  late Future<List<Map<String, dynamic>>> placesFuture =
+      RouteService.fetchPlaces('Batangas');
 
   @override
   void initState() {
@@ -50,13 +53,16 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  void _showToSelectionPage(Map<String, dynamic> fromPlace, List<Map<String, dynamic>> allPlaces) async {
+  void _showToSelectionPage(Map<String, dynamic> fromPlace,
+      List<Map<String, dynamic>> allPlaces) async {
     // Only allow To places after the selected From
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No valid drop-off locations after selected pick-up.')),
+        SnackBar(
+            content:
+                Text('No valid drop-off locations after selected pick-up.')),
       );
       return;
     }
@@ -70,7 +76,8 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  void _showQuantityModal(Map<String, dynamic> fromPlace, Map<String, dynamic> toPlace) async {
+  void _showQuantityModal(
+      Map<String, dynamic> fromPlace, Map<String, dynamic> toPlace) async {
     int? quantity = await showDialog<int>(
       context: context,
       builder: (context) => _QuantitySelectionModal(),
@@ -80,7 +87,8 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  void _showFareTypeModal(Map<String, dynamic> fromPlace, Map<String, dynamic> toPlace, int quantity) async {
+  void _showFareTypeModal(Map<String, dynamic> fromPlace,
+      Map<String, dynamic> toPlace, int quantity) async {
     List<String>? fareTypes = await showDialog<List<String>>(
       context: context,
       builder: (context) => _FareTypeSelectionModal(quantity: quantity),
@@ -90,7 +98,11 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  void _showConfirmationModal(Map<String, dynamic> fromPlace, Map<String, dynamic> toPlace, int quantity, List<String> fareTypes) async {
+  void _showConfirmationModal(
+      Map<String, dynamic> fromPlace,
+      Map<String, dynamic> toPlace,
+      int quantity,
+      List<String> fareTypes) async {
     bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => _ConfirmationModal(),
@@ -100,7 +112,11 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  void _showReceiptModal(Map<String, dynamic> fromPlace, Map<String, dynamic> toPlace, int quantity, List<String> fareTypes) async {
+  void _showReceiptModal(
+      Map<String, dynamic> fromPlace,
+      Map<String, dynamic> toPlace,
+      int quantity,
+      List<String> fareTypes) async {
     await showDialog(
       context: context,
       builder: (context) => _ReceiptModal(
@@ -144,10 +160,13 @@ class _PreTicketState extends State<PreTicket> {
                   style: GoogleFonts.outfit(fontSize: 11, color: Colors.white),
                   iconEnabledColor: Colors.white,
                   underline: Container(),
-                  items: routeChoices.map((route) => DropdownMenuItem(
-                    value: route,
-                    child: Text(route, style: TextStyle(color: Colors.white)),
-                  )).toList(),
+                  items: routeChoices
+                      .map((route) => DropdownMenuItem(
+                            value: route,
+                            child: Text(route,
+                                style: TextStyle(color: Colors.white)),
+                          ))
+                      .toList(),
                   onChanged: _onRouteChanged,
                 ),
               ),
@@ -157,7 +176,8 @@ class _PreTicketState extends State<PreTicket> {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.02),
+                margin: EdgeInsets.only(
+                    top: MediaQuery.of(context).size.height * 0.02),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -170,7 +190,8 @@ class _PreTicketState extends State<PreTicket> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -187,18 +208,23 @@ class _PreTicketState extends State<PreTicket> {
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: placesFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        } else if (!snapshot.hasData ||
+                            snapshot.data!.isEmpty) {
                           return const Center(child: Text('No places found.'));
                         }
                         final myList = snapshot.data!;
                         return GridView.builder(
                           shrinkWrap: true,
                           physics: NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             mainAxisSpacing: 16,
                             crossAxisSpacing: 16,
@@ -215,21 +241,25 @@ class _PreTicketState extends State<PreTicket> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 8, horizontal: 4),
                               ),
-                              onPressed: () => _showToSelectionPage(item, myList),
+                              onPressed: () =>
+                                  _showToSelectionPage(item, myList),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Text(
                                     item['name'] ?? '',
-                                    style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+                                    style: GoogleFonts.outfit(
+                                        fontSize: 14, color: Colors.white),
                                     textAlign: TextAlign.center,
                                   ),
                                   if (item['km'] != null)
                                     Text(
                                       '${item['km']} km',
-                                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                                      style: TextStyle(
+                                          fontSize: 12, color: Colors.white70),
                                     ),
                                 ],
                               ),
@@ -252,7 +282,8 @@ class _PreTicketState extends State<PreTicket> {
 // Quantity Selection Modal
 class _QuantitySelectionModal extends StatefulWidget {
   @override
-  State<_QuantitySelectionModal> createState() => _QuantitySelectionModalState();
+  State<_QuantitySelectionModal> createState() =>
+      _QuantitySelectionModalState();
 }
 
 class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
@@ -294,7 +325,8 @@ class _FareTypeSelectionModal extends StatefulWidget {
   final int quantity;
   const _FareTypeSelectionModal({required this.quantity});
   @override
-  State<_FareTypeSelectionModal> createState() => _FareTypeSelectionModalState();
+  State<_FareTypeSelectionModal> createState() =>
+      _FareTypeSelectionModalState();
 }
 
 class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
@@ -312,7 +344,8 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
     return AlertDialog(
       title: Text('Assign Fare Type:', style: GoogleFonts.outfit(fontSize: 20)),
       content: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.5, // or a fixed value like 350
+        height: MediaQuery.of(context).size.height *
+            0.5, // or a fixed value like 350
         width: double.maxFinite,
         child: SingleChildScrollView(
           child: Column(
@@ -321,14 +354,19 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
               for (int i = 0; i < widget.quantity; i++)
                 Row(
                   children: [
-                    Text('Passenger ${i + 1}:', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text('Passenger ${i + 1}:',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, fontWeight: FontWeight.w500)),
                     SizedBox(width: 10),
                     DropdownButton<String>(
                       value: selectedTypes[i],
-                      items: fareTypes.map((type) => DropdownMenuItem(
-                        value: type,
-                        child: Text(type, style: GoogleFonts.outfit(fontSize: 14)),
-                      )).toList(),
+                      items: fareTypes
+                          .map((type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(type,
+                                    style: GoogleFonts.outfit(fontSize: 14)),
+                              ))
+                          .toList(),
                       onChanged: (val) {
                         setState(() {
                           selectedTypes[i] = val!;
@@ -360,8 +398,10 @@ class _ConfirmationModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Are you sure with the Pre-Ticketing?', style: GoogleFonts.outfit(fontSize: 20)),
-      content: Text('Do you wish to proceed?', style: GoogleFonts.outfit(fontSize: 14)),
+      title: Text('Are you sure with the Pre-Ticketing?',
+          style: GoogleFonts.outfit(fontSize: 20)),
+      content: Text('Do you wish to proceed?',
+          style: GoogleFonts.outfit(fontSize: 14)),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
@@ -383,7 +423,12 @@ class _ReceiptModal extends StatelessWidget {
   final Map<String, dynamic> toPlace;
   final int quantity;
   final List<String> fareTypes;
-  _ReceiptModal({required this.route, required this.fromPlace, required this.toPlace, required this.quantity, required this.fareTypes});
+  _ReceiptModal(
+      {required this.route,
+      required this.fromPlace,
+      required this.toPlace,
+      required this.quantity,
+      required this.fareTypes});
 
   double computeFare(num startKm, num endKm) {
     final totalKm = endKm - startKm;
@@ -397,28 +442,42 @@ class _ReceiptModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final formattedTime = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    final startKm = fromPlace['km'] is num ? fromPlace['km'] : num.tryParse(fromPlace['km'].toString()) ?? 0;
-    final endKm = toPlace['km'] is num ? toPlace['km'] : num.tryParse(toPlace['km'].toString()) ?? 0;
+    final formattedDate =
+        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final formattedTime =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final startKm = fromPlace['km'] is num
+        ? fromPlace['km']
+        : num.tryParse(fromPlace['km'].toString()) ?? 0;
+    final endKm = toPlace['km'] is num
+        ? toPlace['km']
+        : num.tryParse(toPlace['km'].toString()) ?? 0;
     final baseFare = computeFare(startKm, endKm);
 
-    // Prepare discount breakdown
+    // Prepare discount breakdown and per-passenger fares
     List<String> discountBreakdown = [];
+    List<double> passengerFares = [];
     double totalAmount = 0.0;
     for (int i = 0; i < fareTypes.length; i++) {
       final type = fareTypes[i];
       String discountText;
       double passengerFare;
-      if (type.toLowerCase() == 'pwd' || type.toLowerCase() == 'senior' || type.toLowerCase() == 'student') {
+      bool isDiscounted = false;
+      if (type.toLowerCase() == 'pwd' ||
+          type.toLowerCase() == 'senior' ||
+          type.toLowerCase() == 'student') {
         passengerFare = baseFare * 0.8;
         discountText = '20% off';
+        isDiscounted = true;
       } else {
         passengerFare = baseFare;
         discountText = 'No discount';
       }
       totalAmount += passengerFare;
-      discountBreakdown.add('Passenger ${i + 1}: $type ($discountText)');
+      passengerFares.add(passengerFare);
+      discountBreakdown.add(
+        'Passenger ${i + 1}: $type${isDiscounted ? ' (20% off)' : ' (No discount)'} — ${passengerFare.toStringAsFixed(2)} PHP',
+      );
     }
 
     final qrData = {
@@ -434,6 +493,7 @@ class _ReceiptModal extends StatelessWidget {
       'amount': totalAmount,
       'fareTypes': fareTypes,
       'discountBreakdown': discountBreakdown,
+      'passengerFares': passengerFares,
     };
     return AlertDialog(
       title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20)),
@@ -442,18 +502,30 @@ class _ReceiptModal extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Route: $route', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('From: ${fromPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('To: ${toPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('From KM: ${fromPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('To KM: ${toPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Base Fare: ${baseFare.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Amount: ${totalAmount.toStringAsFixed(2)}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Date: $formattedDate',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Time: $formattedTime',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From: ${fromPlace['name']}',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To: ${toPlace['name']}',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From KM: ${fromPlace['km']}',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To KM: ${toPlace['km']}',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Base Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Quantity: $quantity',
+                style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
-            Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
-            ...discountBreakdown.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
+            Text('Discounts:',
+                style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.w500, fontSize: 14)),
+            ...discountBreakdown
+                .map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
           ],
         ),
       ),
@@ -470,11 +542,13 @@ class _ReceiptModal extends StatelessWidget {
                   quantity: quantity,
                   qrData: qrData.toString(),
                   discountBreakdown: discountBreakdown,
+                  showConfirmButton: true,
                 ),
               ),
             );
           },
-          child: Text('Show generated QR code', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Show generated QR code',
+              style: GoogleFonts.outfit(fontSize: 14)),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -506,12 +580,12 @@ class ToSelectionPage extends StatelessWidget {
               ),
             ),
             title: Text(
-                'Drop-off',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  color: Colors.white,
-                ),
+              'Drop-off',
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                color: Colors.white,
               ),
+            ),
             // No actions/dropdown for To page
           ),
           SliverToBoxAdapter(
@@ -534,7 +608,8 @@ class ToSelectionPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0, vertical: 24.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -568,7 +643,8 @@ class ToSelectionPage extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 4),
                           ),
                           onPressed: () => Navigator.of(context).pop(place),
                           child: Column(
@@ -576,13 +652,15 @@ class ToSelectionPage extends StatelessWidget {
                             children: [
                               Text(
                                 place['name'] ?? '',
-                                style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
+                                style: GoogleFonts.outfit(
+                                    fontSize: 14, color: Colors.white),
                                 textAlign: TextAlign.center,
                               ),
                               if (place['km'] != null)
                                 Text(
                                   '${place['km']} km',
-                                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.white70),
                                 ),
                             ],
                           ),
@@ -609,6 +687,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
   final int quantity;
   final String qrData;
   final List<String>? discountBreakdown;
+  final bool showConfirmButton;
 
   const QRCodeFullScreenPage({
     Key? key,
@@ -619,7 +698,45 @@ class QRCodeFullScreenPage extends StatelessWidget {
     required this.quantity,
     required this.qrData,
     this.discountBreakdown,
+    this.showConfirmButton = true,
   }) : super(key: key);
+
+  Future<bool> canCreatePreTicket() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // PH time
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('preTickets')
+        .where('createdAt', isGreaterThanOrEqualTo: startOfDay)
+        .where('createdAt', isLessThan: endOfDay)
+        .get();
+    return snapshot.docs.length < 3;
+  }
+
+  Future<void> savePreTicket(BuildContext context) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // PH time
+    final data = {
+      'from': from,
+      'to': to,
+      'km': km,
+      'fare': fare,
+      'quantity': quantity,
+      'qrData': qrData,
+      'discountBreakdown': discountBreakdown,
+      'createdAt': now,
+    };
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('preTickets')
+        .add(data);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -628,13 +745,15 @@ class QRCodeFullScreenPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1D2B53),
+        backgroundColor: const Color(0xFF0091AD),
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('QR Code', style: GoogleFonts.outfit(color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16)),
+        title: Text('QR Code',
+            style: GoogleFonts.outfit(
+                color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16)),
         centerTitle: false,
       ),
       body: SafeArea(
@@ -656,7 +775,8 @@ class QRCodeFullScreenPage extends StatelessWidget {
             SizedBox(height: 16),
             Text(
               'Show your generated QR code to the conductor',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
+              style:
+                  GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
@@ -665,17 +785,24 @@ class QRCodeFullScreenPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Details:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
+                  Text('Details:',
+                      style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w500, fontSize: 14)),
                   SizedBox(height: 8),
                   Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
                   Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
                   Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('Fare: $fare Pesos', style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('Total Passengers: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('Fare: $fare Pesos',
+                      style: GoogleFonts.outfit(fontSize: 14)),
+                  Text('Total Passengers: $quantity',
+                      style: GoogleFonts.outfit(fontSize: 14)),
                   if (discountBreakdown != null) ...[
                     SizedBox(height: 12),
-                    Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
-                    ...discountBreakdown!.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
+                    Text('Discounts:',
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500, fontSize: 14)),
+                    ...discountBreakdown!.map((e) =>
+                        Text(e, style: GoogleFonts.outfit(fontSize: 14))),
                   ],
                 ],
               ),
@@ -683,19 +810,62 @@ class QRCodeFullScreenPage extends StatelessWidget {
             Spacer(),
             Padding(
               padding: const EdgeInsets.only(bottom: 24.0),
-              child: SizedBox(
-                width: size.width * 0.5,
-                height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(32),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: size.width * 0.35,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(showConfirmButton ? 'Cancel' : 'Close',
+                          style: GoogleFonts.outfit(
+                              color: Colors.white, fontSize: 17)),
                     ),
                   ),
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: Text('Cancel', style: GoogleFonts.outfit(color: Colors.white, fontSize: 17)),
-                ),
+                  if (showConfirmButton) ...[
+                    SizedBox(width: 16),
+                    SizedBox(
+                      width: size.width * 0.35,
+                      height: 48,
+                      child: FutureBuilder<bool>(
+                        future: canCreatePreTicket(),
+                        builder: (context, snapshot) {
+                          final canCreate = snapshot.data ?? false;
+                          return ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.lightGreen[400],
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(32),
+                              ),
+                            ),
+                            onPressed: canCreate
+                                ? () async {
+                                    await savePreTicket(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Pre-ticket saved!'),
+                                        backgroundColor: Colors.green,
+                                      ),
+                                    );
+                                    Navigator.of(context).pop();
+                                  }
+                                : null,
+                            child: Text('Confirm',
+                                style: GoogleFonts.outfit(
+                                    color: Colors.white, fontSize: 17)),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],

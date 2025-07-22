@@ -41,7 +41,6 @@
       });
     }
 
-
     late Future<List<Map<String, dynamic>>> placesFuture;
 
     String getRouteLabel(String placeCollection) {
@@ -163,144 +162,194 @@
               ),
             ),
 
-            
-            SliverToBoxAdapter(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.02),
-                  width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                    boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 16, offset: Offset(0, -4))],
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        selectedDate.isNotEmpty
-                            ? "Tickets for $selectedDate"
-                            : "Select a date",
-                        style: GoogleFonts.outfit(fontSize: 18),
-                      ),
-                    DropdownButton<String>(
-                      value: availableDates.contains(selectedDate) ? selectedDate : null,
-                      isExpanded: true,
-                      onChanged: (String? newDate) async {
-                        if (newDate != null) {
-                          setState(() {
-                            isLoading = true;
-                            selectedDate = newDate;
-                          });
-                          tickets = await RouteService.fetchTickets(
-                            widget.route,
-                            selectedDate,
-                            placeCollection: widget.placeCollection,
-                          );
-                          setState(() => isLoading = false);
-                        }
-                      },
-                      items: availableDates.map((String date) {
-                        return DropdownMenuItem<String>(
-                          value: date,
-                          child: Text(date),
-                        );
-                      }).toList(),
+          SliverToBoxAdapter(
+            child: SizedBox(height: 20),
+          ),
+
+           SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-
-
-                      if (isLoading)
-                        Center(child: CircularProgressIndicator())
-                      else if (tickets.isEmpty)
-                        Text("No tickets for $selectedDate", style: GoogleFonts.outfit(fontSize: 18))
-                      else
-                       SizedBox(
-                        height: MediaQuery.of(context).size.height * 0.5,
-                        child: ListView.builder(
-                          itemCount: tickets.length,
-                          itemBuilder: (context, index) {
-                            final ticket = tickets[index];
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 6,
-                                      offset: Offset(0, 3),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selectedDate.isNotEmpty
+                              ? "Tickets for $selectedDate"
+                              : "Select a date",
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F1F1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: availableDates.contains(selectedDate)
+                                        ? selectedDate
+                                        : null,
+                                    isExpanded: true,
+                                    icon: const Icon(Icons.arrow_drop_down),
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.black87,
+                                      fontSize: 16,
                                     ),
-                                  ],
+                                    onChanged: (String? newDate) async {
+                                      if (newDate != null) {
+                                        setState(() {
+                                          isLoading = true;
+                                          selectedDate = newDate;
+                                        });
+                                        tickets = await RouteService.fetchTickets(
+                                          widget.route,
+                                          selectedDate,
+                                          placeCollection: widget.placeCollection,
+                                        );
+                                        setState(() => isLoading = false);
+                                      }
+                                    },
+                                    items: availableDates.map((String date) {
+                                      return DropdownMenuItem<String>(
+                                        value: date,
+                                        child: Text(date),
+                                      );
+                                    }).toList(),
+                                  ),
                                 ),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  title: Text(
-                                    '${ticket['from']} to ${ticket['to']}',
-                                    style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Text(
-                                    '₱${ticket['totalFare']} - Quantity: ${ticket['quantity']}',
-                                    style: GoogleFonts.outfit(),
-                                  ),
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        title: Text(
-                                          'Ticket Details',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 20,
-                                          ),
-                                        ),
-                                        content: SingleChildScrollView(
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                'Active: ${ticket['active'] ? "Yes" : "No"}',
-                                                style: TextStyle(color: ticket['active'] ? Colors.green : Colors.red),
-                                              ),
-                                              Text(
-                                                'Time: ${ticket['timestamp'] != null ? (ticket['timestamp'] as Timestamp).toDate().toString() : 'N/A'}',
-                                              ),
-                                              Text('From: ${ticket['from']}'),
-                                              Text('To: ${ticket['to']}'),
-                                              Text('Quantity: ${ticket['quantity']}'),
-                                              Text('Discount Amount: ₱${ticket['discountAmount']}'),
-                                              const SizedBox(height: 10),
-                                              const Text(
-                                                'Discount Breakdown:',
-                                                style: TextStyle(fontWeight: FontWeight.bold),
-                                              ),
-                                              ...List.generate((ticket['discountBreakdown'] as List).length, (i) {
-                                                return Text(ticket['discountBreakdown'][i]);
-                                              }),
-                                              const SizedBox(height: 10),
-                                              Text(
-                                                'Total Fare: ₱${ticket['totalFare']}',
-                                                style: TextStyle(fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            child: const Text('Close'),
-                                            onPressed: () => Navigator.of(context).pop(),
-                                          ),
-                                          TextButton(
-                                            child: const Text(
-                                              'Delete',
-                                              style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  if (isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (tickets.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20.0),
+                      child: Text(
+                        "No tickets for $selectedDate",
+                        style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: tickets.length,
+                      itemBuilder: (context, index) {
+                        final ticket = tickets[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6.0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.10),
+                                  blurRadius: 12,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.grey.withOpacity(0.5),
+                              ),
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              title: Text(
+                                '${ticket['from']} to ${ticket['to']}',
+                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text(
+                                '₱${ticket['totalFare']} - Quantity: ${ticket['quantity']}',
+                                style: GoogleFonts.outfit(),
+                              ),
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text(
+                                      'Ticket Details',
+                                      style: GoogleFonts.outfit(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 20,
+                                      ),
+                                    ),
+                                    content: SingleChildScrollView(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Active: ${ticket['active'] ? "Yes" : "No"}',
+                                            style: TextStyle(
+                                              color: ticket['active'] ? Colors.green : Colors.red,
                                             ),
-                                            onPressed: () async {
-                                              await FirebaseFirestore.instance
+                                          ),
+                                          Text(
+                                            'Time: ${ticket['timestamp'] != null ? (ticket['timestamp'] as Timestamp).toDate().toString() : 'N/A'}',
+                                          ),
+                                          Text('From: ${ticket['from']}'),
+                                          Text('To: ${ticket['to']}'),
+                                          Text('Quantity: ${ticket['quantity']}'),
+                                          Text('Discount Amount: ₱${ticket['discountAmount']}'),
+                                          const SizedBox(height: 10),
+                                          const Text(
+                                            'Discount Breakdown:',
+                                            style: TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                          ...List.generate((ticket['discountBreakdown'] as List).length, (i) {
+                                            return Text(ticket['discountBreakdown'][i]);
+                                          }),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            'Total Fare: ₱${ticket['totalFare']}',
+                                            style: const TextStyle(fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        child: const Text('Close'),
+                                        onPressed: () => Navigator.of(context).pop(),
+                                      ),
+                                      TextButton(
+                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                        onPressed: () async {
+                                          await FirebaseFirestore.instance
                                               .collection('trips')
                                               .doc(widget.route)
                                               .collection('trips')
@@ -308,37 +357,34 @@
                                               .collection('tickets')
                                               .doc(ticket['id'])
                                               .delete();
-
-                                            Navigator.of(context).pop();
-
-                                            // Optionally refresh the ticket list
+                                          Navigator.of(context).pop();
+                                          if (mounted) {
                                             setState(() {
                                               tickets.removeAt(index);
                                             });
-                                            },
-                                          ),
-                                        ],
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        elevation: 10,
-                                        backgroundColor: Colors.white,
+                                          }
+                                        },
                                       ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      )
-                    ],
-                  ),
-                ),
+                                    ],
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    elevation: 10,
+                                    backgroundColor: Colors.white,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                ],
               ),
             ),
-        ],
-      ),
-      );
+          )
+                    ],
+                  ),
+                );
     }
   }

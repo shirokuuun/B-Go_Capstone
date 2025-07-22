@@ -129,42 +129,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 ),
               ),
             ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(top: 15.0, right: 8.0),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        // SOS action
-                      },
-                      child: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: Image.asset(
-                          'assets/sos-button.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                    SizedBox(width: 20),
-                    GestureDetector(
-                      onTap: () {
-                        // Camera action
-                      },
-                      child: SizedBox(
-                        width: 40,
-                        height: 30,
-                        child: Image.asset(
-                          'assets/photo-camera.png',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ),
           SliverAppBar(
             automaticallyImplyLeading: false,

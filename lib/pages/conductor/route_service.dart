@@ -242,7 +242,7 @@ class RouteService {
   static Future<List<Map<String, dynamic>>> fetchTickets(
     String route,
     String date, {
-    required String placeCollection, // keep for compatibility
+    required String placeCollection, 
   }) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('trips')
@@ -250,6 +250,7 @@ class RouteService {
         .collection('trips')
         .doc(date)
         .collection('tickets')
+        .orderBy('timestamp', descending: true)
         .get();
 
     return snapshot.docs.map((doc) {
@@ -301,118 +302,121 @@ class RouteService {
         .delete();
   }
 
-// sos saving details
-  Future<void> sendSOS({
-  required String emergencyType,
-  required String description,
-  required double lat,
-  required double lng,
-  required String route,
-  required bool isActive, 
-}) async {
-  final counterDocRef = FirebaseFirestore.instance.collection('counters').doc('sos');
+  // sos saving details
+    Future<void> sendSOS({
+    required String emergencyType,
+    required String description,
+    required double lat,  
+    required double lng,
+    required String route,
+    required bool isActive, 
+  }) async {
+    final counterDocRef = FirebaseFirestore.instance.collection('counters').doc('sos');
 
-  await FirebaseFirestore.instance.runTransaction((transaction) async {
-    final snapshot = await transaction.get(counterDocRef);
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(counterDocRef);
 
-    int currentCount = 0;
-    if (snapshot.exists) {
-      currentCount = snapshot.data()!['count'] ?? 0;
-    }
-
-    final newCount = currentCount + 1;
-    final paddedCount = newCount.toString().padLeft(3, '0'); // sos_001, sos_002, etc.
-    final newDocId = 'sos_$paddedCount';
-    final newDocRef = FirebaseFirestore.instance.collection('sosRequests').doc(newDocId);
-
-    // Determine status based on isActive
-    final status = isActive ? 'Pending' : 'Received';
-
-    // Update counter
-    transaction.set(counterDocRef, {'count': newCount});
-
-    // Save SOS request
-    transaction.set(newDocRef, {
-      'route': route,
-      'emergencyType': emergencyType,
-      'description': description.trim(),
-      'timestamp': FieldValue.serverTimestamp(),
-      'status': status,
-      'isActive' : isActive,
-      'location': {
-        'lat': lat,
-        'lng': lng,
-      },
-      'docPath': newDocRef.path,
-    });
-  });
-}
-
-  //fetch lastest SOS
- Future<Map<String, dynamic>?> fetchLatestSOS(String routeLabel) async {
-  try {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('sosRequests')
-        .where('route', isEqualTo: routeLabel)
-        .orderBy('timestamp', descending: true)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isNotEmpty) {
-      final doc = snapshot.docs.first;
-      final data = doc.data();
-
-      // ✅ Check if isActive is false, then update status to "Received"
-      if (data['isActive'] == false && data['status'] != 'Received') {
-        await doc.reference.update({'status': 'Received'});
-        data['status'] = 'Received'; // So the local data reflects the update
+      int currentCount = 0;
+      if (snapshot.exists) {
+        currentCount = snapshot.data()!['count'] ?? 0;
       }
 
-      print('🆘 Latest SOS fetched: $data');
-      return data;
-    } else {
-      print('🟡 No SOS data found for route: $routeLabel');
+      final newCount = currentCount + 1;
+      final paddedCount = newCount.toString().padLeft(3, '0'); // sos_001, sos_002, etc.
+      final newDocId = 'sos_$paddedCount';
+      final newDocRef = FirebaseFirestore.instance.collection('sosRequests').doc(newDocId);
+
+      final status = isActive ? 'Pending' : 'Received';
+
+      transaction.set(counterDocRef, {'count': newCount});
+
+      // Save SOS request
+      transaction.set(newDocRef, {
+        'route': route,
+        'emergencyType': emergencyType,
+        'description': description.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': status,
+        'isActive' : isActive,
+        'location': {
+          'lat': lat,
+          'lng': lng,
+        },
+        'docPath': newDocRef.path,
+      });
+    });
+  }
+
+    //fetch lastest SOS
+  Future<Map<String, dynamic>?> fetchLatestSOS(String routeLabel) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('sosRequests')
+          .where('route', isEqualTo: routeLabel)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        final data = doc.data();
+        data['id'] = doc.id;
+
+        if (data['status'] == 'Pending') {
+          return data;
+        } else {
+          return null; 
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching SOS: $e');
       return null;
     }
-  } catch (e) {
-    print('❌ Error fetching SOS: $e');
-    return null;
   }
-}
 
-  //changing the pending and received
-  Future<void> updateSOSStatus(String docPath, bool isActive) async {
-  final docRef = FirebaseFirestore.instance.doc(docPath);
+ // Helper to update SOS status based on document path
+  Future<void> _updateSOSStatus(String docPath, bool isActive) async {
+    final docRef = FirebaseFirestore.instance.doc(docPath);
+    final newStatus = isActive ? 'Pending' : 'Received';
 
-  await docRef.update({
-    'isActive': isActive,
-    'status': isActive ? 'Pending' : 'Received',
-  });
-}
+    await docRef.update({
+      'isActive': isActive,
+      'status': newStatus,
+    });
 
-  // clear the non-pending for that route
-   Future<void> cleanUpOldSOS(String route) async {
-  final existingSos = await FirebaseFirestore.instance
-      .collection('sosRequests')
-      .where('route', isEqualTo: route)
-      .get();
+    print('✅ Updated SOS: $docPath → isActive=$isActive, status=$newStatus');
+  }
 
-  for (var doc in existingSos.docs) {
-    final status = doc['status'];
-    if (status != 'Pending') {
-      try {
-        await doc.reference.delete();
-        print('🗑️ Deleted: ${doc.id}');
-      } catch (e) {
-        print('❌ Failed to delete ${doc.id}: $e');
+// Find latest SOS by route and update its status
+  Future<void> updateSOSStatusByRoute(String routeLabel, bool isActive) async {
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('sosRequests')
+          .where('route', isEqualTo: routeLabel)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        print("⚠️ No SOS document found for route: $routeLabel");
+        return;
       }
+
+      final docPath = query.docs.first.reference.path;
+      await _updateSOSStatus(docPath, isActive);
+    } catch (e) {
+      print("❌ Error updating SOS: $e");
     }
   }
-}
 
-
-
-
-
+  Future<void> cancelSOS(String docId) async {
+    final docRef = FirebaseFirestore.instance.collection('sosRequests').doc(docId);
+    await docRef.update({
+      'status': 'Cancelled',
+      'isActive': false,
+    });
+  }
 
   }

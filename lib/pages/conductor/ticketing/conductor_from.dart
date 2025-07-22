@@ -114,7 +114,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => SOSPage(route: widget.route),
+                          builder: (context) => SOSPage(route: widget.route, placeCollection: selectedPlaceCollection),
                         ),
                       );
                     },

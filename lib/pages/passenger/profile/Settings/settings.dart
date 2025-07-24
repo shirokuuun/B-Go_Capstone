@@ -11,7 +11,6 @@ class SettingsPage extends StatelessWidget {
       _SettingsOption('Pre-Ticket QRs', Icons.confirmation_num),
       _SettingsOption('Reservation Confirmations', Icons.event_available),
       _SettingsOption('Help Center / FAQs', Icons.help_outline),
-      _SettingsOption('Terms & Conditions', Icons.description),
       _SettingsOption('Privacy Policy', Icons.groups),
       _SettingsOption('About', Icons.info_outline),
       _SettingsOption('ID Verification', Icons.badge),
@@ -73,6 +72,16 @@ class SettingsPage extends StatelessWidget {
               onTap: () {
                 if (opt.title == 'Pre-Ticket QRs') {
                   Navigator.pushNamed(context, '/pre_ticket_qr');
+                } else if (opt.title == 'Reservation Confirmations') {
+                  Navigator.pushNamed(context, '/reservation_confirmations');
+                } else if (opt.title == 'Help Center / FAQs') {
+                  Navigator.pushNamed(context, '/help_center');
+                } else if (opt.title == 'Privacy Policy') {
+                  Navigator.pushNamed(context, '/privacy_policy');
+                } else if (opt.title == 'About') {
+                  Navigator.pushNamed(context, '/about');
+                } else if (opt.title == 'ID Verification') {
+                  Navigator.pushNamed(context, '/id_verification');
                 }
               }, // Add navigation if needed
             ),

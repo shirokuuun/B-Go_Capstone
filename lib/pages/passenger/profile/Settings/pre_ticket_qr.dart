@@ -24,7 +24,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
   Future<List<Map<String, dynamic>>> _fetchAndCleanTickets() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
-    final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // PH time
+    final now = DateTime.now(); // Use device local time
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
     final tenPm = DateTime(now.year, now.month, now.day, 22);
@@ -48,6 +48,19 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
       data['id'] = doc.id;
       return data;
     }).toList();
+  }
+
+  Future<void> _deleteTicket(String ticketId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final col = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('preTickets');
+    await col.doc(ticketId).delete();
+    setState(() {
+      _ticketsFuture = _fetchAndCleanTickets();
+    });
   }
 
   void _showTicketDetails(Map<String, dynamic> ticket) {
@@ -107,49 +120,84 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
             separatorBuilder: (_, __) => SizedBox(height: width * 0.04),
             itemBuilder: (context, i) {
               final t = tickets[i];
-              return GestureDetector(
-                onTap: () => _showTicketDetails(t),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-                  child: Row(
-                    children: [
-                      QrImageView(
-                        data: t['qrData'] ?? '',
-                        size: width * 0.18,
-                      ),
-                      SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${t['from']} → ${t['to']}',
-                              style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text('Fare: ${t['fare']} PHP',
-                                style: GoogleFonts.outfit(fontSize: 14)),
-                            Text('Passengers: ${t['quantity']}',
-                                style: GoogleFonts.outfit(fontSize: 14)),
-                          ],
+              return Dismissible(
+                key: Key(t['id'] ?? i.toString()),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  color: Colors.red,
+                  child: Icon(Icons.delete, color: Colors.white, size: 32),
+                ),
+                confirmDismiss: (direction) async {
+                  return await showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('Delete Ticket'),
+                      content: Text('Are you sure you want to delete this ticket?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: Text('Cancel'),
                         ),
-                      ),
-                      Icon(Icons.chevron_right, color: Colors.grey, size: 28),
-                    ],
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: Text('Delete', style: TextStyle(color: Colors.red)),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                onDismissed: (direction) async {
+                  await _deleteTicket(t['id']);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ticket deleted')),
+                  );
+                },
+                child: GestureDetector(
+                  onTap: () => _showTicketDetails(t),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black12,
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                    child: Row(
+                      children: [
+                        QrImageView(
+                          data: t['qrData'] ?? '',
+                          size: width * 0.18,
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${t['from']} → ${t['to']}',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 4),
+                              Text('Fare: ${t['fare']} PHP',
+                                  style: GoogleFonts.outfit(fontSize: 14)),
+                              Text('Passengers: ${t['quantity']}',
+                                  style: GoogleFonts.outfit(fontSize: 14)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right, color: Colors.grey, size: 28),
+                      ],
+                    ),
                   ),
                 ),
               );

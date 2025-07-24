@@ -720,7 +720,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
   Future<void> savePreTicket(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // PH time
+    final now = DateTime.now(); // Use device local time
     final data = {
       'from': from,
       'to': to,
@@ -729,7 +729,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
       'quantity': quantity,
       'qrData': qrData,
       'discountBreakdown': discountBreakdown,
-      'createdAt': now,
+      'createdAt': now, // Save as local time
     };
     await FirebaseFirestore.instance
         .collection('users')
@@ -780,34 +780,37 @@ class QRCodeFullScreenPage extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
             SizedBox(height: 24),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Details:',
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w500, fontSize: 14)),
-                  SizedBox(height: 8),
-                  Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('Fare: $fare Pesos',
-                      style: GoogleFonts.outfit(fontSize: 14)),
-                  Text('Total Passengers: $quantity',
-                      style: GoogleFonts.outfit(fontSize: 14)),
-                  if (discountBreakdown != null) ...[
-                    SizedBox(height: 12),
-                    Text('Discounts:',
-                        style: GoogleFonts.outfit(
-                            fontWeight: FontWeight.w500, fontSize: 14)),
-                    ...discountBreakdown!.map((e) =>
-                        Text(e, style: GoogleFonts.outfit(fontSize: 14))),
-                  ],
-                ],
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Details:',
+                          style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w500, fontSize: 14)),
+                      SizedBox(height: 8),
+                      Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('Fare: $fare Pesos',
+                          style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('Total Passengers: $quantity',
+                          style: GoogleFonts.outfit(fontSize: 14)),
+                      if (discountBreakdown != null) ...[
+                        SizedBox(height: 12),
+                        Text('Discounts:',
+                            style: GoogleFonts.outfit(
+                                fontWeight: FontWeight.w500, fontSize: 14)),
+                        ...discountBreakdown!.map((e) =>
+                            Text(e, style: GoogleFonts.outfit(fontSize: 14))),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-            Spacer(),
             Padding(
               padding: const EdgeInsets.only(bottom: 24.0),
               child: Row(

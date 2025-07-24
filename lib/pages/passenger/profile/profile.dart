@@ -162,7 +162,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   _ProfileRow(
                     icon: Icons.badge,
                     label: 'Your ID',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.pushNamed(context, '/user_id');
+                    },
                   ),
                   Spacer(),
                   Padding(

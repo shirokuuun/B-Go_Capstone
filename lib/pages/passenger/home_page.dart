@@ -2,8 +2,7 @@ import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -15,12 +14,15 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final user = FirebaseAuth.instance.currentUser;
-  // Remove GoogleMapController
+  late GoogleMapController mapController;
 
-  final LatLng _center = LatLng(14.5995, 120.9842); // Manila, Philippines
+  final LatLng _center =
+      const LatLng(13.9407, 121.1529); // Example: Rosario, Batangas
   int _selectedIndex = 0;
 
-  // Remove _onMapCreated and mapController
+  void _onMapCreated(GoogleMapController controller) {
+    mapController = controller;
+  }
 
   void _onItemTapped(int index) {
     switch (index) {
@@ -114,35 +116,12 @@ class _HomePageState extends State<HomePage> {
           ],
         ),
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: FlutterMap(
-              options: MapOptions(
-                initialCenter: _center,
-                initialZoom: 10.0, // Try 10 or 8
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-                  subdomains: ['a', 'b', 'c', 'd'],
-                  userAgentPackageName: 'com.example.yourapp',
-                ),
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      width: 80.0,
-                      height: 80.0,
-                      point: _center,
-                      child: Icon(Icons.location_pin, color: Colors.red, size: 40),
-                    ),
-                    // Add more markers here as needed
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+      body: GoogleMap(
+        onMapCreated: _onMapCreated,
+        initialCameraPosition: CameraPosition(
+          target: _center,
+          zoom: 14.0,
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[

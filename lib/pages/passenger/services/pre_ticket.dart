@@ -40,7 +40,15 @@ class _PreTicketState extends State<PreTicket> {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
         selectedRoute = newRoute;
-        placesFuture = RouteService.fetchPlaces(routeToDocId[selectedRoute]!);
+        final docId = routeToDocId[selectedRoute];
+        if (docId == null) {
+          // Handle the error gracefully, e.g. show a message or use a default
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Invalid route selected.')),
+          );
+          return;
+        }
+        placesFuture = RouteService.fetchPlaces(docId);
       });
     }
   }

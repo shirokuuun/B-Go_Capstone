@@ -2,12 +2,18 @@ import 'package:b_go/pages/get_started.dart';
 import 'package:b_go/auth/login_page.dart';
 import 'package:b_go/auth/login_phone_page.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
+import 'package:b_go/pages/passenger/profile/Settings/about.dart';
+import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_instruction.dart';
+import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_picture.dart';
+import 'package:b_go/pages/passenger/profile/user_id.dart';
+import 'package:b_go/pages/passenger/profile/Settings/privacy_policy.dart';
 import 'package:b_go/pages/passenger/profile/Settings/pre_ticket_qr.dart';
 import 'package:b_go/pages/passenger/profile/Settings/settings.dart';
 import 'package:b_go/pages/passenger/sidebar/trip_sched.dart';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/profile/edit_profile.dart';
 import 'package:b_go/pages/passenger/profile/profile.dart';
+import 'package:b_go/pages/passenger/profile/Settings/faq.dart';
 import 'package:b_go/pages/passenger/services/pre_ticket.dart';
 import 'package:b_go/auth/register_page.dart';
 import 'package:b_go/auth/register_phone_page.dart';
@@ -54,6 +60,13 @@ class MyApp extends StatelessWidget {
         '/trip_sched': (context) => TripSchedPage(),
         '/settings': (context) => SettingsPage(),
         '/pre_ticket_qr': (context) => PreTicketQrs(),
+        // '/reservation_confirmations': (context) => ReservationConfirmations(),
+        '/help_center': (context) => FAQPage(),
+        '/privacy_policy': (context) => PrivacyPolicyPage(),
+        '/about': (context) => AboutPage(),
+        '/id_verification': (context) => IDVerificationInstructionPage(),
+        '/id_verification_picture': (context) => IDVerificationPicturePage(),
+        '/user_id': (context) => UserIDPage(),
       },
     );
   }

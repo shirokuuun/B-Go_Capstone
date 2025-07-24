@@ -5,6 +5,7 @@
   import 'package:b_go/pages/conductor/conductor_home.dart';
   import 'package:b_go/pages/conductor/route_service.dart';
   import 'package:cloud_firestore/cloud_firestore.dart';
+  import 'package:intl/intl.dart';
 
   class TripsPage extends StatefulWidget {
     final String route;
@@ -134,37 +135,43 @@
             ),
 
           SliverAppBar(
-              automaticallyImplyLeading: false,
-              backgroundColor: const Color(0xFF1D2B53),
-              pinned: true,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                    SizedBox(
-                      height: 40,
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: Text(
-                          getRouteLabel(widget.placeCollection),
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            color: Colors.white,
-                          ),
-                        ),
+          automaticallyImplyLeading: false,
+          backgroundColor: const Color(0xFF1D2B53),
+          pinned: true,
+          expandedHeight: 80,
+          flexibleSpace: FlexibleSpaceBar(
+            background: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF273469), // Slightly lighter than background
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      getRouteLabel(widget.placeCollection),
+                      style: GoogleFonts.outfit(
+                        fontSize: 24,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    ],
                   ),
                 ),
               ),
             ),
-
-          SliverToBoxAdapter(
-            child: SizedBox(height: 20),
           ),
+        ),
 
            SliverToBoxAdapter(
             child: Padding(
@@ -198,7 +205,9 @@
                             color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(height: 12),
+
+                        const SizedBox(height: 10),
+
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
@@ -264,13 +273,64 @@
                     )
                   else
                     ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: tickets.length,
-                      itemBuilder: (context, index) {
-                        final ticket = tickets[index];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: tickets.length,
+                    itemBuilder: (context, index) {
+                      final ticket = tickets[index];
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6.0),
+                        child: Dismissible(
+                          key: Key(ticket['id'] ?? index.toString()),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            color: Colors.red,
+                            child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                          ),
+                          confirmDismiss: (direction) async {
+                            return await showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Delete Ticket'),
+                                content: const Text('Are you sure you want to delete this ticket?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => Navigator.of(context).pop(true),
+                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          onDismissed: (direction) async {
+                            try {
+                              await RouteService.deleteTicket(
+                                widget.route,
+                                selectedDate,
+                                ticket['id'],
+                                placeCollection: 'Place', 
+                              );
+
+                              setState(() {
+                                tickets.removeAt(index);
+                              });
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Ticket deleted')),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to delete ticket: $e')),
+                              );
+                            }
+                          },
                           child: Container(
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -298,87 +358,41 @@
                                 style: GoogleFonts.outfit(),
                               ),
                               onTap: () {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text(
-                                      'Ticket Details',
-                                      style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 20,
-                                      ),
+                              showDialog(
+                                context: context,
+                                builder: (context) {
+                                  return AlertDialog(
+                                    title: const Text('Ticket Details'),
+                                    content: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('From: ${ticket['from']}'),
+                                        Text('To: ${ticket['to']}'),
+                                        Text('Fare: ₱${ticket['totalFare']}'),
+                                        Text('Quantity: ${ticket['quantity']}'),
+                                        Text('Time: ${ticket['timestamp'] != null ? DateFormat('MMM dd, yyyy hh:mm a')
+                                        .format((ticket['timestamp'] as Timestamp).toDate()) 
+                                              : 'N/A'}',
+                                        ),
+                                      ],
                                     ),
-                                    content: SingleChildScrollView(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'Active: ${ticket['active'] ? "Yes" : "No"}',
-                                            style: TextStyle(
-                                              color: ticket['active'] ? Colors.green : Colors.red,
-                                            ),
-                                          ),
-                                          Text(
-                                            'Time: ${ticket['timestamp'] != null ? (ticket['timestamp'] as Timestamp).toDate().toString() : 'N/A'}',
-                                          ),
-                                          Text('From: ${ticket['from']}'),
-                                          Text('To: ${ticket['to']}'),
-                                          Text('Quantity: ${ticket['quantity']}'),
-                                          Text('Discount Amount: ₱${ticket['discountAmount']}'),
-                                          const SizedBox(height: 10),
-                                          const Text(
-                                            'Discount Breakdown:',
-                                            style: TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                          ...List.generate((ticket['discountBreakdown'] as List).length, (i) {
-                                            return Text(ticket['discountBreakdown'][i]);
-                                          }),
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            'Total Fare: ₱${ticket['totalFare']}',
-                                            style: const TextStyle(fontWeight: FontWeight.bold),
-                                          ),
-                                        ],
-                                      ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Close'),
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        child: const Text('Close'),
-                                        onPressed: () => Navigator.of(context).pop(),
-                                      ),
-                                      TextButton(
-                                        child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                        onPressed: () async {
-                                          await FirebaseFirestore.instance
-                                              .collection('trips')
-                                              .doc(widget.route)
-                                              .collection('trips')
-                                              .doc(selectedDate)
-                                              .collection('tickets')
-                                              .doc(ticket['id'])
-                                              .delete();
-                                          Navigator.of(context).pop();
-                                          if (mounted) {
-                                            setState(() {
-                                              tickets.removeAt(index);
-                                            });
-                                          }
-                                        },
-                                      ),
-                                    ],
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    elevation: 10,
-                                    backgroundColor: Colors.white,
-                                  ),
+                                  ],
+                                );
+                                  },
                                 );
                               },
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      );
+                    },
+                  )
                 ],
               ),
             ),

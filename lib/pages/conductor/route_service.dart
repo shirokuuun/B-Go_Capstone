@@ -290,7 +290,7 @@ class RouteService {
     String route,
     String date,
     String ticketId, {
-    required String placeCollection, // you can still keep this for compatibility
+    required String placeCollection,
   }) async {
     await FirebaseFirestore.instance
         .collection('trips')

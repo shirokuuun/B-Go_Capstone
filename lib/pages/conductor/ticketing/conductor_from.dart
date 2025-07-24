@@ -160,155 +160,190 @@ class _ConductorFromState extends State<ConductorFrom> {
           ),
 
           SliverAppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF1D2B53),
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: 40,
-                      child: DropdownButton<String>(
-                        value: selectedPlaceCollection,
-                        dropdownColor: const Color(0xFF1D2B53),
-                        iconEnabledColor: Colors.white,
-                        items: routeDirections.map((route) {
-                          return DropdownMenuItem<String>(
-                            value: route['collection'],
-                            child: Text(
-                              route['label']!,
-                              style: GoogleFonts.outfit(
-                                fontSize: 24,
-                                color: Colors.white,
-                                
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              selectedPlaceCollection = newValue;
-                              placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: selectedPlaceCollection);
-                            });
-                          }
-                        },
+          automaticallyImplyLeading: false,
+          backgroundColor: const Color(0xFF1D2B53),
+          pinned: true,
+          expandedHeight: 80, 
+          flexibleSpace: FlexibleSpaceBar(
+            background: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF273469), // Slight contrast from background
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
                       ),
-                    ),
-
-                  ],
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.swap_horiz, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: selectedPlaceCollection,
+                            dropdownColor: const Color(0xFF1D2B53),
+                            iconEnabledColor: Colors.white,
+                            isExpanded: true,
+                            style: GoogleFonts.outfit(
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
+                            items: routeDirections.map((route) {
+                              return DropdownMenuItem<String>(
+                                value: route['collection'],
+                                child: Text(
+                                  route['label']!,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 20,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  selectedPlaceCollection = newValue;
+                                  placesFuture = RouteService.fetchPlaces(
+                                    widget.route,
+                                    placeCollection: selectedPlaceCollection,
+                                  );
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
+        ),
 
           SliverToBoxAdapter(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.02), // adjust as needed
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
+            child: SizedBox(height: 16),
+          ),
+
+          SliverToBoxAdapter(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height * 0.80, // Ensures it fills enough space
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Text(
-                        "From:",
-                        style: GoogleFonts.outfit(
-                          fontSize: 25,
-                          color: Colors.black87,
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 16,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: Text(
+                          "From:",
+                          style: GoogleFonts.outfit(
+                            fontSize: 25,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                    
-                    FutureBuilder<List<Map<String, dynamic>>>(
-                      future: placesFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        } else if (snapshot.hasError) {
-                          return Center(child: Text('Error: ${snapshot.error}'));
-                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                          return const Center(child: Text('No places found.'));
-                        }
-                        final myList = snapshot.data!;
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 2.2,
-                          ),
-                          itemCount: myList.length,
-                          itemBuilder: (context, index) {
-                            final item = myList[index];
-                            return ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1D2B53),
-                                elevation: 0,
-                                side: BorderSide.none,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: placesFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          } else if (snapshot.hasError) {
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(child: Text('No places found.'));
+                          }
+
+                          final myList = snapshot.data!;
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 2.2,
+                            ),
+                            itemCount: myList.length,
+                            itemBuilder: (context, index) {
+                              final item = myList[index];
+                              return ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF1D2B53),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                              ),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ConductorTo(
-                                      route: widget.route,
-                                      role: widget.role,
-                                      from: item['name'],
-                                      startKm: item['km'],
-                                      placeCollection: selectedPlaceCollection,
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ConductorTo(
+                                        route: widget.route,
+                                        role: widget.role,
+                                        from: item['name'],
+                                        startKm: item['km'],
+                                        placeCollection: selectedPlaceCollection,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                               child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    item['name'] ?? '',
-                                    style: GoogleFonts.outfit(fontSize: 15, color: Colors.white),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  if (item['km'] != null)
+                                  );
+                                },
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
                                     Text(
-                                      '${item['km']} km',
-                                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                                      item['name'] ?? '',
+                                      style: GoogleFonts.outfit(fontSize: 15, color: Colors.white),
+                                      textAlign: TextAlign.center,
                                     ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ],
+                                    if (item['km'] != null)
+                                      Text(
+                                        '${item['km']} km',
+                                        style: const TextStyle(fontSize: 11, color: Colors.white70),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          )
+              );
+            },
+          ),
+        ),
         ],
       ),
     );

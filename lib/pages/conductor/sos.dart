@@ -83,6 +83,25 @@ class _SOSPageState extends State<SOSPage> {
     });
   }
 
+  Widget detailRow(String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: RichText(
+      text: TextSpan(
+        text: '$label: ',
+        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.black),
+        children: [
+          TextSpan(
+            text: value,
+            style: GoogleFonts.outfit(fontWeight: FontWeight.normal),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -178,98 +197,156 @@ class _SOSPageState extends State<SOSPage> {
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 15),
 
-                // Dropdown
-                Row(children: [
-                  const Icon(Icons.warning, color: Colors.red, size: 30),
-                  const SizedBox(width: 10),
-                  Text('Select Emergency Type', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  value: emergencyTypes.contains(selectedEmergencyType) ? selectedEmergencyType : null,
-                  decoration: InputDecoration(
-                    hintText: "Choose an emergency type",
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Emergency Type
+                      Row(
+                        children: [
+                          const Icon(Icons.warning, color: Colors.red, size: 30),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Select Emergency Type',
+                            style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      DropdownButtonFormField<String>(
+                        value: emergencyTypes.contains(selectedEmergencyType) ? selectedEmergencyType : null,
+                        decoration: InputDecoration(
+                          hintText: "Choose an emergency type",
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onChanged: (value) => setState(() => selectedEmergencyType = value),
+                        items: emergencyTypes
+                            .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+                            .toList(),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Emergency Details
+                      Row(
+                        children: [
+                          const Icon(Icons.edit, color: Colors.red, size: 30),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Enter Emergency Details',
+                            style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _descriptionController,
+                        decoration: InputDecoration(
+                          hintText: 'Enter emergency details',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        ),
+                        maxLines: 3,
+                      ),
+                    ],
                   ),
-                  onChanged: (value) => setState(() => selectedEmergencyType = value),
-                  items: emergencyTypes
-                      .map((type) => DropdownMenuItem(value: type, child: Text(type)))
-                      .toList(),
                 ),
+              ),
 
-                const SizedBox(height: 20),
-
-                // Description
-                Row(children: [
-                  const Icon(Icons.edit, color: Colors.red, size: 30),
-                  const SizedBox(width: 10),
-                  Text('Enter Emergency Details',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
-                ]),
                 const SizedBox(height: 10),
-                TextField(
-                  controller: _descriptionController,
-                  decoration: InputDecoration(
-                    hintText: 'Enter emergency details',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                  maxLines: 3,
-                ),
-
-                const SizedBox(height: 20),
 
                 // Location (static placeholder)
-                Row(children: [
-                  const Icon(Icons.location_on, color: Colors.black, size: 30),
-                  const SizedBox(width: 10),
-                  Text('Current Location',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 10),
-                const Text('GPS'), // Placeholder
-
-                const SizedBox(height: 20),
-
-                // Status
-                Row(children: [
-                  const Icon(Icons.hourglass_empty, color: Colors.black, size: 30),
-                  const SizedBox(width: 10),
-                  Text('Status:', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 10),
-                  if (!isLoading && latestSOS != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: getStatusColor(latestSOS?['status']),
-                        borderRadius: BorderRadius.circular(20),
+                Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.red),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Current Location (GPS)',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
-                      child: Text(latestSOS!['status'],
-                          style: GoogleFonts.outfit(fontSize: 16, color: Colors.white)),
-                    ),
-                ]),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Latitude: 13.9401\nLongitude: 121.1639', // Replace with dynamic GPS if needed
+                        style: GoogleFonts.outfit(fontSize: 16),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          const Icon(Icons.hourglass_empty, color: Colors.black, size: 30),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Status:',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          if (!isLoading && latestSOS != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: getStatusColor(latestSOS?['status']),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                latestSOS!['status'],
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
 
                 if (latestSOS != null) ...[
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   GestureDetector(
                     onTap: () => showDialog(
                       context: context,
                       builder: (_) => AlertDialog(
                         title: const Text('🚨 SOS Details'),
                         content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Emergency Type: ${latestSOS!['emergencyType']}'),
-                            Text('Description: ${latestSOS!['description']}'),
-                            Text('Status: ${latestSOS!['status']}'),
-                            Text('Time: ${latestSOS!['timestamp'] != null ? (latestSOS!['timestamp'] as Timestamp).toDate().toLocal().toString() : 'Unknown'}',),
-                            Text('Route: ${latestSOS!['route']}'),
-                          ],
-                        ),
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          detailRow('🚨 Emergency Type', latestSOS!['emergencyType']),
+                          detailRow('📝 Description', latestSOS!['description']),
+                          detailRow('📍 Route', latestSOS!['route']),
+                          detailRow('🕒 Time', 
+                            latestSOS!['timestamp'] != null
+                              ? (latestSOS!['timestamp'] as Timestamp).toDate().toLocal().toString()
+                              : 'Unknown'),
+                          detailRow('🔁 Status', latestSOS!['status']),
+                        ],
+                      ),
+
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),

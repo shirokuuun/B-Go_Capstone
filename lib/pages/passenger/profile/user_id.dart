@@ -118,7 +118,7 @@ class _UserIDPageState extends State<UserIDPage> {
         SizedBox(height: 6),
         Container(
           width: double.infinity,
-          height: width * 0.22,
+          height: width * 0.55,
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(12),

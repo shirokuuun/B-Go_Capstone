@@ -24,7 +24,7 @@ class IDVerificationInstructionPage extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Take a photo of your ID',
+          'ID Verification Instructions',
           style: GoogleFonts.outfit(
             color: Colors.black,
             fontWeight: FontWeight.w500,

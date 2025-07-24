@@ -9,7 +9,8 @@ class IDVerificationReviewPage extends StatefulWidget {
   const IDVerificationReviewPage({Key? key}) : super(key: key);
 
   @override
-  State<IDVerificationReviewPage> createState() => _IDVerificationReviewPageState();
+  State<IDVerificationReviewPage> createState() =>
+      _IDVerificationReviewPageState();
 }
 
 class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
@@ -29,7 +30,10 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
   }
 
   Future<void> _uploadAndSubmit() async {
-    setState(() { uploading = true; error = null; });
+    setState(() {
+      uploading = true;
+      error = null;
+    });
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Not logged in');
@@ -40,20 +44,38 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
       await backRef.putFile(backImage!);
       final frontUrl = await frontRef.getDownloadURL();
       final backUrl = await backRef.getDownloadURL();
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).collection('VerifyID').doc('id').set({
-        'frontUrl': frontUrl,
-        'backUrl': backUrl,
-        'status': 'pending',
-        'submittedAt': FieldValue.serverTimestamp(),
-      });
+      bool firestoreSuccess = false;
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('VerifyID')
+            .doc('id')
+            .set({
+          'frontUrl': frontUrl,
+          'backUrl': backUrl,
+          'status': 'pending',
+          'submittedAt': FieldValue.serverTimestamp(),
+        });
+        firestoreSuccess = true;
+      } catch (e) {
+        // Firestore write failed, but upload succeeded
+        firestoreSuccess = false;
+      }
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('ID submitted for verification.')),
+          SnackBar(
+              content: Text(firestoreSuccess
+                  ? 'ID submitted for verification.'
+                  : 'Images uploaded successfully, but verification status not updated.')),
         );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
-      setState(() { error = 'Failed to upload. Please try again.'; uploading = false; });
+      setState(() {
+        error = 'Failed to upload. Please try again.';
+        uploading = false;
+      });
     }
   }
 
@@ -85,13 +107,15 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
         centerTitle: true,
       ),
       body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+        padding:
+            EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
               'Please make sure there is enough lighting and the ID lettering is clear before continuing',
-              style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.black87),
+              style: GoogleFonts.outfit(
+                  fontSize: fontSizeBody, color: Colors.black87),
               textAlign: TextAlign.center,
             ),
             SizedBox(height: width * 0.04),
@@ -100,7 +124,9 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
             _imageCard('Back', backImage, width),
             if (error != null) ...[
               SizedBox(height: 12),
-              Text(error!, style: GoogleFonts.outfit(color: Colors.red, fontSize: fontSizeBody)),
+              Text(error!,
+                  style: GoogleFonts.outfit(
+                      color: Colors.red, fontSize: fontSizeBody)),
             ],
             Spacer(),
             Row(
@@ -116,10 +142,9 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                       elevation: 0,
                       padding: EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onPressed: uploading ? null : _uploadAndSubmit,
-                    child: uploading
-                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Use this photo', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                    onPressed: uploading ? null : () => Navigator.pop(context),
+                    child: Text('Retake',
+                        style: GoogleFonts.outfit(fontSize: fontSizeBody)),
                   ),
                 ),
                 SizedBox(width: 12),
@@ -134,8 +159,14 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                       elevation: 0,
                       padding: EdgeInsets.symmetric(vertical: 16),
                     ),
-                    onPressed: uploading ? null : () => Navigator.pop(context),
-                    child: Text('Retake', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                    onPressed: uploading ? null : _uploadAndSubmit,
+                    child: uploading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text('Use this photo',
+                            style: GoogleFonts.outfit(fontSize: fontSizeBody)),
                   ),
                 ),
               ],
@@ -150,11 +181,13 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: width * 0.04)),
+        Text(label,
+            style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w500, fontSize: width * 0.04)),
         SizedBox(height: 6),
         Container(
           width: double.infinity,
-          height: width * 0.22,
+          height: width * 0.55,
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(12),

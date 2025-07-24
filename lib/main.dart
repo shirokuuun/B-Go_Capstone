@@ -5,6 +5,7 @@ import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:b_go/pages/passenger/profile/Settings/about.dart';
 import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_instruction.dart';
 import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_picture.dart';
+import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification.dart';
 import 'package:b_go/pages/passenger/profile/user_id.dart';
 import 'package:b_go/pages/passenger/profile/Settings/privacy_policy.dart';
 import 'package:b_go/pages/passenger/profile/Settings/pre_ticket_qr.dart';
@@ -66,6 +67,7 @@ class MyApp extends StatelessWidget {
         '/about': (context) => AboutPage(),
         '/id_verification': (context) => IDVerificationInstructionPage(),
         '/id_verification_picture': (context) => IDVerificationPicturePage(),
+        '/id_verification_review': (context) => IDVerificationReviewPage(),
         '/user_id': (context) => UserIDPage(),
       },
     );

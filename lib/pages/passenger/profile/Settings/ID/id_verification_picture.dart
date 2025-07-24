@@ -16,6 +16,21 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
   bool _checking = false;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    _checking = false;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reset _checking when returning to this screen
+    setState(() {
+      _checking = false;
+    });
+  }
+
   Future<void> _pickImage(bool isFront) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.camera, imageQuality: 85);
@@ -49,10 +64,14 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
       });
       return;
     }
-    Navigator.pushNamed(context, '/id_verification', arguments: {
-      'front': _frontImage,
-      'back': _backImage,
-    });
+    Navigator.pushNamed(
+      context,
+      '/id_verification_review',
+      arguments: {
+        'front': _frontImage,
+        'back': _backImage,
+      },
+    );
   }
 
   @override
@@ -105,7 +124,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey[300],
+                  backgroundColor: Colors.lightGreen[400],
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(cardRadius),
@@ -152,7 +171,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            height: width * 0.22,
+            height: width * 0.55,
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(12),

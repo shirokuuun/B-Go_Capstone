@@ -6,6 +6,7 @@
   import 'package:b_go/pages/conductor/route_service.dart';
   import 'package:cloud_firestore/cloud_firestore.dart';
   import 'package:intl/intl.dart';
+  import 'package:firebase_auth/firebase_auth.dart';
 
   class TripsPage extends StatefulWidget {
     final String route;
@@ -124,7 +125,8 @@
                   Icons.logout,
                   color: Colors.white,
                   ),
-                onPressed: () {
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => ConductorLogin()),
                     (route) => false, // Removes all previous routes
@@ -337,14 +339,14 @@
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.10),
+                                  color: Colors.black.withValues(alpha: 0.5),
                                   blurRadius: 12,
                                   spreadRadius: 1,
                                   offset: const Offset(0, 4),
                                 ),
                               ],
                               border: Border.all(
-                                color: Colors.grey.withOpacity(0.5),
+                                color: Colors.grey.withValues(alpha: 0.5),
                               ),
                             ),
                             child: ListTile(

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
@@ -60,26 +61,29 @@ class _ConductorHomeState extends State<ConductorHome> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.confirmation_number),
-            label: 'Ticketing',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_bus),
-            label: 'Trips',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Color(0xFF0091AD),
-        onTap: _onItemTapped,
+    return PopScope(
+      canPop: false, // Disable back button
+      child: Scaffold(
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.confirmation_number),
+              label: 'Ticketing',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.directions_bus),
+              label: 'Trips',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: Color(0xFF0091AD),
+          onTap: _onItemTapped,
+        ),
       ),
     );
   }

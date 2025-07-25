@@ -104,7 +104,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               child: SingleChildScrollView(
                 child: Container(
                   margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.18,
+                    top: MediaQuery.of(context).size.height * 0.20,
                   ),
                   width: double.infinity,
                   decoration: const BoxDecoration(
@@ -123,7 +123,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     top: responsive.height * 0.05,
                     left: responsive.width * 0.07,
                     right: responsive.width * 0.07,
-                    bottom: responsive.height * 0.50,
+                    bottom: responsive.height * 0.25,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

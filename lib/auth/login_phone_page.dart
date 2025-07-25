@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:b_go/pages/terms_and_conditions_page.dart';
+import 'package:b_go/responsiveness/responsive_page.dart';
+import 'dart:math' as math;
 
 class LoginPhonePage extends StatefulWidget {
   const LoginPhonePage({Key? key}) : super(key: key);
@@ -17,6 +20,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
   String? _verificationId;
   bool _otpSent = false;
   bool _isLoading = false;
+  bool agreedToTerms = false;
 
   // Country code dropdown
   final List<Map<String, String>> countries = [
@@ -87,39 +91,62 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
 
   @override
   Widget build(BuildContext context) {
+    Responsive responsive = Responsive(context);
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              SizedBox(height: 24),
-              Center(
-                child: Image.asset(
-                  'assets/batrasco-logo.png',
-                  width: 150,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              SizedBox(height: 16),
-              Container(
+      body: Stack(
+        children: [
+          Container(
+            height: MediaQuery.of(context).size.height * 0.38,
+            decoration: BoxDecoration(
+              color: Color(0xFFE5E9F0),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                double maxLogoWidth = 400.0;
+                double logoWidth = 150;
+                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                return Transform.translate(
+                  offset: Offset(0, -20),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/batrasco-logo.png',
+                      width: logoWidth,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SingleChildScrollView(
+              child: Container(
+                margin: EdgeInsets.only(
+                    top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
                   boxShadow: [
                     BoxShadow(
-                      color: Color.fromARGB(31, 172, 172, 172),
-                      blurRadius: 25,
-                      offset: Offset(0, -28),
+                      color: Colors.black12,
+                      blurRadius: 16,
+                      offset: Offset(0, -4),
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                padding: EdgeInsets.only(
+                  top: responsive.height * 0.05,
+                  left: responsive.width * 0.07,
+                  right: responsive.width * 0.07,
+                  bottom: responsive.height * 0.25,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    SizedBox(height: 20),
                     Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -132,7 +159,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                             ),
                           ),
                           Text(
-                            "Login with Phone Number",
+                            "Login with Phone Number!",
                             style: GoogleFonts.outfit(
                               fontSize: 18,
                               fontWeight: FontWeight.w500,
@@ -142,9 +169,10 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(height: 20),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
@@ -153,14 +181,18 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                         child: Row(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(left: 14.0, right: 4.0),
+                              padding: const EdgeInsets.only(
+                                  left: 14.0, right: 4.0),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   value: selectedCountryCode,
                                   items: countries.map((country) {
                                     return DropdownMenuItem<String>(
                                       value: country['code'],
-                                      child: Text(country['code']!, style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                                      child: Text(country['code']!,
+                                          style: GoogleFonts.outfit(
+                                              fontWeight:
+                                                  FontWeight.w500)),
                                     );
                                   }).toList(),
                                   onChanged: !_otpSent
@@ -198,7 +230,8 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                     SizedBox(height: 20),
                     if (_otpSent)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 25.0),
                         child: Container(
                           decoration: BoxDecoration(
                             color: Color(0xFFE5E9F0),
@@ -224,11 +257,62 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                           ),
                         ),
                       ),
+                    Padding(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: agreedToTerms,
+                            onChanged: (bool? value) {
+                              setState(() {
+                                agreedToTerms = value ?? false;
+                              });
+                            },
+                          ),
+                          Flexible(
+                            child: RichText(
+                              text: TextSpan(
+                                style: GoogleFonts.outfit(
+                                    color: Colors.black),
+                                children: [
+                                  TextSpan(
+                                    text: 'I agree to the ',
+                                  ),
+                                  WidgetSpan(
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
+                                          ),
+                                        );
+                                      },
+                                      child: Text(
+                                        'Terms and Conditions',
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.blue,
+                                          decoration: TextDecoration.underline,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     SizedBox(height: 20),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
                       child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
+                          ? const Center(
+                              child: CircularProgressIndicator())
                           : ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Color(0xFF1D2B53),
@@ -237,7 +321,9 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
-                              onPressed: _otpSent ? _verifyOTP : _sendOTP,
+                              onPressed: agreedToTerms
+                                  ? (_otpSent ? _verifyOTP : _sendOTP)
+                                  : null,
                               child: Text(
                                 _otpSent ? 'Verify OTP' : 'Send OTP',
                                 style: GoogleFonts.outfit(
@@ -253,10 +339,9 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Use email instead?',
+                          'Already have an account?',
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w500,
-                            fontSize: 15,
                           ),
                         ),
                         GestureDetector(
@@ -268,7 +353,6 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                             style: GoogleFonts.outfit(
                               color: Colors.blue,
                               fontWeight: FontWeight.w500,
-                              fontSize: 15,
                             ),
                           ),
                         )
@@ -277,9 +361,9 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

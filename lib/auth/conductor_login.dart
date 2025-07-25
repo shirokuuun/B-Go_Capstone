@@ -3,6 +3,8 @@ import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ConductorLogin extends StatefulWidget {
   const ConductorLogin({super.key});
@@ -17,75 +19,77 @@ class _ConductorLoginState extends State<ConductorLogin> {
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
 
-  // Hardcoded conductor credentials (email:password)
-  final Map<String, String> _conductorAccounts = {
-    'batangas_1@gmail.com': 'batangas1',
-    'tiaong_1@gmail.com': 'tiaong1',
-    'kahoy_1@gmail.com': 'mataasnakahoy1',
-    'rosario_1@gmail.com': 'rosario1',
+  // Map email to Firestore doc ID
+  final Map<String, String> _conductorDocIds = {
+    'batangas_1@gmail.com': 'Batangas_1',
+    'tiaong_1@gmail.com': 'Tiaong_1',
+    'kahoy_1@gmail.com': 'Kahoy_1',
+    'rosario_1@gmail.com': 'Rosario_1',
   };
 
-  final Map<String, String> _conductorDocIds = {
-  'batangas_1@gmail.com': 'Batangas_1',
-  'tiaong_1@gmail.com': 'Tiaong_1',
-  'kahoy_1@gmail.com': 'Kahoy_1',
-  'rosario_1@gmail.com': 'Rosario_1',
-};
-
-   void _login() async {
+  Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (_conductorAccounts.containsKey(email) &&
-        _conductorAccounts[email] == password) {
+    try {
+      // Use Firebase Auth for sign-in
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       setState(() {
         _errorMessage = null;
       });
 
-      try {
-        // Get doc ID mapped from email
-        final docId = _conductorDocIds[email]!;
-        final doc = await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(docId)
-            .get();
-
-        if (doc.exists) {
-          final data = doc.data()!;
-          final route = data['route'] ?? '';
-          final placeCollection = data['placeCollection'] ?? 'Place';
-
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ConductorHome(
-                role: 'Conductor',
-                route: route,
-                placeCollection: placeCollection,
-                selectedIndex: 0,
-              ),
-            ),
-          );
-        } else {
-          setState(() {
-            _errorMessage = 'No conductor record found for this email.';
-          });
-        }
-      } catch (e) {
-        print("Error fetching conductor data: $e");
+      // Get doc ID mapped from email
+      final docId = _conductorDocIds[email];
+      if (docId == null) {
         setState(() {
-          _errorMessage = 'Failed to fetch conductor route.';
+          _errorMessage = 'No conductor record found for this email.';
+        });
+        return;
+      }
+      final doc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(docId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data()!;
+        final route = data['route'] ?? '';
+        final placeCollection = data['placeCollection'] ?? 'Place';
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ConductorHome(
+              role: 'Conductor',
+              route: route,
+              placeCollection: placeCollection,
+              selectedIndex: 0,
+            ),
+          ),
+        );
+      } else {
+        setState(() {
+          _errorMessage = 'No conductor record found for this email.';
         });
       }
-    } else {
+    } on FirebaseAuthException catch (e) {
       setState(() {
-        _errorMessage = 'Invalid email or password.';
+        _errorMessage = e.message ?? 'Login failed. Please try again.';
+      });
+    } catch (e) {
+      print("Error fetching conductor data: $e");
+      setState(() {
+        _errorMessage = 'Failed to fetch conductor route.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Responsive responsive = Responsive(context);
     return Scaffold(
       backgroundColor: const Color(0xFFE5E9F0),
       body: SafeArea(
@@ -115,7 +119,12 @@ class _ConductorLoginState extends State<ConductorLogin> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                  padding: EdgeInsets.only(
+                    top: responsive.height * 0.05,
+                    left: responsive.width * 0.07,
+                    right: responsive.width * 0.07,
+                    bottom: responsive.height * 0.20,
+                  ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

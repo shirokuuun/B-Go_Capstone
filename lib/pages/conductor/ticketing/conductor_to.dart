@@ -66,6 +66,13 @@ class _ConductorToState extends State<ConductorTo> {
         case 'Place 2':
           return 'Tiaong - SM City Lipa';
       }
+    } else if (route == 'San Juan') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - San Juan';
+        case 'Place 2':
+          return 'San Juan - SM City Lipa';
+      }
     }
 
     return 'Unknown Route';

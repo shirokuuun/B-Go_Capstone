@@ -53,6 +53,11 @@ class _ConductorFromState extends State<ConductorFrom> {
       {'label': 'SM City Lipa - Tiaong', 'collection': 'Place'},
       {'label': 'Tiaong - SM City Lipa', 'collection': 'Place 2'},
     ];
+  } else if ('${widget.route.trim()}' == 'San Juan') {
+    routeDirections = [
+      {'label': 'SM City Lipa - San Juan', 'collection': 'Place'},
+      {'label': 'San Juan - SM City Lipa', 'collection': 'Place 2'},
+    ];
   }  else {
     // Default fallback
     routeDirections = [

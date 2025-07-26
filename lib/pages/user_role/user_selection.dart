@@ -1,5 +1,6 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
+import 'package:b_go/pages/bus_reserve/BusReserve_pages/bus_home.dart';
 
 class UserSelection extends StatefulWidget {
   const UserSelection({super.key});
@@ -47,11 +48,9 @@ class _UserSelectionState extends State<UserSelection> {
                       ),
                     );
                   } else if (roles[currentIndex] == 'Bus Reservation') {
-                    // TODO: Replace with your actual Bus Reservation page
-                    // Navigator.push(context, MaterialPageRoute(builder: (context) => BusReservationPage()));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('Bus Reservation page coming soon!')),
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => BusHome()),
                     );
                   }
                 },

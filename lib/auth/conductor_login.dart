@@ -25,6 +25,7 @@ class _ConductorLoginState extends State<ConductorLogin> {
     'tiaong_1@gmail.com': 'Tiaong_1',
     'kahoy_1@gmail.com': 'Kahoy_1',
     'rosario_1@gmail.com': 'Rosario_1',
+    'san_juan_1@gmail.com': 'San_Juan_1'
   };
 
   Future<void> _login() async {

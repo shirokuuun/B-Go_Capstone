@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
-import 'package:elevated_ticket_widget/elevated_ticket_widget.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 
 class ConductorTicket extends StatefulWidget {
@@ -95,71 +94,77 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 timestamp.toDate().add(const Duration(hours: 8)))
             .format(context)
         : 'N/A';
+    final from = latestTrip?['from'] ?? '';
+    final to = latestTrip?['to'] ?? '';
+    final startKm = latestTrip?['startKm'] ?? '';
+    final endKm = latestTrip?['endKm'] ?? '';
+    final baseFare = latestTrip?['farePerPassenger'] ?? '';
+    final quantity = latestTrip?['quantity'] ?? '';
+    final totalFare = latestTrip?['totalFare'] ?? '';
+    final discountAmount = latestTrip?['discountAmount'] ?? '';
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: const Color(0xFF1D2B53),
+            backgroundColor: const Color(0xFF0091AD),
             leading: Padding(
-              padding: const EdgeInsets.only(top: 18.0, left: 8.0),
+              padding: const EdgeInsets.only(left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
-               onPressed: () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ConductorFrom(
-                      route: widget.route,
-                      role: 'conductor',
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ConductorFrom(
+                        route: widget.route,
+                        role: 'conductor',
+                      ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
               ),
             ),
-            title: Padding(
-              padding: const EdgeInsets.only(top: 22.0),
-              child: Text(
-                'Ticketing',
-                style: GoogleFonts.outfit(
-                  fontSize: 25,
-                  color: Colors.white,
-                ),
+            title: Text(
+              'Ticketing',
+              style: GoogleFonts.outfit(
+                fontSize: 25,
+                color: Colors.white,
               ),
             ),
           ),
           SliverAppBar(
-          automaticallyImplyLeading: false,
-          backgroundColor: const Color(0xFF1D2B53),
-          pinned: true,
-          expandedHeight: 80,
-          flexibleSpace: FlexibleSpaceBar(
-            background: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF273469), // Slightly lighter than background
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      getRouteLabel(widget.placeCollection),
-                      style: GoogleFonts.outfit(
-                        fontSize: 24,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF0091AD),
+            pinned: true,
+            expandedHeight: 80,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007A8F),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        getRouteLabel(widget.placeCollection),
+                        style: GoogleFonts.outfit(
+                          fontSize: 20,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -167,8 +172,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
               ),
             ),
           ),
-        ),
-
           SliverFillRemaining(
             hasScrollBody: false,
             child: Padding(
@@ -212,7 +215,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF1D2B53),
+                          backgroundColor: Color(0xFF0091AD),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 24.0, vertical: 12.0),
                           shape: RoundedRectangleBorder(
@@ -221,170 +224,54 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         ),
                       ),
                     ),
-                   
+                    SizedBox(height: 24),
                     Center(
                       child: latestTrip == null
                           ? Text(
                               'No ticket yet.',
-                              style: GoogleFonts.bebasNeue(
+                              style: GoogleFonts.outfit(
                                 fontSize: 20,
                                 color: Colors.black54,
                               ),
                             )
                           : Padding(
                               padding: const EdgeInsets.only(top: 20.0),
-                              child: ElevatedTicketWidget(
-                                width: MediaQuery.of(context).size.width * 0.9,
-                                elevation: 2,
-                                backgroundColor: Colors.white,
-                                height: MediaQuery.of(context).size.height * 0.6,
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20.0),
-                                  child: SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              width: 120,
-                                              height: 30,
-                                              decoration: BoxDecoration(
-                                                borderRadius:
-                                                    BorderRadius.circular(30),
-                                                border: Border.all(
-                                                    color: Color(0xFF10B981),
-                                                    width: 1.5),
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  'Ticket:',
-                                                  style: GoogleFonts.outfit(
-                                                    fontSize: 15,
-                                                    color: Color(0xFF10B981),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          'BATRASCO',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 25,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                        Center(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              
-                                              const SizedBox(height: 20),
-                                              Text.rich(
-                                                TextSpan(
-                                                  style: GoogleFonts.bebasNeue(
-                                                    fontSize: 18,
-                                                    color: Colors.black87,
-                                                    //height: 1.3,
-                                                  ),
-                                                  children: [
-                                                    TextSpan(
-                                                      text:
-                                                          'Route: ${getRouteLabel(widget.placeCollection)}\n',
-                                                      style:
-                                                          GoogleFonts.outfit(
-                                                        fontSize: 18,
-                                                      ),
-                                                    ),
-                                                    TextSpan(
-                                                        text:
-                                                            'Date: $formattedDate\n',
-                                                            style:
-                                                              GoogleFonts.outfit(
-                                                            fontSize: 18,
-                                                          ),
-                                                            ),
-                                                    TextSpan(
-                                                        text:
-                                                            'Time: $formattedTime\n',
-                                                            style:
-                                                              GoogleFonts.outfit(
-                                                            fontSize: 18,
-                                                          ),),
-                                                    TextSpan(
-                                                        text:
-                                                            'From: ${latestTrip!['from']}\n',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                          fontSize: 18,
-                                                        ),),
-                                                    TextSpan(
-                                                        text:
-                                                            'To: ${latestTrip!['to']}\n',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                          fontSize: 18,
-                                                        ),),
-                                                    TextSpan(
-                                                        text:
-                                                            'Regular: ${latestTrip!['farePerPassenger']}\n',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                          fontSize: 18,
-                                                        ),),
-                                                    TextSpan(
-                                                        text:
-                                                            'Discount: ${double.tryParse(latestTrip!['discountAmount'].toString())?.toStringAsFixed(2) ?? '0.00'}\n',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                          fontSize: 18,
-                                                        ),),
-                                                    TextSpan(
-                                                        text:
-                                                            'Quantity: ${latestTrip!['quantity']}\n',
-                                                        style:
-                                                            GoogleFonts.outfit(
-                                                          fontSize: 18,
-                                                        ),),
-                                                    TextSpan(
-                                                      text:
-                                                          'Amount: ${latestTrip!['totalFare']}\n',
-                                                      style:
-                                                          GoogleFonts.outfit(
-                                                        fontSize:
-                                                            24,
-                                                        color: Colors.black,
-                                                      ),
-                                                    ),
-                              
-                                                     if (discountBreakdown != null) ...[
-                                                      TextSpan(
-                                                        text: '\nDiscount Breakdown:\n',
-                                                        style: GoogleFonts.outfit(fontSize: 20, color: Colors.black),
-                                                      ),
-                                                      for (var line in discountBreakdown)
-                                                        TextSpan(
-                                                          text: '$line\n',
-                                                          style: GoogleFonts.outfit(fontSize: 16, color: Colors.black87),
-                                                        ),
-                                                    ],
-                                                  ],
-                                                ),
-                                                textAlign: TextAlign.start,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                              child: Container(
+                                width: MediaQuery.of(context).size.width * 0.95,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 16,
+                                      offset: Offset(0, 4),
                                     ),
-                                  ),
+                                  ],
+                                ),
+                                padding: const EdgeInsets.all(24.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Receipt', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0091AD))),
+                                    SizedBox(height: 16),
+                                    Text('Route: ${getRouteLabel(widget.placeCollection)}', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('From: $from', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('To: $to', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('From KM: $startKm', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('To KM: $endKm', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('Base Fare (Regular): $baseFare PHP', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 16)),
+                                    Text('Total Amount: $totalFare PHP', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600)),
+                                    SizedBox(height: 16),
+                                    Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 16)),
+                                    if (discountBreakdown != null)
+                                      ...discountBreakdown.map((e) => Text(e.toString(), style: GoogleFonts.outfit(fontSize: 15))),
+                                    if (discountBreakdown == null)
+                                      Text('No discounts.', style: GoogleFonts.outfit(fontSize: 15)),
+                                  ],
                                 ),
                               ),
                             ),

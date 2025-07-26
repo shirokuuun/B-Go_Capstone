@@ -86,40 +86,47 @@ class _DiscountSelectionState extends State<DiscountSelection> {
       ),
       content: SizedBox(
         width: 350,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (int i = 0; i < widget.quantity; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Passenger ${i + 1}:',
-                      style: GoogleFonts.outfit(fontSize: 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int i = 0; i < widget.quantity; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Passenger ${i + 1}:',
+                          style: GoogleFonts.outfit(fontSize: 16),
+                        ),
+                        const SizedBox(width: 10),
+                        DropdownButton<String>(
+                          value: selectedLabels[i],
+                          style: GoogleFonts.outfit(color: Colors.black),
+                          underline: Container(),
+                          items: fareTypes
+                              .map((type) => DropdownMenuItem(
+                                    value: type,
+                                    child: Text(type),
+                                  ))
+                              .toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              selectedLabels[i] = val!;
+                            });
+                          },
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
-                    DropdownButton<String>(
-                      value: selectedLabels[i],
-                      style: GoogleFonts.outfit(color: Colors.black),
-                      underline: Container(),
-                      items: fareTypes
-                          .map((type) => DropdownMenuItem(
-                                value: type,
-                                child: Text(type),
-                              ))
-                          .toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          selectedLabels[i] = val!;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-          ],
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
       actions: [

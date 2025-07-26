@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/pages/conductor/trip_page.dart';
-import 'package:b_go/pages/conductor/conductor_from.dart';
+import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
+import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
-import 'package:b_go/auth/login_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
   String role;
+  String placeCollection;
   final int selectedIndex;
 
-  ConductorHome({Key? key, required this.route, required this.role, this.selectedIndex = 0}) : super(key: key);
+  ConductorHome({Key? key, required this.route, required this.role, required this.placeCollection, this.selectedIndex = 0, }) : super(key: key);
 
   @override
   _ConductorHomeState createState() => _ConductorHomeState();
@@ -31,7 +32,11 @@ class _ConductorHomeState extends State<ConductorHome> {
       role: widget.role,
     ),
     Container(),
-    TripsPage(),
+    TripsPage(
+      route: widget.route,
+      role: widget.role,
+      placeCollection: widget.placeCollection,
+    ),
   ];
   }
 
@@ -56,46 +61,29 @@ class _ConductorHomeState extends State<ConductorHome> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Conductor Home'),
-        backgroundColor: const Color(0xFF1D2B53),
-        foregroundColor: Colors.white,
-        automaticallyImplyLeading: false, // Remove back arrow
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Logout',
-            onPressed: () {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => LoginPage(showRegisterPage: () {}),
-                ),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.confirmation_number),
-            label: 'Ticketing',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.directions_bus),
-            label: 'Trips',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Color(0xFF0091AD),
-        onTap: _onItemTapped,
+    return PopScope(
+      canPop: false, // Disable back button
+      child: Scaffold(
+        body: _pages[_selectedIndex],
+        bottomNavigationBar: BottomNavigationBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.confirmation_number),
+              label: 'Ticketing',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.directions_bus),
+              label: 'Trips',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: Color(0xFF0091AD),
+          onTap: _onItemTapped,
+        ),
       ),
     );
   }

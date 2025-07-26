@@ -46,6 +46,7 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.0.1
   permission_handler: ^12.0.1
+  intl: ^0.18.1
   image_picker: ^1.1.2
   firebase_storage: ^12.4.10
 

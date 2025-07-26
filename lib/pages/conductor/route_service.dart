@@ -1,15 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class RouteService {
-
-
   static Future<String> fetchRoutePlaceName(String route) async {
-
     final doc = await FirebaseFirestore.instance
         .collection('Destinations')
         .doc(route.trim()) 
         .collection('Place')
-        .doc('${route.trim()} City Proper') // Adjusted to use the route name directly
+        .doc('${route.trim()} City Proper') 
         .get();
 
     if (doc.exists) {
@@ -56,118 +54,137 @@ class RouteService {
     return places;
   }
 
-  //To save trip details
   static Future<String> saveTrip({
-  required String route,
-  required String from,
-  required String to,
-  required num startKm,
-  required num endKm,
-  required int quantity,
-  required List<double> discountList,
-  required List<String> fareTypes, 
-}) async {
-  final totalKm = endKm - startKm;
+    required String route,
+    required String from,
+    required String to,
+    required num startKm,
+    required num endKm,
+    required int quantity,
+    required List<double> discountList,
+    required List<String> fareTypes,
+    String? date,
+  }) async {
+    final totalKm = endKm - startKm;
 
-  // base fare calculation, isa isa
-  double baseFare = 15.0;
-  if (totalKm > 4) {
-    baseFare += (totalKm - 4) * 2.20;
-  }
-
-  // Calculate discounted fare per passenger
-  List<double> discountedFares = discountList.map((discount) {
-    return baseFare * (1 - discount);
-  }).toList();
-
-  // Total fare
-  double totalFare = discountedFares.fold(0.0, (sum, fare) => sum + fare);
-
-  // Total discount amount
-  double totalDiscountAmount = discountList.fold(0.0, (sum, discount) {
-    return sum + (baseFare * discount);
-  });
-
-  // Convert for Firestore storage
-  List<String> formattedFares = discountedFares.map((f) => f.toStringAsFixed(2)).toList();
-  String totalDiscountStr = totalDiscountAmount.toStringAsFixed(2);
-  String totalFareStr = totalFare.toStringAsFixed(2);
-
-  //discount breakdown
-  List<String> discountBreakdown = [];
-
-  for (int i = 0; i < discountList.length; i++) {
-    final discount = discountList[i];
-    final type = fareTypes[i]; // e.g. 'regular', 'student', etc.
-
-    if (discount > 0) {
-      final discountAmount = baseFare * discount;
-      discountBreakdown.add(
-        'Passenger ${i + 1}: $type (₱${discountAmount.toStringAsFixed(2)} discount)',
-      );
-    } else {
-      discountBreakdown.add(
-        'Passenger ${i + 1}: Regular (No discount)',
-      );
+    // base fare calculation, isa isa
+    double baseFare = 15.0;
+    if (totalKm > 4) {
+      baseFare += (totalKm - 4) * 2.20;
     }
-  }
 
-  final tripsCollection = FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
-      .collection('trips');
+    // Calculate discounted fare per passenger
+    List<double> discountedFares = discountList.map((discount) {
+      return baseFare * (1 - discount);
+    }).toList();
 
-  final snapshot = await tripsCollection.get();
-  int maxTripNumber = 0;
-  for (var doc in snapshot.docs) {
-    final tripName = doc.id; 
-    final parts = tripName.split(' ');
-    if (parts.length == 2 && int.tryParse(parts[1]) != null) {
-      final num = int.parse(parts[1]);
-      if (num > maxTripNumber) maxTripNumber = num;
+    // Total fare
+    double totalFare = discountedFares.fold(0.0, (sum, fare) => sum + fare);
+
+    // Total discount amount
+    double totalDiscountAmount = discountList.fold(0.0, (sum, discount) {
+      return sum + (baseFare * discount);
+    });
+
+    // Convert for Firestore storage
+    List<String> formattedFares = discountedFares.map((f) => f.toStringAsFixed(2)).toList();
+    String totalDiscountStr = totalDiscountAmount.toStringAsFixed(2);
+    String totalFareStr = totalFare.toStringAsFixed(2);
+
+    // discount breakdown
+    List<String> discountBreakdown = [];
+    for (int i = 0; i < discountList.length; i++) {
+      final discount = discountList[i];
+      final type = fareTypes[i];
+      if (discount > 0) {
+        final discountAmount = baseFare * discount;
+        discountBreakdown.add(
+          'Passenger ${i + 1}: $type (₱${discountAmount.toStringAsFixed(2)} discount)',
+        );
+      } else {
+        discountBreakdown.add(
+          'Passenger ${i + 1}: Regular (No discount)',
+        );
+      }
     }
-  }
-  final tripNumber = maxTripNumber + 1;
-  final tripDocName = "trip $tripNumber";
 
-  await tripsCollection.doc(tripDocName).set({
-  'from': from,
-  'to': to,
-  'startKm': startKm,
-  'endKm': endKm,
-  'totalKm': totalKm,
-  'timestamp': FieldValue.serverTimestamp(),
-  'active': true,
-  'quantity': quantity,
-  'farePerPassenger': formattedFares,
-  'totalFare': totalFareStr,
-  'discountAmount': totalDiscountStr,
-  'discountList': discountList,
-  'discountBreakdown': discountBreakdown, 
-});
+    final now = DateTime.now();
+    String formattedDate = date ?? DateFormat('yyyy-MM-dd').format(now);
 
-  return tripDocName; 
-}
+    try {
+      await FirebaseFirestore.instance
+          .collection('trips')
+          .doc(route)
+          .collection('trips')
+          .doc(formattedDate)
+          .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+    } catch (e) {
+      print('Failed to ensure date document exists: $e');
+    }
 
-  // To update trip status
-  static Future<void> updateTripStatus(String route, String tripDocName, bool isActive) async {
-    final tripDoc = FirebaseFirestore.instance
+    final tripsCollection = FirebaseFirestore.instance
         .collection('trips')
         .doc(route)
         .collection('trips')
-        .doc(tripDocName);
+        .doc(formattedDate)
+        .collection('tickets');
+
+    final snapshot = await tripsCollection.get();
+    int maxTripNumber = 0;
+    for (var doc in snapshot.docs) {
+      final tripName = doc.id;
+      final parts = tripName.split(' ');
+      if (parts.length == 2 && int.tryParse(parts[1]) != null) {
+        final num = int.parse(parts[1]);
+        if (num > maxTripNumber) maxTripNumber = num;
+      }
+    }
+    final tripNumber = maxTripNumber + 1;
+    final tripDocName = "ticket $tripNumber";
+
+    await tripsCollection.doc(tripDocName).set({
+      'from': from,
+      'to': to,
+      'startKm': startKm,
+      'endKm': endKm,
+      'totalKm': totalKm,
+      'timestamp': FieldValue.serverTimestamp(),
+      'active': true,
+      'quantity': quantity,
+      'farePerPassenger': formattedFares,
+      'totalFare': totalFareStr,
+      'discountAmount': totalDiscountStr,
+      'discountList': discountList,
+      'discountBreakdown': discountBreakdown,
+    });
+
+    return tripDocName;
+  }
+
+  // To update trip status
+  static Future<void> updateTripStatus(String route, String date, String ticketDocName, bool isActive) async {
+    final tripDoc = FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketDocName);
+
 
     await tripDoc.update({'active': isActive});
   }
 
   // To fetch trip details for the ticket
-  static Future<Map<String, dynamic>?> fetchTrip(String route, String tripDocName) async {
+  static Future<Map<String, dynamic>?> fetchTrip(String route, String date, String ticketDocName) async {
     final doc = await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .doc(tripDocName)
-        .get();
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketDocName)
+      .get();
 
     if (doc.exists) {
       final data = doc.data();
@@ -188,7 +205,218 @@ class RouteService {
     return null;
   }
 
-  // compute total fare
+  // to fetch the subcollection document IDs (dates) 
+  Future<List<String>> fetchAvailableTripDates(String route) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .get();
 
-
+  return snapshot.docs.map((doc) => doc.id).toList();
 }
+
+  static Future<List<String>> fetchAvailableDates(String route, {required String placeCollection}) async {
+  try {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(route)
+        .collection('trips')
+        .get();
+
+    print("Fetched ${snapshot.docs.length} date documents for route $route");
+
+    List<String> dates = snapshot.docs.map((doc) {
+      print("Found date doc: ${doc.id}"); // ADD THIS
+      return doc.id;
+    }).toList();
+
+    dates.sort((a, b) => b.compareTo(a)); // newest first
+    return dates;
+  } catch (e) {
+    print('Error fetching dates: $e');
+    return [];
+  }
+}
+
+  static Future<List<Map<String, dynamic>>> fetchTickets(
+    String route,
+    String date, {
+    required String placeCollection, 
+  }) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(route)
+        .collection('trips')
+        .doc(date)
+        .collection('tickets')
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return data;
+    }).toList();
+  }
+
+
+  // fetch all active trips for a specific route
+  Future<List<Map<String, dynamic>>> fetchTicketsForDate(String route, String date) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('trips')
+      .doc(route)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .get();
+
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    return {
+      'id': doc.id,
+      'from': data['from'],
+      'to': data['to'],
+      'totalFare': data['totalFare'],
+      'quantity': data['quantity'],
+      'discountAmount': data['discountAmount'],
+      'timestamp': data['timestamp'],
+    };
+  }).toList();
+}
+
+  // to delete ticket
+  static Future<void> deleteTicket(
+    String route,
+    String date,
+    String ticketId, {
+    required String placeCollection,
+  }) async {
+    await FirebaseFirestore.instance
+        .collection('trips')
+        .doc(route)
+        .collection('trips')
+        .doc(date)
+        .collection('tickets')
+        .doc(ticketId)
+        .delete();
+  }
+
+  // sos saving details
+    Future<void> sendSOS({
+    required String emergencyType,
+    required String description,
+    required double lat,  
+    required double lng,
+    required String route,
+    required bool isActive, 
+  }) async {
+    final counterDocRef = FirebaseFirestore.instance.collection('counters').doc('sos');
+
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(counterDocRef);
+
+      int currentCount = 0;
+      if (snapshot.exists) {
+        currentCount = snapshot.data()!['count'] ?? 0;
+      }
+
+      final newCount = currentCount + 1;
+      final paddedCount = newCount.toString().padLeft(3, '0'); // sos_001, sos_002, etc.
+      final newDocId = 'sos_$paddedCount';
+      final newDocRef = FirebaseFirestore.instance.collection('sosRequests').doc(newDocId);
+
+      final status = isActive ? 'Pending' : 'Received';
+
+      transaction.set(counterDocRef, {'count': newCount});
+
+      // Save SOS request
+      transaction.set(newDocRef, {
+        'route': route,
+        'emergencyType': emergencyType,
+        'description': description.trim(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': status,
+        'isActive' : isActive,
+        'location': {
+          'lat': lat,
+          'lng': lng,
+        },
+        'docPath': newDocRef.path,
+      });
+    });
+  }
+
+    //fetch lastest SOS
+  Future<Map<String, dynamic>?> fetchLatestSOS(String routeLabel) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('sosRequests')
+          .where('route', isEqualTo: routeLabel)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        final data = doc.data();
+        data['id'] = doc.id;
+
+        if (data['status'] == 'Pending') {
+          return data;
+        } else {
+          return null; 
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error fetching SOS: $e');
+      return null;
+    }
+  }
+
+ // Helper to update SOS status based on document path
+  Future<void> _updateSOSStatus(String docPath, bool isActive) async {
+    final docRef = FirebaseFirestore.instance.doc(docPath);
+    final newStatus = isActive ? 'Pending' : 'Received';
+
+    await docRef.update({
+      'isActive': isActive,
+      'status': newStatus,
+    });
+
+    print('✅ Updated SOS: $docPath → isActive=$isActive, status=$newStatus');
+  }
+
+// Find latest SOS by route and update its status
+  Future<void> updateSOSStatusByRoute(String routeLabel, bool isActive) async {
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('sosRequests')
+          .where('route', isEqualTo: routeLabel)
+          .orderBy('timestamp', descending: true)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
+        print("⚠️ No SOS document found for route: $routeLabel");
+        return;
+      }
+
+      final docPath = query.docs.first.reference.path;
+      await _updateSOSStatus(docPath, isActive);
+    } catch (e) {
+      print("❌ Error updating SOS: $e");
+    }
+  }
+
+  Future<void> cancelSOS(String docId) async {
+    final docRef = FirebaseFirestore.instance.collection('sosRequests').doc(docId);
+    await docRef.update({
+      'status': 'Cancelled',
+      'isActive': false,
+    });
+  }
+
+  }

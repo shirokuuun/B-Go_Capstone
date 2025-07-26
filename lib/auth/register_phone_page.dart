@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
+import 'package:b_go/responsiveness/responsive_page.dart';
 
 class RegisterPhonePage extends StatefulWidget {
   const RegisterPhonePage({super.key});
@@ -41,7 +43,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     if (!agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('You must agree to the Terms and Conditions to sign up.'),
+          content:
+              Text('You must agree to the Terms and Conditions to sign up.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -62,7 +65,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Verification failed'), backgroundColor: Colors.red),
+          SnackBar(
+              content: Text(e.message ?? 'Verification failed'),
+              backgroundColor: Colors.red),
         );
       },
       codeSent: (String verificationId, int? resendToken) {
@@ -92,46 +97,72 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid OTP or verification failed'), backgroundColor: Colors.red),
+        SnackBar(
+            content: Text('Invalid OTP or verification failed'),
+            backgroundColor: Colors.red),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+        Responsive responsive = Responsive(context);
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              SizedBox(height: 24),
-              Center(
-                child: Image.asset(
-                  'assets/batrasco-logo.png',
-                  width: 150,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              SizedBox(height: 16),
-              Container(
+      body: Stack(
+        children: [
+          Container(
+            height: MediaQuery.of(context).size.height * 0.38,
+            decoration: BoxDecoration(
+              color: Color(0xFFE5E9F0),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                double maxLogoWidth = 400.0; // Adjust this value as needed
+                double logoWidth = 150;
+                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                // Use Center to make sure the logo always stays in the middle, even if alignment changes
+                return Transform.translate(
+                  offset: Offset(0, -20),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/batrasco-logo.png',
+                      width: logoWidth,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SingleChildScrollView(
+              child: Container(
+                margin: EdgeInsets.only(
+                    top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
                   boxShadow: [
                     BoxShadow(
-                      color: Color.fromARGB(31, 172, 172, 172),
-                      blurRadius: 25,
-                      offset: Offset(0, -28),
+                      color: Colors.black12,
+                      blurRadius: 16,
+                      offset: Offset(0, -4),
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                  padding: EdgeInsets.only(
+                    top: responsive.height * 0.05,
+                    left: responsive.width * 0.07,
+                    right: responsive.width * 0.07,
+                    bottom: responsive.height * 0.25,
+                  ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
+                    SizedBox(height: 20),
                     Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -144,7 +175,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                             ),
                           ),
                           Text(
-                            "Register Here!",
+                            "Register Your Phone Number!",
                             style: GoogleFonts.outfit(
                               fontSize: 18,
                               fontWeight: FontWeight.w500,
@@ -154,9 +185,11 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(height: 20),
+                    // --- All the rest of the registration content goes here, directly in this Column ---
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
@@ -165,14 +198,18 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         child: Row(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(left: 14.0, right: 4.0),
+                              padding: const EdgeInsets.only(
+                                  left: 14.0, right: 4.0),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   value: selectedCountryCode,
                                   items: countries.map((country) {
                                     return DropdownMenuItem<String>(
                                       value: country['code'],
-                                      child: Text(country['code']!, style: GoogleFonts.outfit(fontWeight: FontWeight.w500)),
+                                      child: Text(country['code']!,
+                                          style: GoogleFonts.outfit(
+                                              fontWeight:
+                                                  FontWeight.w500)),
                                     );
                                   }).toList(),
                                   onChanged: !_otpSent
@@ -210,7 +247,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                     SizedBox(height: 20),
                     if (_otpSent)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 25.0),
                         child: Container(
                           decoration: BoxDecoration(
                             color: Color(0xFFE5E9F0),
@@ -237,7 +275,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         ),
                       ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
                       child: Row(
                         children: [
                           Checkbox(
@@ -251,7 +290,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           Flexible(
                             child: RichText(
                               text: TextSpan(
-                                style: GoogleFonts.outfit(color: Colors.black),
+                                style: GoogleFonts.outfit(
+                                    color: Colors.black),
                                 children: [
                                   TextSpan(
                                     text: 'I agree to the ',
@@ -285,9 +325,11 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                     ),
                     SizedBox(height: 20),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 25.0),
                       child: _isLoading
-                          ? const Center(child: CircularProgressIndicator())
+                          ? const Center(
+                              child: CircularProgressIndicator())
                           : ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Color(0xFF1D2B53),
@@ -336,9 +378,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                   ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

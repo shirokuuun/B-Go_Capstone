@@ -119,12 +119,12 @@ class _ConductorLoginState extends State<ConductorLogin> {
                     ),
                   ],
                 ),
-                  padding: EdgeInsets.only(
-                    top: responsive.height * 0.05,
-                    left: responsive.width * 0.07,
-                    right: responsive.width * 0.07,
-                    bottom: responsive.height * 0.20,
-                  ),
+                padding: EdgeInsets.only(
+                  top: responsive.height * 0.05,
+                  left: responsive.width * 0.07,
+                  right: responsive.width * 0.07,
+                  bottom: responsive.height * 0.20,
+                ),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -240,6 +240,36 @@ class _ConductorLoginState extends State<ConductorLogin> {
                           ),
                         ),
                       ),
+
+                      SizedBox(height: 25),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text('Not a conductor?',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.w500)),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/login');
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 2,
+                                  vertical: 4), // Increase tap area
+                              minimumSize:
+                                  Size(0, 0), // Remove min size if needed
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              "Sign In",
+                              style: GoogleFonts.outfit(
+                                color: Color(0xFF2397f3),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
                     ],
                   ),
                 ),

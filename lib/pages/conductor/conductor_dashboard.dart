@@ -13,7 +13,7 @@ class ConductorDashboard extends StatelessWidget {
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
-          "B-Go Map",
+          "Dashboard",
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,

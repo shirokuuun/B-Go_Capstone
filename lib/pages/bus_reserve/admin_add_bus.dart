@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/bus_reserve/reservation_service.dart';
 
 class AdminAddBus extends StatefulWidget {
-
   AdminAddBus({super.key});
 
   @override
@@ -11,33 +10,36 @@ class AdminAddBus extends StatefulWidget {
 }
 
 class _AdminAddBusState extends State<AdminAddBus> {
-
   final TextEditingController _busNameController = TextEditingController();
-  final TextEditingController _routeController = TextEditingController();
   final TextEditingController _plateNumberController = TextEditingController();
 
-  final List<String> _daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  final List<String> _selectedDays = [];
+
+  final List<String> _weekDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
-  final Set<String> _selectedDays = {};
 
   Future<void> _submitBus() async {
     final busName = _busNameController.text.trim();
-    final route = _routeController.text.trim();
     final plate = _plateNumberController.text.trim();
 
-    if (busName.isEmpty || route.isEmpty || plate.isEmpty) {
+    if (busName.isEmpty || plate.isEmpty || _selectedDays.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Please fill in all fields.")),
+        SnackBar(content: Text("Please fill in all fields and select at least one coding day.")),
       );
       return;
     }
 
     await ReservationService.addBus(
       busName: busName,
-      route: route,
       plateNumber: plate,
-      codingDays: _selectedDays.toList(),
+      codingDays: _selectedDays,
     );
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -45,9 +47,18 @@ class _AdminAddBusState extends State<AdminAddBus> {
     );
 
     _busNameController.clear();
-    _routeController.clear();
     _plateNumberController.clear();
     setState(() => _selectedDays.clear());
+  }
+
+  void _toggleDay(String day) {
+    setState(() {
+      if (_selectedDays.contains(day)) {
+        _selectedDays.remove(day);
+      } else {
+        _selectedDays.add(day);
+      }
+    });
   }
 
   @override
@@ -57,9 +68,10 @@ class _AdminAddBusState extends State<AdminAddBus> {
         title: Text(
           'Bus Reservation',
           style: GoogleFonts.outfit(
-            fontSize: 20, 
+            fontSize: 20,
             color: Colors.white,
-            fontWeight: FontWeight.w600),
+            fontWeight: FontWeight.w600,
+          ),
         ),
         backgroundColor: const Color(0xFF1D2B53),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -74,48 +86,46 @@ class _AdminAddBusState extends State<AdminAddBus> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _busNameController,
-                  decoration: InputDecoration(labelText: "Bus Number"),
-                ),
-                TextField(
-                  controller: _routeController,
-                  decoration: InputDecoration(labelText: "Route"),
-                ),
-                TextField(
-                  controller: _plateNumberController,
-                  decoration: InputDecoration(labelText: "Plate Number"),
-                ),
-                SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text("Select Coding Days", style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-                Wrap(
-                  spacing: 8,
-                  children: _daysOfWeek.map((day) {
-                    return FilterChip(
-                      label: Text(day),
-                      selected: _selectedDays.contains(day),
-                      onSelected: (bool selected) {
-                        setState(() {
-                          selected ? _selectedDays.add(day) : _selectedDays.remove(day);
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-                SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _submitBus,
-                  icon: Icon(Icons.save),
-                  label: Text("Save to Firestore"),
-                )
-              ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _busNameController,
+                    decoration: InputDecoration(labelText: "Bus Number"),
+                  ),
+                  TextField(
+                    controller: _plateNumberController,
+                    decoration: InputDecoration(labelText: "Plate Number"),
+                  ),
+                  SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text("Select Coding Days", style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _weekDays.map((day) {
+                      final selected = _selectedDays.contains(day);
+                      return ChoiceChip(
+                        label: Text(day),
+                        selected: selected,
+                        onSelected: (_) => _toggleDay(day),
+                        selectedColor: Colors.blue[700],
+                        labelStyle: TextStyle(
+                          color: selected ? Colors.white : Colors.black,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: _submitBus,
+                    icon: Icon(Icons.save),
+                    label: Text("Save Bus"),
+                  ),
+                ],
+              ),
             ),
-              ) 
           ),
         ),
       ),

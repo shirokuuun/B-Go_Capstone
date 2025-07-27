@@ -86,6 +86,7 @@ flutter:
     - assets/sos-button.png
     - assets/photo-camera.png
     - assets/phone-call.png
+    - assets/batrasco_bus.jpg
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

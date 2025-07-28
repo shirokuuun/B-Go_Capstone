@@ -88,7 +88,7 @@ class _BusHomeState extends State<BusHome> {
               ),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.pushNamed(context, '/home');
+                Navigator.pushNamed(context, '/bus_home');
               },
             ),
             ListTile(
@@ -106,34 +106,6 @@ class _BusHomeState extends State<BusHome> {
                   context,
                   MaterialPageRoute(builder: (context) => UserSelection()),
                 );
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.schedule),
-              title: Text(
-                'Trip Schedules',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/trip_sched');
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.map),
-              title: Text(
-                'Batrasco Routes',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              onTap: () {
-                // TODO: Navigate to Batrasco Routes page
-                Navigator.pop(context);
               },
             ),
           ],
@@ -410,33 +382,39 @@ class _BusHomeState extends State<BusHome> {
           _fetchAvailableBuses();
         },
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _selectedBusIds.isNotEmpty
-                ? const Color(0xFF0091AD)
-                : Colors.grey.shade400,
-            minimumSize: const Size(double.infinity, 50),
-          ),
-          onPressed: _selectedBusIds.isNotEmpty
-              ? () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ReservationForm(
-                        selectedBusIds: _selectedBusIds.toList(),
+      bottomNavigationBar: SafeArea(
+        bottom: true,
+        top: false,
+        left: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _selectedBusIds.isNotEmpty
+                  ? const Color(0xFF0091AD)
+                  : Colors.grey.shade400,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+            onPressed: _selectedBusIds.isNotEmpty
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ReservationForm(
+                          selectedBusIds: _selectedBusIds.toList(),
+                        ),
                       ),
-                    ),
-                  );
-                }
-              : null,
-          child: const Text(
-            'Continue with Selected Bus',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+                    );
+                  }
+                : null,
+            child: const Text(
+              'Continue with Selected Bus',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),

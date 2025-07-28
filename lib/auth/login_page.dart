@@ -346,7 +346,39 @@ class _LoginPageState extends State<LoginPage> {
                               final userCredential =
                                   await _authServices.SignInWithGoogle();
                               if (userCredential == null) return;
+                              
+                              // Handle successful Google Sign-In
+                              if (!mounted) return;
+                              
+                              final user = userCredential.user;
+                              if (user != null) {
+                                // Check if user is a conductor
+                                String email = user.email!;
+                                String username = email.split('@').first;
+                                String conductorDocId = username[0].toUpperCase() + username.substring(1);
+
+                                final conductorDoc = await FirebaseFirestore.instance
+                                    .collection('conductors')
+                                    .doc(conductorDocId)
+                                    .get();
+
+                                if (!mounted) return;
+
+                                if (conductorDoc.exists) {
+                                  final route = conductorDoc.data()?['route'] ?? '';
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+                                    ),
+                                  );
+                                } else {
+                                  // Not a conductor, navigate as a normal user
+                                  Navigator.pushReplacementNamed(context, '/user_selection');
+                                }
+                              }
                             } catch (e) {
+                              if (!mounted) return;
                               showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(

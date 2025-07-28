@@ -217,7 +217,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size.fromHeight(55),
-                  backgroundColor: const Color(0xFF1D2B53),
+                  backgroundColor: const Color(0xFF007A8F),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),

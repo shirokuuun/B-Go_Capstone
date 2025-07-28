@@ -14,43 +14,65 @@ class PreTicket extends StatefulWidget {
 
 class _PreTicketState extends State<PreTicket> {
   final List<String> routeChoices = [
-    'SM Lipa to Batangas City',
-    'SM Lipa to Rosario',
-    'SM Lipa to Mataas na Kahoy',
+    'Batangas',
+    'Rosario',
+    'Mataas na Kahoy',
+    'Tiaong',
+    'San Juan',
   ];
 
-  // Map dropdown value to Firestore document ID
-  final Map<String, String> routeToDocId = {
-    'SM Lipa to Batangas City': 'Batangas',
-    'SM Lipa to Rosario': 'Rosario',
-    'SM Lipa to Mataas na Kahoy': 'Mataas na Kahoy',
+  // Map route to display names
+  final Map<String, List<String>> routeLabels = {
+    'Batangas': [
+      'SM Lipa to Batangas City',
+      'Batangas City to SM Lipa',
+    ],
+    'Rosario': [
+      'SM Lipa to Rosario',
+      'Rosario to SM Lipa',
+    ],
+    'Mataas na Kahoy': [
+      'SM Lipa to Mataas na Kahoy',
+      'Mataas na Kahoy to SM Lipa',
+    ],
+    'Tiaong': [
+      'SM Lipa to Tiaong',
+      'Tiaong to SM Lipa',
+    ],
+    'San Juan': [
+      'SM Lipa to San Juan',
+      'San Juan to SM Lipa',
+    ],
   };
 
-  String selectedRoute = 'SM Lipa to Batangas City';
-  late Future<List<Map<String, dynamic>>> placesFuture =
-      RouteService.fetchPlaces('Batangas');
+  String selectedRoute = 'Batangas';
+  String selectedPlaceCollection = 'Place';
+  int directionIndex = 0; // 0: Place, 1: Place 2
+  late Future<List<Map<String, dynamic>>> placesFuture;
 
   @override
   void initState() {
     super.initState();
-    // Already initialized above
+    placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
   }
 
   void _onRouteChanged(String? newRoute) {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
         selectedRoute = newRoute;
-        final docId = routeToDocId[selectedRoute];
-        if (docId == null) {
-          // Handle the error gracefully, e.g. show a message or use a default
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Invalid route selected.')),
-          );
-          return;
-        }
-        placesFuture = RouteService.fetchPlaces(docId);
+        directionIndex = 0;
+        selectedPlaceCollection = 'Place';
+        placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: selectedPlaceCollection);
       });
     }
+  }
+
+  void _toggleDirection() {
+    setState(() {
+      directionIndex = directionIndex == 0 ? 1 : 0;
+      selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
+      placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: selectedPlaceCollection);
+    });
   }
 
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
@@ -136,41 +158,96 @@ class _PreTicketState extends State<PreTicket> {
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: const Color(0xFF1D2B53),
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF007A8F),
+            expandedHeight: 140,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Column(
+                children: [
+                  // App bar content
+                  Padding(
+                    padding: const EdgeInsets.only(top: 50.0),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Pre-Ticketing',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10.0),
+                          child: DropdownButton<String>(
+                            value: selectedRoute,
+                            dropdownColor: const Color(0xFF007A8F),
+                            style: GoogleFonts.outfit(fontSize: 13, color: Colors.white),
+                            iconEnabledColor: Colors.white,
+                            underline: Container(),
+                            items: routeChoices
+                                .map((route) => DropdownMenuItem(
+                                      value: route,
+                                      child: Text(routeLabels[route]![0], style: TextStyle(color: Colors.white)),
+                                    ))
+                                .toList(),
+                            onChanged: _onRouteChanged,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Route directions display (clickable)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: GestureDetector(
+                      onTap: _toggleDirection,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A8F),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                routeLabels[selectedRoute]![directionIndex],
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            title: Text(
-              'Pre-Ticketing',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 10.0),
-                child: DropdownButton<String>(
-                  value: selectedRoute,
-                  dropdownColor: const Color(0xFF1D2B53),
-                  style: GoogleFonts.outfit(fontSize: 11, color: Colors.white),
-                  iconEnabledColor: Colors.white,
-                  underline: Container(),
-                  items: routeChoices
-                      .map((route) => DropdownMenuItem(
-                            value: route,
-                            child: Text(route,
-                                style: TextStyle(color: Colors.white)),
-                          ))
-                      .toList(),
-                  onChanged: _onRouteChanged,
-                ),
-              ),
-            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 20.0),
           ),
           SliverToBoxAdapter(
             child: Align(
@@ -235,7 +312,7 @@ class _PreTicketState extends State<PreTicket> {
                             final item = myList[index];
                             return ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1D2B53),
+                                backgroundColor: const Color(0xFF007A8F),
                                 elevation: 0,
                                 side: BorderSide.none,
                                 shape: RoundedRectangleBorder(

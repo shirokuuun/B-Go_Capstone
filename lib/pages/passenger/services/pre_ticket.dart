@@ -53,7 +53,8 @@ class _PreTicketState extends State<PreTicket> {
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+    placesFuture =
+        RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
   }
 
   void _onRouteChanged(String? newRoute) {
@@ -62,7 +63,8 @@ class _PreTicketState extends State<PreTicket> {
         selectedRoute = newRoute;
         directionIndex = 0;
         selectedPlaceCollection = 'Place';
-        placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: selectedPlaceCollection);
+        placesFuture = RouteService.fetchPlaces(selectedRoute,
+            placeCollection: selectedPlaceCollection);
       });
     }
   }
@@ -71,7 +73,8 @@ class _PreTicketState extends State<PreTicket> {
     setState(() {
       directionIndex = directionIndex == 0 ? 1 : 0;
       selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
-      placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: selectedPlaceCollection);
+      placesFuture = RouteService.fetchPlaces(selectedRoute,
+          placeCollection: selectedPlaceCollection);
     });
   }
 
@@ -175,7 +178,8 @@ class _PreTicketState extends State<PreTicket> {
                         Padding(
                           padding: const EdgeInsets.only(left: 8.0),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                         ),
@@ -193,13 +197,16 @@ class _PreTicketState extends State<PreTicket> {
                           child: DropdownButton<String>(
                             value: selectedRoute,
                             dropdownColor: const Color(0xFF007A8F),
-                            style: GoogleFonts.outfit(fontSize: 13, color: Colors.white),
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, color: Colors.white),
                             iconEnabledColor: Colors.white,
                             underline: Container(),
                             items: routeChoices
                                 .map((route) => DropdownMenuItem(
                                       value: route,
-                                      child: Text(routeLabels[route]![0], style: TextStyle(color: Colors.white)),
+                                      child: Text(routeLabels[route]![0],
+                                          style:
+                                              TextStyle(color: Colors.white)),
                                     ))
                                 .toList(),
                             onChanged: _onRouteChanged,
@@ -210,11 +217,13 @@ class _PreTicketState extends State<PreTicket> {
                   ),
                   // Route directions display (clickable)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
                     child: GestureDetector(
                       onTap: _toggleDirection,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: const Color(0xFF007A8F),
                           borderRadius: BorderRadius.circular(16),
@@ -573,7 +582,7 @@ class _ReceiptModal extends StatelessWidget {
       'passengerFares': passengerFares,
     };
     return AlertDialog(
-      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20)),
+      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -596,7 +605,8 @@ class _ReceiptModal extends StatelessWidget {
             Text('Quantity: $quantity',
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
             Text('Discounts:',
                 style: GoogleFonts.outfit(
@@ -625,11 +635,18 @@ class _ReceiptModal extends StatelessWidget {
             );
           },
           child: Text('Show generated QR code',
-              style: GoogleFonts.outfit(fontSize: 14)),
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0091AD),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: Colors.black)),
         ),
       ],
     );
@@ -639,7 +656,9 @@ class _ReceiptModal extends StatelessWidget {
 class ToSelectionPage extends StatelessWidget {
   final List<Map<String, dynamic>> toPlaces;
   final String directionLabel;
-  const ToSelectionPage({Key? key, required this.toPlaces, required this.directionLabel}) : super(key: key);
+  const ToSelectionPage(
+      {Key? key, required this.toPlaces, required this.directionLabel})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -662,7 +681,8 @@ class ToSelectionPage extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 8.0),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
                             onPressed: () => Navigator.of(context).pop(),
                           ),
                         ),
@@ -681,9 +701,11 @@ class ToSelectionPage extends StatelessWidget {
                   ),
                   // Non-clickable direction label
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFF007A8F),
                         borderRadius: BorderRadius.circular(16),
@@ -918,7 +940,8 @@ class QRCodeFullScreenPage extends StatelessWidget {
                           style: GoogleFonts.outfit(
                               fontWeight: FontWeight.w500, fontSize: 14)),
                       SizedBox(height: 8),
-                      Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('From: $from',
+                          style: GoogleFonts.outfit(fontSize: 14)),
                       Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
                       Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
                       Text('Fare: $fare Pesos',

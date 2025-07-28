@@ -493,7 +493,7 @@ class _ProfileTextField extends StatelessWidget {
   final IconData icon;
   final bool obscureText;
   final TextInputType? keyboardType;
-  final Widget? prefix;
+
 
   const _ProfileTextField({
     required this.controller,
@@ -501,7 +501,7 @@ class _ProfileTextField extends StatelessWidget {
     required this.icon,
     this.obscureText = false,
     this.keyboardType,
-    this.prefix,
+
   });
 
   @override
@@ -513,7 +513,6 @@ class _ProfileTextField extends StatelessWidget {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: Colors.black),
-        prefix: prefix,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(18),
         ),

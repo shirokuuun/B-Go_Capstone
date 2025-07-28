@@ -1,4 +1,4 @@
-import 'package:b_go/pages/bus_reserve/BusReserve_pages/bus_home.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';

@@ -47,13 +47,13 @@ class _UserIDPageState extends State<UserIDPage> {
         backgroundColor: cyan,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Your ID',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeTitle,
           ),
@@ -76,35 +76,47 @@ class _UserIDPageState extends State<UserIDPage> {
     final frontUrl = idData?['frontUrl'];
     final backUrl = idData?['backUrl'];
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: width * 0.07, vertical: width * 0.04),
+      padding: EdgeInsets.symmetric(
+          horizontal: width * 0.07, vertical: width * 0.04),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (status == 'pending')
             Text('Your ID is pending verification.',
-                style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.orange)),
+                style: GoogleFonts.outfit(
+                    fontSize: fontSizeBody, color: Colors.orange)),
+          SizedBox(height: 12),
           if (status == 'rejected')
             Column(
               children: [
                 Text('Your ID was rejected. Please resubmit.',
-                    style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.red)),
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.red)),
                 SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/id_verification_instruction');
+                    Navigator.pushNamed(context, '/id_verification');
                   },
-                  child: Text('Resubmit ID', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF01A03E),
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text('Resubmit ID',
+                      style: GoogleFonts.outfit(
+                          fontSize: fontSizeBody, color: Colors.white)),
                 ),
               ],
             ),
           if (status == 'verified')
             Text('Your ID is verified!',
-                style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.green)),
+                style: GoogleFonts.outfit(
+                    fontSize: fontSizeBody, color: Colors.green)),
           SizedBox(height: width * 0.04),
-          if (frontUrl != null)
-            _imageCard('Front', frontUrl, width),
-          if (backUrl != null)
-            _imageCard('Back', backUrl, width),
+          if (frontUrl != null) _imageCard('Front', frontUrl, width),
+          if (backUrl != null) _imageCard('Back', backUrl, width),
         ],
       ),
     );
@@ -114,7 +126,9 @@ class _UserIDPageState extends State<UserIDPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: width * 0.04)),
+        Text(label,
+            style: GoogleFonts.outfit(
+                fontWeight: FontWeight.w500, fontSize: width * 0.04)),
         SizedBox(height: 6),
         Container(
           width: double.infinity,

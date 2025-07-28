@@ -1,4 +1,4 @@
-import 'package:b_go/pages/bus_reserve/BusReserve_pages/reservation_form.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/reservation_form.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -17,6 +17,7 @@ class _BusHomeState extends State<BusHome> {
   List<Map<String, dynamic>> _availableBuses = [];
   Set<String> _selectedBusIds = {};
   DateTime? _selectedDate;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -59,6 +60,85 @@ class _BusHomeState extends State<BusHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                color: Color(0xFF0091AD),
+              ),
+              child: Text(
+                'Menu',
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontSize: 30,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.home),
+              title: Text(
+                'Home',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/home');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.directions_bus),
+              title: Text(
+                'Role Selection',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => UserSelection()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.schedule),
+              title: Text(
+                'Trip Schedules',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/trip_sched');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.map),
+              title: Text(
+                'Batrasco Routes',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                // TODO: Navigate to Batrasco Routes page
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -67,18 +147,16 @@ class _BusHomeState extends State<BusHome> {
             leading: Padding(
               padding: const EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: const Icon(Icons.menu, color: Colors.white),
                 onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => UserSelection()),
-                  );
+                  _scaffoldKey.currentState?.openDrawer();
                 },
               ),
             ),
             title: Padding(
               padding: const EdgeInsets.only(top: 22.0),
               child: Text(
-                'Available Buses',
+                'Bus Reservation',
                 style: GoogleFonts.outfit(
                   fontSize: 25,
                   color: Colors.white,
@@ -107,7 +185,8 @@ class _BusHomeState extends State<BusHome> {
                 child: Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF007A8F),
                       borderRadius: BorderRadius.circular(16),
@@ -144,7 +223,8 @@ class _BusHomeState extends State<BusHome> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade200,
                             borderRadius: BorderRadius.circular(20),
@@ -179,7 +259,8 @@ class _BusHomeState extends State<BusHome> {
                     (context, index) {
                       final bus = _availableBuses[index];
                       return Container(
-                        margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 6, horizontal: 10),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -214,7 +295,7 @@ class _BusHomeState extends State<BusHome> {
                               width: 100,
                               child: Text(
                                 bus['name'] ?? '',
-                                style:  GoogleFonts.outfit(
+                                style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF0091AD),
@@ -228,64 +309,67 @@ class _BusHomeState extends State<BusHome> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   RichText(
-                                  text: TextSpan(
-                                    children: [
-                                      TextSpan(
-                                        text: 'Plate: ',
-                                       style: GoogleFonts.outfit(
-                                         fontWeight: FontWeight.bold,
-                                         color: Colors.black, // or your desired color
-                                       ),
-                                      ),
-                                      TextSpan(
-                                        text: '${bus['plateNumber']}',
-                                        style: GoogleFonts.outfit(
-                                          fontWeight: FontWeight.normal,
-                                          color: Colors.grey[800], // or any style you want
+                                    text: TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: 'Plate: ',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors
+                                                .black, // or your desired color
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                        TextSpan(
+                                          text: '${bus['plateNumber']}',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.normal,
+                                            color: Colors.grey[
+                                                800], // or any style you want
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
                                   RichText(
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: 'Available: ',
-                                      style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
+                                    text: TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: 'Available: ',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: List<String>.from(
+                                                  bus['codingDays'])
+                                              .join(', '),
+                                          style: GoogleFonts.outfit(
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    TextSpan(
-                                      text: List<String>.from(bus['codingDays']).join(', '),
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.grey[800],
-                                      ),
+                                  ),
+                                  RichText(
+                                    text: TextSpan(
+                                      children: [
+                                        TextSpan(
+                                          text: 'Price: ',
+                                          style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                        TextSpan(
+                                          text: '${bus['Price']}',
+                                          style: GoogleFonts.outfit(
+                                            color: Colors.grey[800],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                              ),
-
-                              RichText(
-                                text: TextSpan(
-                                  children: [
-                                    TextSpan(
-                                      text: 'Price: ',
-                                      style: GoogleFonts.outfit(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: '${bus['Price']}',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.grey[800],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                                  ),
                                 ],
                               ),
                             ),

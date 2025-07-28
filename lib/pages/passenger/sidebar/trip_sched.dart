@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class TripSchedPage extends StatelessWidget {
-  const TripSchedPage({Key? key}) : super(key: key);
+  TripSchedPage({Key? key}) : super(key: key);
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: Colors.white),
+          onPressed: () {
+            _scaffoldKey.currentState?.openDrawer();
+          },
+        ),
         title: Text(
           'Trip Schedules',
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,
+            color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF0091AD),
@@ -46,6 +55,20 @@ class TripSchedPage extends StatelessWidget {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/home');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.directions_bus),
+              title: Text(
+                'Role Selection',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/user_selection');
               },
             ),
             ListTile(
@@ -134,7 +157,8 @@ class TripSchedPage extends StatelessWidget {
     );
   }
 
-  Widget _buildScheduleCard({required String route, required List<String> schedules}) {
+  Widget _buildScheduleCard(
+      {required String route, required List<String> schedules}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

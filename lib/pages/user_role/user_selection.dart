@@ -1,6 +1,6 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
-import 'package:b_go/pages/bus_reserve/BusReserve_pages/bus_home.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
 
 class UserSelection extends StatefulWidget {
   const UserSelection({super.key});

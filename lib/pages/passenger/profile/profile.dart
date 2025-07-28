@@ -72,13 +72,13 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundColor: Color(0xFF0091AD),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           'Profile',
           style: GoogleFonts.outfit(
-            color: const Color.fromARGB(255, 0, 0, 0),
+            color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w500,
           ),
@@ -148,7 +148,10 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Text(
                       'Edit Profile',
                       style: GoogleFonts.outfit(
-                          fontSize: 18, fontWeight: FontWeight.w500),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                   SizedBox(height: 32),
@@ -221,8 +224,8 @@ class _ProfileRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: Color(0xFF0091AD),
-        child: Icon(icon, color: Colors.black),
+        backgroundColor: Color.fromARGB(255, 1, 123, 148),
+        child: Icon(icon, color: Colors.white),
       ),
       title: Text(
         label,

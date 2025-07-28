@@ -88,14 +88,14 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
         backgroundColor: const Color(0xFF0091AD),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         centerTitle: true,
         title: Text(
           'Pre-Ticket QRs',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: 20,
           ),

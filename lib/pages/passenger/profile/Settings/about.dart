@@ -20,14 +20,14 @@ class AboutPage extends StatelessWidget {
         backgroundColor: cyan,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black, size: fontSizeTitle + 2),
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: fontSizeTitle + 2),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: Text(
           'About',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeTitle,
           ),
@@ -41,7 +41,11 @@ class AboutPage extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  Icon(Icons.directions_bus, color: cyan, size: iconSize * 1.2),
+                  Image.asset(
+                      'assets/batrasco-logo.png',
+                      width: 150,
+                      fit: BoxFit.contain,
+                    ),
                   SizedBox(height: width * 0.02),
                   Text(
                     'Welcome to B-Go — Your Smart Bus Companion in Batangas!',
@@ -62,25 +66,25 @@ class AboutPage extends StatelessWidget {
               textAlign: TextAlign.justify,
             ),
             SizedBox(height: width * 0.06),
-            _sectionTitle('🚍 What B-Go Offers:', fontSizeSection),
+            _sectionTitle('What B-Go Offers:', fontSizeSection),
             _featureRow(Icons.location_on, 'Live Bus Tracking', 'Know exactly where your bus is and when it will arrive using real-time GPS updates.', iconSize, cyan, fontSizeBody),
             _featureRow(Icons.event_seat, 'Seat Availability Monitoring', 'Check how many seats are available before boarding so you can plan your trip more comfortably.', iconSize, cyan, fontSizeBody),
             _featureRow(Icons.confirmation_num, 'Ticket Management', 'The conductor issues and updates tickets through their interface, and you see accurate trip data in real-time.', iconSize, cyan, fontSizeBody),
             SizedBox(height: width * 0.06),
-            _sectionTitle('🎯 Our Mission:', fontSizeSection),
+            _sectionTitle('Our Mission:', fontSizeSection),
             Text(
               'To support safe, efficient, and modern public transport in Batangas through reliable digital solutions that connect passengers and bus operators in real time.',
               style: GoogleFonts.outfit(fontSize: fontSizeBody),
               textAlign: TextAlign.justify,
             ),
             SizedBox(height: width * 0.06),
-            _sectionTitle('👥 Who We Serve:', fontSizeSection),
+            _sectionTitle('Who We Serve:', fontSizeSection),
             _bullet('Local commuters', fontSizeBody),
             _bullet('Students', fontSizeBody),
             _bullet('Workers', fontSizeBody),
             _bullet('Tourists exploring Batangas', fontSizeBody),
             SizedBox(height: width * 0.06),
-            _sectionTitle('⚙️ Powered By:', fontSizeSection),
+            _sectionTitle('Powered By:', fontSizeSection),
             Text(
               'The B-Go app is proudly developed in partnership with local developers and the BATRASCO cooperative, aiming to promote innovation in provincial transportation.',
               style: GoogleFonts.outfit(fontSize: fontSizeBody),

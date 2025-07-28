@@ -294,7 +294,7 @@ class _LoginPageState extends State<LoginPage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D2B53),
+                            backgroundColor: const Color(0xFF0091AD),
                             padding: EdgeInsets.all(20),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -406,7 +406,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             child: const Icon(
                               Icons.directions_bus,
-                              color: Color(0xFF1D2B53),
+                              color: Color(0xFF0091AD),
                               size: 28,
                             ),
                           ),
@@ -436,7 +436,7 @@ class _LoginPageState extends State<LoginPage> {
                           child: Text(
                             "Sign Up",
                             style: GoogleFonts.outfit(
-                              color: Color(0xFF2397f3),
+                              color: Color(0xFF0091AD),
                               fontWeight: FontWeight.w500,
                             ),
                           ),

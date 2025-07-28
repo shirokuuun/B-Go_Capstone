@@ -2,6 +2,7 @@ import 'package:b_go/pages/get_started.dart';
 import 'package:b_go/auth/login_page.dart';
 import 'package:b_go/auth/login_phone_page.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
 import 'package:b_go/pages/passenger/profile/Settings/about.dart';
 import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_instruction.dart';
 import 'package:b_go/pages/passenger/profile/Settings/ID/id_verification_picture.dart';
@@ -69,6 +70,7 @@ class MyApp extends StatelessWidget {
         '/id_verification_picture': (context) => IDVerificationPicturePage(),
         '/id_verification_review': (context) => IDVerificationReviewPage(),
         '/user_id': (context) => UserIDPage(),
+        '/bus_home': (context) => BusHome(),
       },
     );
   }

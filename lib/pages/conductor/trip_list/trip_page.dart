@@ -32,57 +32,89 @@
       placesFuture = RouteService.fetchPlaces(widget.route, placeCollection: widget.placeCollection);
     }
 
-      Future<void> loadInitialData() async {
-      availableDates = await RouteService.fetchAvailableDates(widget.route, placeCollection: widget.placeCollection);
-      if (availableDates.isNotEmpty) {
-        selectedDate = availableDates[0];
-        tickets = await RouteService.fetchTickets(widget.route, selectedDate, placeCollection: widget.placeCollection);
-      }
-      setState(() {
-        isLoading = false;
-      });
-    }
+  Future<void> loadInitialData() async {
+  final currentUser = FirebaseAuth.instance.currentUser;
+  final conductorId = await RouteService.getConductorDocIdFromEmail(currentUser?.email ?? '');
+
+  if (conductorId == null) {
+    // Show error if conductorId could not be retrieved
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Conductor ID not found. Please contact admin.')),
+    );
+    setState(() {
+      isLoading = false;
+    });
+    return;
+  }
+
+  availableDates = await RouteService.fetchAvailableDates(conductorId);
+
+  if (availableDates.isNotEmpty) {
+    selectedDate = availableDates[0];
+
+    tickets = await RouteService.fetchTickets(
+      conductorId: conductorId, 
+      date: selectedDate,
+    );
+  }
+
+  setState(() {
+    isLoading = false;
+  });
+}
 
     late Future<List<Map<String, dynamic>>> placesFuture;
 
     Future<void> _showDatePicker(BuildContext context) async {
-      final DateTime? picked = await showDatePicker(
-        context: context,
-        initialDate: selectedDate.isNotEmpty 
-            ? DateTime.parse(selectedDate) 
-            : DateTime.now(),
-        firstDate: DateTime(2020), // Allow dates from 2020 onwards
-        lastDate: DateTime(2030), // Allow dates up to 2030
-        builder: (context, child) {
-          return Theme(
-            data: Theme.of(context).copyWith(
-              colorScheme: const ColorScheme.light(
-                primary: Color(0xFF0091AD), // Header background color
-                onPrimary: Colors.white, // Header text color
-                onSurface: Colors.black, // Body text color
-              ),
-            ),
-            child: child!,
-          );
-        },
+  final DateTime? picked = await showDatePicker(
+    context: context,
+    initialDate: selectedDate.isNotEmpty 
+        ? DateTime.parse(selectedDate) 
+        : DateTime.now(),
+    firstDate: DateTime(2020),
+    lastDate: DateTime(2030),
+    builder: (context, child) {
+      return Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFF0091AD),
+            onPrimary: Colors.white,
+            onSurface: Colors.black,
+          ),
+        ),
+        child: child!,
       );
-      
-      if (picked != null) {
-        final formattedDate = DateFormat('yyyy-MM-dd').format(picked);
-        setState(() {
-          isLoading = true;
-          selectedDate = formattedDate;
-        });
-        
-        // Fetch tickets for the selected date
-        tickets = await RouteService.fetchTickets(
-          widget.route,
-          selectedDate,
-          placeCollection: widget.placeCollection,
-        );
-        setState(() => isLoading = false);
-      }
+    },
+  );
+
+  if (picked != null) {
+    final formattedDate = DateFormat('yyyy-MM-dd').format(picked);
+
+    final conductorId = await RouteService.getConductorDocIdFromEmail(
+      FirebaseAuth.instance.currentUser?.email ?? '',
+    );
+
+    if (conductorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Conductor ID not found.')),
+      );
+      return;
     }
+
+    setState(() {
+      selectedDate = formattedDate;
+      isLoading = true;
+    });
+
+    tickets = await RouteService.fetchTickets(
+      conductorId: conductorId,
+      date: formattedDate,
+    );
+
+    setState(() => isLoading = false);
+  }
+}
+
 
     String getRouteLabel(String placeCollection) {
       final route = widget.route.trim();
@@ -115,6 +147,13 @@
           case 'Place 2':
             return 'Tiaong - SM City Lipa';
         }
+      } else if (route == 'San Juan') {
+        switch (placeCollection) {
+          case 'Place':
+            return 'SM City Lipa - San Juan';
+          case 'Place 2':
+            return 'San Juan - SM City Lipa';
+        }
       }
 
       return 'Unknown Route';
@@ -129,7 +168,7 @@
               floating: true,
               automaticallyImplyLeading: false,
               backgroundColor: const Color(0xFF0091AD),
-              expandedHeight: 140,
+              expandedHeight: 145,
               flexibleSpace: FlexibleSpaceBar(
                 background: Column(
                   children: [
@@ -338,11 +377,14 @@
                             },
                             onDismissed: (direction) async {
                               try {
+                                final conductorId = await RouteService.getConductorDocIdFromEmail(
+                                  FirebaseAuth.instance.currentUser?.email ?? '',
+                                );
+
                                 await RouteService.deleteTicket(
-                                  widget.route,
+                                  conductorId!,
                                   selectedDate,
                                   ticket['id'],
-                                  placeCollection: 'Place',
                                 );
                                 setState(() {
                                   tickets.removeWhere((t) => t['id'] == ticket['id']);

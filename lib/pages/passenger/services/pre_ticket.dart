@@ -14,43 +14,68 @@ class PreTicket extends StatefulWidget {
 
 class _PreTicketState extends State<PreTicket> {
   final List<String> routeChoices = [
-    'SM Lipa to Batangas City',
-    'SM Lipa to Rosario',
-    'SM Lipa to Mataas na Kahoy',
+    'Batangas',
+    'Rosario',
+    'Mataas na Kahoy',
+    'Tiaong',
+    'San Juan',
   ];
 
-  // Map dropdown value to Firestore document ID
-  final Map<String, String> routeToDocId = {
-    'SM Lipa to Batangas City': 'Batangas',
-    'SM Lipa to Rosario': 'Rosario',
-    'SM Lipa to Mataas na Kahoy': 'Mataas na Kahoy',
+  // Map route to display names
+  final Map<String, List<String>> routeLabels = {
+    'Batangas': [
+      'SM Lipa to Batangas City',
+      'Batangas City to SM Lipa',
+    ],
+    'Rosario': [
+      'SM Lipa to Rosario',
+      'Rosario to SM Lipa',
+    ],
+    'Mataas na Kahoy': [
+      'SM Lipa to Mataas na Kahoy',
+      'Mataas na Kahoy to SM Lipa',
+    ],
+    'Tiaong': [
+      'SM Lipa to Tiaong',
+      'Tiaong to SM Lipa',
+    ],
+    'San Juan': [
+      'SM Lipa to San Juan',
+      'San Juan to SM Lipa',
+    ],
   };
 
-  String selectedRoute = 'SM Lipa to Batangas City';
-  late Future<List<Map<String, dynamic>>> placesFuture =
-      RouteService.fetchPlaces('Batangas');
+  String selectedRoute = 'Batangas';
+  String selectedPlaceCollection = 'Place';
+  int directionIndex = 0; // 0: Place, 1: Place 2
+  late Future<List<Map<String, dynamic>>> placesFuture;
 
   @override
   void initState() {
     super.initState();
-    // Already initialized above
+    placesFuture =
+        RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
   }
 
   void _onRouteChanged(String? newRoute) {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
         selectedRoute = newRoute;
-        final docId = routeToDocId[selectedRoute];
-        if (docId == null) {
-          // Handle the error gracefully, e.g. show a message or use a default
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Invalid route selected.')),
-          );
-          return;
-        }
-        placesFuture = RouteService.fetchPlaces(docId);
+        directionIndex = 0;
+        selectedPlaceCollection = 'Place';
+        placesFuture = RouteService.fetchPlaces(selectedRoute,
+            placeCollection: selectedPlaceCollection);
       });
     }
+  }
+
+  void _toggleDirection() {
+    setState(() {
+      directionIndex = directionIndex == 0 ? 1 : 0;
+      selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
+      placesFuture = RouteService.fetchPlaces(selectedRoute,
+          placeCollection: selectedPlaceCollection);
+    });
   }
 
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
@@ -68,7 +93,10 @@ class _PreTicketState extends State<PreTicket> {
     }
     final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
-        builder: (context) => ToSelectionPage(toPlaces: toPlaces),
+        builder: (context) => ToSelectionPage(
+          toPlaces: toPlaces,
+          directionLabel: routeLabels[selectedRoute]![directionIndex],
+        ),
       ),
     );
     if (toPlace != null) {
@@ -136,41 +164,102 @@ class _PreTicketState extends State<PreTicket> {
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: const Color(0xFF1D2B53),
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF007A8F),
+            expandedHeight: 140,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Column(
+                children: [
+                  // App bar content
+                  Padding(
+                    padding: const EdgeInsets.only(top: 50.0),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Pre-Ticketing',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10.0),
+                          child: DropdownButton<String>(
+                            value: selectedRoute,
+                            dropdownColor: const Color(0xFF007A8F),
+                            style: GoogleFonts.outfit(
+                                fontSize: 13, color: Colors.white),
+                            iconEnabledColor: Colors.white,
+                            underline: Container(),
+                            items: routeChoices
+                                .map((route) => DropdownMenuItem(
+                                      value: route,
+                                      child: Text(routeLabels[route]![0],
+                                          style:
+                                              TextStyle(color: Colors.white)),
+                                    ))
+                                .toList(),
+                            onChanged: _onRouteChanged,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Route directions display (clickable)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: GestureDetector(
+                      onTap: _toggleDirection,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A8F),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz, color: Colors.white),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                routeLabels[selectedRoute]![directionIndex],
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            title: Text(
-              'Pre-Ticketing',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 10.0),
-                child: DropdownButton<String>(
-                  value: selectedRoute,
-                  dropdownColor: const Color(0xFF1D2B53),
-                  style: GoogleFonts.outfit(fontSize: 11, color: Colors.white),
-                  iconEnabledColor: Colors.white,
-                  underline: Container(),
-                  items: routeChoices
-                      .map((route) => DropdownMenuItem(
-                            value: route,
-                            child: Text(route,
-                                style: TextStyle(color: Colors.white)),
-                          ))
-                      .toList(),
-                  onChanged: _onRouteChanged,
-                ),
-              ),
-            ],
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 20.0),
           ),
           SliverToBoxAdapter(
             child: Align(
@@ -235,7 +324,7 @@ class _PreTicketState extends State<PreTicket> {
                             final item = myList[index];
                             return ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1D2B53),
+                                backgroundColor: const Color(0xFF007A8F),
                                 elevation: 0,
                                 side: BorderSide.none,
                                 shape: RoundedRectangleBorder(
@@ -460,18 +549,15 @@ class _ReceiptModal extends StatelessWidget {
     double totalAmount = 0.0;
     for (int i = 0; i < fareTypes.length; i++) {
       final type = fareTypes[i];
-      String discountText;
       double passengerFare;
       bool isDiscounted = false;
       if (type.toLowerCase() == 'pwd' ||
           type.toLowerCase() == 'senior' ||
           type.toLowerCase() == 'student') {
         passengerFare = baseFare * 0.8;
-        discountText = '20% off';
         isDiscounted = true;
       } else {
         passengerFare = baseFare;
-        discountText = 'No discount';
       }
       totalAmount += passengerFare;
       passengerFares.add(passengerFare);
@@ -496,7 +582,7 @@ class _ReceiptModal extends StatelessWidget {
       'passengerFares': passengerFares,
     };
     return AlertDialog(
-      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20)),
+      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -519,7 +605,8 @@ class _ReceiptModal extends StatelessWidget {
             Text('Quantity: $quantity',
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
             Text('Discounts:',
                 style: GoogleFonts.outfit(
@@ -548,11 +635,18 @@ class _ReceiptModal extends StatelessWidget {
             );
           },
           child: Text('Show generated QR code',
-              style: GoogleFonts.outfit(fontSize: 14)),
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0091AD),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: Colors.black)),
         ),
       ],
     );
@@ -561,7 +655,10 @@ class _ReceiptModal extends StatelessWidget {
 
 class ToSelectionPage extends StatelessWidget {
   final List<Map<String, dynamic>> toPlaces;
-  const ToSelectionPage({Key? key, required this.toPlaces}) : super(key: key);
+  final String directionLabel;
+  const ToSelectionPage(
+      {Key? key, required this.toPlaces, required this.directionLabel})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -571,22 +668,75 @@ class ToSelectionPage extends StatelessWidget {
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: const Color(0xFF1D2B53),
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF007A8F),
+            expandedHeight: 140,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 50.0),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Drop-off',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        // No dropdown here
+                      ],
+                    ),
+                  ),
+                  // Non-clickable direction label
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF007A8F),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              directionLabel,
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            title: Text(
-              'Drop-off',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-            // No actions/dropdown for To page
           ),
           SliverToBoxAdapter(
             child: Align(
@@ -637,9 +787,8 @@ class ToSelectionPage extends StatelessWidget {
                         final place = toPlaces[index];
                         return ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D2B53),
+                            backgroundColor: const Color(0xFF007A8F),
                             elevation: 0,
-                            side: BorderSide.none,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -791,7 +940,8 @@ class QRCodeFullScreenPage extends StatelessWidget {
                           style: GoogleFonts.outfit(
                               fontWeight: FontWeight.w500, fontSize: 14)),
                       SizedBox(height: 8),
-                      Text('From: $from', style: GoogleFonts.outfit(fontSize: 14)),
+                      Text('From: $from',
+                          style: GoogleFonts.outfit(fontSize: 14)),
                       Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
                       Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
                       Text('Fare: $fare Pesos',

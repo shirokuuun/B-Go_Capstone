@@ -88,13 +88,13 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
         backgroundColor: cyan,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Take a photo of your ID',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeTitle,
           ),
@@ -153,7 +153,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
                   });
                 }
               },
-              child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+              child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Color(0xFF0091AD))),
             ),
           ],
         ),

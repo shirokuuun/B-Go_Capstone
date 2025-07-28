@@ -54,7 +54,12 @@ class _ConductorFromState extends State<ConductorFrom> {
         {'label': 'SM City Lipa - Tiaong', 'collection': 'Place'},
         {'label': 'Tiaong - SM City Lipa', 'collection': 'Place 2'},
       ];
-    } else {
+    } else if ('${widget.route.trim()}' == 'San Juan') {
+    routeDirections = [
+      {'label': 'SM City Lipa - San Juan', 'collection': 'Place'},
+      {'label': 'San Juan - SM City Lipa', 'collection': 'Place 2'},
+    ];
+  } else {
       routeDirections = [
         {'label': 'SM City Lipa - Unknown', 'collection': 'Place'},
         {'label': 'Unknown - SM City Lipa', 'collection': 'Place 2'},
@@ -265,106 +270,116 @@ class _ConductorFromState extends State<ConductorFrom> {
               ),
             ),
           ),
+
+          SliverPadding(
+            padding: const EdgeInsets.only(top: 20.0),
+          ),
+
           SliverToBoxAdapter(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.02),
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final screenHeight = MediaQuery.of(context).size.height;
+              final appBarHeight = 130.0; 
+              final topPadding = MediaQuery.of(context).padding.top;
+
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: screenHeight - appBarHeight - topPadding,
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Text(
-                        "Select Location:",
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          color: Colors.black87,
+                child: Container(
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 16,
+                        offset: Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(left: 10),
+                        child: Text(
+                          "Select Location:",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.black87,
+                          ),
                         ),
                       ),
-                    ),
-                    FutureBuilder<List<Map<String, dynamic>>>(
-                      future: placesFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        } else if (snapshot.hasError) {
-                          return Center(
-                              child: Text('Error:  ${snapshot.error}'));
-                        } else if (!snapshot.hasData ||
-                            snapshot.data!.isEmpty) {
-                          return const Center(child: Text('No places found.'));
-                        }
-                        final myList = snapshot.data!;
-                        return GridView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 2.2,
-                          ),
-                          itemCount: myList.length,
-                          itemBuilder: (context, index) {
-                            final item = myList[index];
-                            return ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF0091AD),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 4),
-                              ),
-                              onPressed: () =>
-                                  _showToSelectionPage(item, myList),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    item['name'] ?? '',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 14, color: Colors.white),
-                                    textAlign: TextAlign.center,
+                      const SizedBox(height: 16),
+                      FutureBuilder<List<Map<String, dynamic>>>(
+                        future: placesFuture,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          } else if (snapshot.hasError) {
+                            return Center(child: Text('Error: ${snapshot.error}'));
+                          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return const Center(child: Text('No places found.'));
+                          }
+                          final myList = snapshot.data!;
+                          return GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              childAspectRatio: 2.2,
+                            ),
+                            itemCount: myList.length,
+                            itemBuilder: (context, index) {
+                              final item = myList[index];
+                              return ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF0091AD),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  if (item['km'] != null)
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                                ),
+                                onPressed: () => _showToSelectionPage(item, myList),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
                                     Text(
-                                      '${item['km']} km',
-                                      style: TextStyle(
-                                          fontSize: 12, color: Colors.white70),
+                                      item['name'] ?? '',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ],
+                                    if (item['km'] != null)
+                                      Text(
+                                        '${item['km']} km',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
+        )
         ],
       ),
     );
@@ -415,6 +430,13 @@ class _ToSelectionPageConductor extends StatelessWidget {
           return 'SM City Lipa - Tiaong';
         case 'Place 2':
           return 'Tiaong - SM City Lipa';
+      }
+    } else if (r == ' San Juan') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - San Juan';
+        case 'Place 2':
+          return 'San Juan - SM City Lipa';
       }
     }
     return 'Unknown Route';
@@ -497,10 +519,17 @@ class _ToSelectionPageConductor extends StatelessWidget {
             ),
           ),
           SliverToBoxAdapter(
-            child: Align(
-              alignment: Alignment.bottomCenter,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: size.height * 0.90,
+              ),
               child: Container(
-                margin: EdgeInsets.only(top: size.height * 0.02, bottom: size.height * 0.08),
+                margin: EdgeInsets.only(
+                  top: size.height * 0.02,
+                  bottom: size.height * 0.08,
+                ),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -514,143 +543,150 @@ class _ToSelectionPageConductor extends StatelessWidget {
                   ],
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 10),
-                        child: Text(
-                          "Select Your Drop-off:",
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            color: Colors.black87,
-                          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(left: 10),
+                      child: Text(
+                        "Select Your Drop-off:",
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          color: Colors.black87,
                         ),
                       ),
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 2.2,
-                        ),
-                        itemCount: toPlaces.length,
-                        itemBuilder: (context, index) {
-                          final place = toPlaces[index];
-                          return ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0091AD),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 4),
+                    ),
+                    const SizedBox(height: 16),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 2.2,
+                      ),
+                      itemCount: toPlaces.length,
+                      itemBuilder: (context, index) {
+                        final place = toPlaces[index];
+                        return ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0091AD),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            onPressed: () async {
-                              final to = place['name'];
-                              final endKm = place['km'];
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          ),
+                          onPressed: () async {
+                            final to = place['name'];
+                            final endKm = place['km'];
 
-                              if (fromPlace['km'] >= endKm) {
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text('Invalid Destination'),
-                                    content: Text('The destination must be farther than the origin.'),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: Text('OK'),
-                                      )
-                                    ],
-                                  ),
-                                );
-                                return;
-                              }
-
-                              final result = await showGeneralDialog<Map<String, dynamic>>(
+                            if (fromPlace['km'] >= endKm) {
+                              showDialog(
                                 context: context,
-                                barrierDismissible: true,
-                                barrierLabel: "Quantity",
-                                barrierColor: Colors.black.withOpacity(0.3),
-                                transitionDuration: Duration(milliseconds: 200),
-                                pageBuilder: (context, anim1, anim2) {
-                                  return const QuantitySelection();
-                                },
-                                transitionBuilder: (context, anim1, anim2, child) {
-                                  return FadeTransition(
-                                    opacity: anim1,
-                                    child: child,
-                                  );
-                                },
+                                builder: (context) => AlertDialog(
+                                  title: Text('Invalid Destination'),
+                                  content: Text(
+                                      'The destination must be farther than the origin.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: Text('OK'),
+                                    )
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
+
+                            final result =
+                                await showGeneralDialog<Map<String, dynamic>>(
+                              context: context,
+                              barrierDismissible: true,
+                              barrierLabel: "Quantity",
+                              barrierColor: Colors.black.withOpacity(0.3),
+                              transitionDuration: Duration(milliseconds: 200),
+                              pageBuilder: (context, anim1, anim2) {
+                                return const QuantitySelection();
+                              },
+                              transitionBuilder: (context, anim1, anim2, child) {
+                                return FadeTransition(
+                                  opacity: anim1,
+                                  child: child,
+                                );
+                              },
+                            );
+
+                            if (result != null) {
+                              final discountResult =
+                                  await showDialog<Map<String, dynamic>>(
+                                context: context,
+                                builder: (context) => DiscountSelection(
+                                    quantity: result['quantity']),
                               );
 
-                              if (result != null) {
-                                final discountResult = await showDialog<Map<String, dynamic>>(
-                                  context: context,
-                                  builder: (context) => DiscountSelection(quantity: result['quantity']),
+                              if (discountResult != null) {
+                                final List<double> discounts =
+                                    List<double>.from(discountResult['discounts']);
+                                final List<String> selectedLabels =
+                                    List<String>.from(discountResult['fareTypes']);
+                                final ticketDocName = await RouteService.saveTrip(
+                                  route: route,
+                                  from: fromPlace['name'],
+                                  to: to,
+                                  startKm: fromPlace['km'],
+                                  endKm: endKm,
+                                  quantity: result['quantity'],
+                                  discountList: discounts,
+                                  fareTypes: selectedLabels,
                                 );
 
-                                if (discountResult != null) {
-                                  final List<double> discounts = List<double>.from(discountResult['discounts']);
-                                  final List<String> selectedLabels = List<String>.from(discountResult['fareTypes']);
-                                  final ticketDocName = await RouteService.saveTrip(
-                                    route: route,
-                                    from: fromPlace['name'],
-                                    to: to,
-                                    startKm: fromPlace['km'],
-                                    endKm: endKm,
-                                    quantity: result['quantity'],
-                                    discountList: discounts,
-                                    fareTypes: selectedLabels,
-                                  );
-
-                                  rootNavigatorKey.currentState?.pushReplacement(
-                                    MaterialPageRoute(
-                                      builder: (context) => ConductorTicket(
-                                        route: route,
-                                        ticketDocName: ticketDocName,
-                                        placeCollection: placeCollection,
-                                        date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-                                      ),
+                                rootNavigatorKey.currentState?.pushReplacement(
+                                  MaterialPageRoute(
+                                    builder: (context) => ConductorTicket(
+                                      route: route,
+                                      ticketDocName: ticketDocName,
+                                      placeCollection: placeCollection,
+                                      date: DateFormat('yyyy-MM-dd')
+                                          .format(DateTime.now()),
                                     ),
-                                  );
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text('Discount not selected')),
-                                  );
-                                }
-                              }
-                            },
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  place['name'] ?? '',
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 15, color: Colors.white),
-                                  textAlign: TextAlign.center,
-                                ),
-                                if (place['km'] != null)
-                                  Text(
-                                    '${place['km']} km',
-                                    style: TextStyle(
-                                        fontSize: 11, color: Colors.white70),
                                   ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                                );
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Discount not selected')),
+                                );
+                              }
+                            }
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                place['name'] ?? '',
+                                style: GoogleFonts.outfit(
+                                    fontSize: 15, color: Colors.white),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (place['km'] != null)
+                                Text(
+                                  '${place['km']} km',
+                                  style: TextStyle(
+                                      fontSize: 11, color: Colors.white70),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+        ),
         ],
       ),
     );

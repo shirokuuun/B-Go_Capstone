@@ -31,14 +31,14 @@ class SettingsPage extends StatelessWidget {
         backgroundColor: cyan,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black, size: iconSize + 2),
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: iconSize + 2),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: Text(
           'Settings',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeAppBar,
           ),
@@ -57,18 +57,19 @@ class SettingsPage extends StatelessWidget {
             ),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: Colors.black,
+                backgroundColor: Color.fromARGB(255, 1, 123, 148),
                 radius: iconRadius,
-                child: Icon(opt.icon, color: cyan, size: iconSize),
+                child: Icon(opt.icon, color: Colors.white, size: iconSize),
               ),
               title: Text(
                 opt.title,
                 style: GoogleFonts.outfit(
                   fontSize: fontSizeTitle,
                   fontWeight: FontWeight.w500,
+                  color: Colors.black,
                 ),
               ),
-              trailing: Icon(Icons.chevron_right, color: Colors.grey, size: iconSize + 6),
+              trailing: Icon(Icons.chevron_right, color: Colors.black, size: iconSize + 6),
               onTap: () {
                 if (opt.title == 'Pre-Ticket QRs') {
                   Navigator.pushNamed(context, '/pre_ticket_qr');

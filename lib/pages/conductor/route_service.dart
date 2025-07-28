@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 class RouteService {
@@ -52,6 +53,20 @@ class RouteService {
     });
 
     return places;
+  }
+
+   // Get conductor document ID from email (e.g., for dynamic document access)
+  static Future<String?> getConductorDocIdFromEmail(String email) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('conductors')
+        .where('email', isEqualTo: email)
+        .limit(1)
+        .get();
+
+    if (snapshot.docs.isNotEmpty) {
+      return snapshot.docs.first.id; 
+    }
+    return null; // Not found
   }
 
   static Future<String> saveTrip({
@@ -111,23 +126,30 @@ class RouteService {
     final now = DateTime.now();
     String formattedDate = date ?? DateFormat('yyyy-MM-dd').format(now);
 
-    try {
-      await FirebaseFirestore.instance
-          .collection('trips')
-          .doc(route)
-          .collection('trips')
-          .doc(formattedDate)
-          .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-    } catch (e) {
-      print('Failed to ensure date document exists: $e');
+    final user = FirebaseAuth.instance.currentUser;
+    final conductorId = await RouteService.getConductorDocIdFromEmail(user?.email ?? '');
+    if (conductorId == null) {
+      throw Exception('Conductor not found for email ${user?.email}');
     }
 
+  try {
+    await FirebaseFirestore.instance
+    .collection('conductors')
+    .doc(conductorId)
+    .collection('trips')
+    .doc(formattedDate)
+    .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+  } catch (e) {
+    print('Failed to ensure date document exists: $e');
+  }
+
     final tripsCollection = FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
+        .collection('conductors')
+        .doc(conductorId)
         .collection('trips')
         .doc(formattedDate)
         .collection('tickets');
+
 
     final snapshot = await tripsCollection.get();
     int maxTripNumber = 0;
@@ -161,73 +183,71 @@ class RouteService {
     return tripDocName;
   }
 
-  // To update trip status
-  static Future<void> updateTripStatus(String route, String date, String ticketDocName, bool isActive) async {
-    final tripDoc = FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
+  // ✅ Update trip status (active/inactive)
+static Future<void> updateTripStatus(
+  String conductorId,
+  String date,
+  String ticketDocName,
+  bool isActive,
+) async {
+  final tripDoc = FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
       .collection('trips')
       .doc(date)
       .collection('tickets')
       .doc(ticketDocName);
 
+  await tripDoc.update({'active': isActive});
+}
 
-    await tripDoc.update({'active': isActive});
-  }
+//  Fetch trip details for a ticket
+static Future<Map<String, dynamic>?> fetchTrip(
+  String route,
+  String date,
+  String ticketDocName,
+) async {
+  final user = FirebaseAuth.instance.currentUser;
+  final conductorId = await getConductorDocIdFromEmail(user?.email ?? '');
+  if (conductorId == null) return null;
 
-  // To fetch trip details for the ticket
-  static Future<Map<String, dynamic>?> fetchTrip(String route, String date, String ticketDocName) async {
-    final doc = await FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
+  final doc = await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
       .collection('trips')
       .doc(date)
       .collection('tickets')
       .doc(ticketDocName)
       .get();
 
-    if (doc.exists) {
-      final data = doc.data();
-      return {
-        'from': data?['from'],
-        'to': data?['to'],
-        'startKm': data?['startKm'],
-        'endKm': data?['endKm'],
-        'totalKm': data?['totalKm'],
-        'timestamp': data?['timestamp'],
-        'discountAmount': data?['discountAmount'],
-        'quantity': data?['quantity'],
-        'farePerPassenger': data?['farePerPassenger'],
-        'totalFare': data?['totalFare'],
-        'discountBreakdown': List<String>.from(data?['discountBreakdown'] ?? []),
-      };
-    }
-    return null;
-  }
+  if (!doc.exists) return null;
+  return doc.data();
+}
 
-  // to fetch the subcollection document IDs (dates) 
-  Future<List<String>> fetchAvailableTripDates(String route) async {
+// Fetch available trip dates for a conductor
+static Future<List<String>> fetchAvailableTripDates(String conductorId) async {
   final snapshot = await FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
+      .collection('conductors')
+      .doc(conductorId)
       .collection('trips')
       .get();
 
   return snapshot.docs.map((doc) => doc.id).toList();
 }
 
-  static Future<List<String>> fetchAvailableDates(String route, {required String placeCollection}) async {
+// Same as above, but with debug prints (optional)
+static Future<List<String>> fetchAvailableDates(String conductorId) async {
   try {
     final snapshot = await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
+        .collection('conductors')
+        .doc(conductorId)
         .collection('trips')
         .get();
 
-    print("Fetched ${snapshot.docs.length} date documents for route $route");
+    print("Fetched ${snapshot.docs.length} date documents for $conductorId");
 
     List<String> dates = snapshot.docs.map((doc) {
-      print("Found date doc: ${doc.id}"); // ADD THIS
+      print("Found date doc: ${doc.id}");
       return doc.id;
     }).toList();
 
@@ -239,33 +259,46 @@ class RouteService {
   }
 }
 
-  static Future<List<Map<String, dynamic>>> fetchTickets(
-    String route,
-    String date, {
-    required String placeCollection, 
-  }) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .doc(date)
-        .collection('tickets')
-        .orderBy('timestamp', descending: true)
-        .get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  }
-
-
-  // fetch all active trips for a specific route
-  Future<List<Map<String, dynamic>>> fetchTicketsForDate(String route, String date) async {
+// Fetch all tickets for a specific conductor and date
+static Future<List<Map<String, dynamic>>> fetchTickets({
+  required String conductorId,
+  required String date,
+}) async {
   final snapshot = await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
       .collection('trips')
-      .doc(route)
+      .doc(date)
+      .collection('tickets')
+      .get();
+
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    return {
+      'id': doc.id,
+      'from': data['from'],
+      'to': data['to'],
+      'totalFare': data['totalFare'],
+      'quantity': data['quantity'],
+      'discountAmount': data['discountAmount'],
+      'discountBreakdown': data['discountBreakdown'],
+      'farePerPassenger': data['farePerPassenger'],
+      'startKm': data['startKm'],
+      'endKm': data['endKm'],
+      'timestamp': data['timestamp'],
+    };
+  }).toList();
+}
+
+
+// Fetch tickets for specific date (
+Future<List<Map<String, dynamic>>> fetchTicketsForDate(
+  String conductorId,
+  String date,
+) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
       .collection('trips')
       .doc(date)
       .collection('tickets')
@@ -285,22 +318,21 @@ class RouteService {
   }).toList();
 }
 
-  // to delete ticket
-  static Future<void> deleteTicket(
-    String route,
-    String date,
-    String ticketId, {
-    required String placeCollection,
-  }) async {
-    await FirebaseFirestore.instance
-        .collection('trips')
-        .doc(route)
-        .collection('trips')
-        .doc(date)
-        .collection('tickets')
-        .doc(ticketId)
-        .delete();
-  }
+//  Delete a ticket
+static Future<void> deleteTicket(
+  String conductorId,
+  String date,
+  String ticketId,
+) async {
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketId)
+      .delete();
+}
 
   // sos saving details
     Future<void> sendSOS({

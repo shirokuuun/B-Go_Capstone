@@ -53,23 +53,35 @@ class _SOSPageState extends State<SOSPage> {
 
   String getRouteLabel(String placeCollection) {
     final route = widget.route.trim();
+    print("🛤️ Route = $route | Collection = $placeCollection");
     final map = {
-      'Rosario': {'Place': 'SM City Lipa - Rosario', 'Place 2': 'Rosario - SM City Lipa'},
-      'Batangas': {'Place': 'SM City Lipa - Batangas City', 'Place 2': 'Batangas City - SM City Lipa'},
-      'Mataas na Kahoy': {'Place': 'SM City Lipa - Mataas na Kahoy', 'Place 2': 'Mataas na Kahoy - SM City Lipa'},
-      'Tiaong': {'Place': 'SM City Lipa - Tiaong', 'Place 2': 'Tiaong - SM City Lipa'},
+      'Rosario': {
+        'Place': 'SM City Lipa - Rosario',
+        'Place 2': 'Rosario - SM City Lipa',
+      },
+      'Tiaong': {
+        'Place': 'SM City Lipa - Tiaong',
+        'Place 2': 'Tiaong - SM City Lipa',
+      },
+      'San Juan': {
+        'Place': 'SM City Lipa - San Juan',
+        'Place 2': 'San Juan - SM City Lipa',
+      },
+      'Mataas na Kahoy': {
+        'Place': 'SM City Lipa - Mataas na Kahoy',
+        'Place 2': 'Mataas na Kahoy - SM City Lipa',
+      },
     };
+      final label = map[route]?[placeCollection];
+      print("📍 Mapped Route Label = $label");
+
     return map[route]?[placeCollection] ?? 'Unknown Route';
   }
 
   Color getStatusColor(String? status) {
     switch (status) {
       case 'Pending':
-        return Colors.orange;
-      case 'Received':
-        return Colors.blue;
-      case 'Cancelled':
-        return Colors.red;
+        return Color(0xFFFFC107);
       default:
         return Colors.transparent;
     }
@@ -113,7 +125,7 @@ class _SOSPageState extends State<SOSPage> {
         appBar: AppBar(
           title: Text('SOS - Emergency Assistance',
               style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white)),
-          backgroundColor: const Color(0xFF1D2B53),
+          backgroundColor: const Color(0xFF0091AD),
           centerTitle: true,
           iconTheme: const IconThemeData(color: Colors.white),
           actions: [
@@ -138,9 +150,15 @@ class _SOSPageState extends State<SOSPage> {
                           (latestSOS!['status'] == 'Pending' || latestSOS!['status'] == 'In Progress')) {
                         await showDialog(
                           context: context,
-                          builder: (_) => const AlertDialog(
-                            title: Text('SOS Received'),
-                            content: Text('The SOS has already been marked.'),
+                          builder: (_) =>  AlertDialog(
+                            title: Text('SOS Received',
+                                 style: GoogleFonts.outfit(
+                                  fontSize: 18, 
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF0091AD)
+                                  )),
+                            content: Text('The SOS has already been marked.',
+                                style: GoogleFonts.outfit(fontSize: 16)),
                           ),
                         );
                         return;
@@ -187,7 +205,7 @@ class _SOSPageState extends State<SOSPage> {
                           Icon(Icons.sos, size: MediaQuery.of(context).size.width * 0.2, color: Colors.white),
                           const SizedBox(height: 8),
                           Text('Tap to send SOS',
-                              style: TextStyle(
+                              style: GoogleFonts.outfit(
                                   fontSize: MediaQuery.of(context).size.width * 0.035,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white)),
@@ -331,7 +349,12 @@ class _SOSPageState extends State<SOSPage> {
                     onTap: () => showDialog(
                       context: context,
                       builder: (_) => AlertDialog(
-                        title: const Text('🚨 SOS Details'),
+                        title:  Text('🚨 SOS Details',
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0091AD)
+                          ),),
                         content: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,7 +373,7 @@ class _SOSPageState extends State<SOSPage> {
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Close'),
+                            child:  Text('Close'),
                           ),
                           TextButton(
                             onPressed: () async {
@@ -366,9 +389,14 @@ class _SOSPageState extends State<SOSPage> {
                                     ),
                                     title: Row(
                                       children: [
-                                        Icon(Icons.cancel, color: Colors.green),
+                                        Icon(Icons.cancel, color: const Color.fromARGB(255, 247, 45, 45)),
                                         SizedBox(width: 8),
-                                        Text('SOS Cancelled'),
+                                        Text('SOS Cancelled',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0091AD),
+                                        )),
                                       ],
                                     ),
                                     content: Column(
@@ -376,7 +404,7 @@ class _SOSPageState extends State<SOSPage> {
                                       children: [
                                         Text(
                                           'The SOS has been cancelled.',
-                                          style: TextStyle(fontSize: 16),
+                                          style: GoogleFonts.outfit(fontSize: 16),
                                         ),
                                         SizedBox(height: 16),
                                       ],
@@ -435,8 +463,16 @@ class _SOSPageState extends State<SOSPage> {
                         final confirm = await showDialog<bool>(
                           context: context,
                           builder: (_) => AlertDialog(
-                            title: const Text('Confirm'),
-                            content: const Text('Are you sure you want to mark this SOS as received?'),
+                            title: Text('Confirm',
+                            style: GoogleFonts.outfit(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0091AD),
+                            )),
+                            content: Text('Are you sure you want to mark this SOS as received?',
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                            )),
                             actions: [
                               TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
                               ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Confirm')),
@@ -457,7 +493,12 @@ class _SOSPageState extends State<SOSPage> {
                                 children: [
                                   Icon(Icons.check_circle, color: Colors.green),
                                   SizedBox(width: 8),
-                                  Text('SOS Received'),
+                                  Text('SOS Received',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0091AD),
+                                  )),
                                 ],
                               ),
                               content: Column(
@@ -465,7 +506,7 @@ class _SOSPageState extends State<SOSPage> {
                                 children: [
                                   Text(
                                     'The SOS has been successfully marked as received.',
-                                    style: TextStyle(fontSize: 16),
+                                    style: GoogleFonts.outfit(fontSize: 16),
                                   ),
                                   SizedBox(height: 16),
                                 ],

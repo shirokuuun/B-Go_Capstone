@@ -90,7 +90,10 @@ class _PreTicketState extends State<PreTicket> {
     }
     final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
-        builder: (context) => ToSelectionPage(toPlaces: toPlaces),
+        builder: (context) => ToSelectionPage(
+          toPlaces: toPlaces,
+          directionLabel: routeLabels[selectedRoute]![directionIndex],
+        ),
       ),
     );
     if (toPlace != null) {
@@ -537,18 +540,15 @@ class _ReceiptModal extends StatelessWidget {
     double totalAmount = 0.0;
     for (int i = 0; i < fareTypes.length; i++) {
       final type = fareTypes[i];
-      String discountText;
       double passengerFare;
       bool isDiscounted = false;
       if (type.toLowerCase() == 'pwd' ||
           type.toLowerCase() == 'senior' ||
           type.toLowerCase() == 'student') {
         passengerFare = baseFare * 0.8;
-        discountText = '20% off';
         isDiscounted = true;
       } else {
         passengerFare = baseFare;
-        discountText = 'No discount';
       }
       totalAmount += passengerFare;
       passengerFares.add(passengerFare);
@@ -638,7 +638,8 @@ class _ReceiptModal extends StatelessWidget {
 
 class ToSelectionPage extends StatelessWidget {
   final List<Map<String, dynamic>> toPlaces;
-  const ToSelectionPage({Key? key, required this.toPlaces}) : super(key: key);
+  final String directionLabel;
+  const ToSelectionPage({Key? key, required this.toPlaces, required this.directionLabel}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -648,22 +649,72 @@ class ToSelectionPage extends StatelessWidget {
         slivers: [
           SliverAppBar(
             floating: true,
-            backgroundColor: const Color(0xFF1D2B53),
-            leading: Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+            automaticallyImplyLeading: false,
+            backgroundColor: const Color(0xFF007A8F),
+            expandedHeight: 140,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 50.0),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8.0),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'Drop-off',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        // No dropdown here
+                      ],
+                    ),
+                  ),
+                  // Non-clickable direction label
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF007A8F),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              directionLabel,
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            title: Text(
-              'Drop-off',
-              style: GoogleFonts.outfit(
-                fontSize: 18,
-                color: Colors.white,
-              ),
-            ),
-            // No actions/dropdown for To page
           ),
           SliverToBoxAdapter(
             child: Align(
@@ -714,9 +765,8 @@ class ToSelectionPage extends StatelessWidget {
                         final place = toPlaces[index];
                         return ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D2B53),
+                            backgroundColor: const Color(0xFF007A8F),
                             elevation: 0,
-                            side: BorderSide.none,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

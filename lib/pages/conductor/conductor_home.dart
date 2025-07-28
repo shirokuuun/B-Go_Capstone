@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;

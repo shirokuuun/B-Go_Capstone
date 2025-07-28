@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class EditProfile extends StatefulWidget {
   const EditProfile({super.key});
@@ -16,6 +20,10 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final ImagePicker _picker = ImagePicker();
+  
+  File? _selectedImage;
+  String? _currentProfileImageUrl;
 
   @override
   void initState() {
@@ -24,12 +32,145 @@ class _EditProfileState extends State<EditProfile> {
     if (user != null) {
       _nameController.text = user.displayName ?? '';
       _emailController.text = user.email ?? '';
+      _currentProfileImageUrl = user.photoURL;
       // Optionally fetch phone from Firestore if not in Auth
       FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
         if (doc.exists) {
           _phoneController.text = doc['phone'] ?? '';
         }
       });
+    }
+  }
+
+  Future<void> _pickImage() async {
+    // Request storage permission
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      status = await Permission.storage.request();
+      if (status.isPermanentlyDenied) {
+        // Show dialog to open app settings
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Permission Required'),
+            content: Text('Storage permission is permanently denied. Please enable it in your device settings to select an image.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  openAppSettings();
+                },
+                child: Text('Open Settings'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Cancel'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      if (!status.isGranted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Storage permission is required to select an image.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512, // Size restriction
+        maxHeight: 512,
+        imageQuality: 80, // Compress image
+      );
+
+      if (image != null) {
+        setState(() {
+          _selectedImage = File(image.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to pick image: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _uploadProfileImage() async {
+    if (_selectedImage == null) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00CFFF)),
+            ),
+          );
+        },
+      );
+
+      // Upload image to Firebase Storage
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child('${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final uploadTask = storageRef.putFile(_selectedImage!);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Update user profile with new photo URL
+      await user.updatePhotoURL(downloadUrl);
+      
+      // Update Firestore
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+        'profileImageUrl': downloadUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update local state
+      setState(() {
+        _currentProfileImageUrl = downloadUrl;
+        _selectedImage = null; // Clear selected image after upload
+      });
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Profile picture updated successfully!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload profile picture: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -41,13 +182,13 @@ class _EditProfileState extends State<EditProfile> {
         backgroundColor: Color(0xFF0091AD),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           'Edit Profile',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontSize: 20,
           ),
         ),
@@ -65,22 +206,48 @@ class _EditProfileState extends State<EditProfile> {
                   children: [
                     CircleAvatar(
                       radius: 54,
-                      backgroundImage: NetworkImage(
-                        'https://randomuser.me/api/portraits/men/1.jpg',
-                      ),
+                      backgroundImage: _selectedImage != null
+                          ? FileImage(_selectedImage!)
+                          : (_currentProfileImageUrl != null
+                              ? NetworkImage(_currentProfileImageUrl!)
+                              : null) as ImageProvider?,
                       backgroundColor: Colors.grey[300],
+                      child: _selectedImage == null && _currentProfileImageUrl == null
+                          ? Icon(Icons.person, size: 54, color: Colors.grey[600])
+                          : null,
                     ),
                     Positioned(
                       bottom: 4,
                       right: 4,
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundColor: Color(0xFF00CFFF),
-                        child: Icon(Icons.camera_alt, color: Colors.black, size: 16),
+                      child: GestureDetector(
+                        onTap: _pickImage,
+                        child: CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Color(0xFF0091AD),
+                          child: Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                        ),
                       ),
                     ),
                   ],
                 ),
+                if (_selectedImage != null) ...[
+                  SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _uploadProfileImage,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF0091AD),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                    ),
+                    child: Text(
+                      'Upload Profile Picture',
+                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
                 SizedBox(height: 24),
                 Form(
                   key: _formKey,
@@ -104,10 +271,6 @@ class _EditProfileState extends State<EditProfile> {
                         label: 'Phone No.',
                         icon: Icons.phone,
                         keyboardType: TextInputType.phone,
-                        prefix: Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: Text('+63', style: GoogleFonts.outfit()),
-                        ),
                       ),
                       SizedBox(height: 16),
                       _ProfileTextField(
@@ -156,14 +319,7 @@ class _EditProfileState extends State<EditProfile> {
                           // If email changed, use verifyBeforeUpdateEmail for secure update
                           if (newEmail != user.email) {
                             try {
-                              // Require re-authentication
-                              // (You may want to prompt for password or use a re-auth flow here)
-                              // Example for email/password:
-                              // final cred = EmailAuthProvider.credential(email: user.email!, password: passwordController.text);
-                              // await user.reauthenticateWithCredential(cred);
-
                               await user.verifyBeforeUpdateEmail(newEmail);
-                              // Close loading dialog
                               Navigator.of(context).pop();
                               await showDialog(
                                 context: context,
@@ -178,7 +334,6 @@ class _EditProfileState extends State<EditProfile> {
                                   ],
                                 ),
                               );
-                              // Log out the user
                               await FirebaseAuth.instance.signOut();
                               if (mounted) {
                                 Navigator.of(context).popUntil((route) => route.isFirst);
@@ -309,7 +464,7 @@ class _EditProfileState extends State<EditProfile> {
                     }
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Color(0xFF00CFFF),
+                    backgroundColor: Color(0xFF0091AD),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24),

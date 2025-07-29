@@ -78,7 +78,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             'Forgot Password',
             style: GoogleFonts.outfit(fontSize: 18, color: Colors.white),
           ),
-          backgroundColor: Color(0xFF1D2B53),
+          backgroundColor: Color(0xFF0091AD),
           elevation: 0,
           iconTheme: IconThemeData(
             color: Colors.white,
@@ -188,7 +188,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                           minWidth: 200,
                           height: 55,
                           onPressed: passwordReset,
-                          color: Color(0xFF1D2B53),
+                          color: Color(0xFF0091AD),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),

@@ -23,72 +23,140 @@ class ReservationService {
   }
 
   // Fetch buses with coding days that match this week (e.g., Monday, Tuesday, etc.)
-  static Future<List<Map<String, dynamic>>> getAvailableBuses() async {
+static Future<List<Map<String, dynamic>>> getAvailableBuses() async {
   final snapshot = await FirebaseFirestore.instance
-    .collection('AvailableBuses')
-    .where('status', isEqualTo: 'active') // Only active buses
-    .get();
-
-
-  print('📦 Fetched ${snapshot.docs.length} bus docs from Firestore');
+      .collection('AvailableBuses')
+      .where('status', isEqualTo: 'active')
+      .get();
 
   const allWeekdays = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'
   ];
 
   final today = DateTime.now();
-  final todayIndex = today.weekday - 1; 
-  final remainingDays = allWeekdays.sublist(todayIndex); 
-
-  print('📅 Remaining days this week: $remainingDays');
+  final todayIndex = today.weekday - 1;
+  final remainingDays = allWeekdays.sublist(todayIndex);
 
   final availableBuses = snapshot.docs.where((doc) {
-  final data = doc.data();
-  final codingDays = List<String>.from(data['codingDays'] ?? []);
-  return codingDays.any((day) => remainingDays.contains(day));
-}).map((doc) {
-  final data = doc.data() as Map<String, dynamic>;
-  data['id'] = doc.id; // <- Save Firestore doc ID (busName)
-  return data;
-}).toList();
+    final data = doc.data();
+    final List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
+    final List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
 
+    // Filter out reserved days from codingDays
+    final unreservedDays = codingDays.where((day) => !reservedDays.contains(day)).toList();
 
-  print('✅ Available (Coded) Buses for the rest of this week: ${availableBuses.length}');
+    // Only return buses with any unreserved days still available this week
+    return unreservedDays.any((day) => remainingDays.contains(day));
+  }).map((doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
+    final List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
+
+    // Clean version of unreserved days for UI
+    final unreservedDays = codingDays.where((day) => !reservedDays.contains(day)).toList();
+    data['codingDays'] = unreservedDays;
+
+    data['id'] = doc.id;
+    return data;
+  }).toList();
+
   return availableBuses;
 }
 
- static Future<void> saveReservation({
+
+// Save a reservation with the selected buses and reservation details
+static Future<void> saveReservation({
   required List<String> selectedBusIds,
   required String from,
   required String to,
   required bool isRoundTrip,
   required String fullName,
   required String email,
+  required String reservationDay,
 }) async {
   final firestore = FirebaseFirestore.instance;
   final reservationsRef = firestore.collection('reservations');
+  final counterRef = firestore.collection('counters').doc('reservations');
 
-  // Get current number of reservations
-  final snapshot = await reservationsRef.get();
-  final newReservationId = 'reservation ${snapshot.docs.length + 1}';
+  // Get current reservation count from the counter document
+  final counterSnap = await counterRef.get();
+  int newCount = 1;
+  if (counterSnap.exists) {
+    newCount = (counterSnap.data()?['count'] ?? 0) + 1;
+  }
 
-  // Save reservation with custom ID
+  // Create a unique reservation ID like 'reservation 12'
+  final newReservationId = 'reservation $newCount';
+
+  // Save the reservation
   await reservationsRef.doc(newReservationId).set({
+    'reservationId': newReservationId,
     'selectedBusIds': selectedBusIds,
     'from': from,
     'to': to,
     'isRoundTrip': isRoundTrip,
     'fullName': fullName,
     'email': email,
+    'reservationDay': reservationDay,
     'timestamp': FieldValue.serverTimestamp(),
   });
 
-  // Mark selected buses as reserved
+  // Update the reservation counter
+  await counterRef.set({'count': newCount});
+
+  // Update reservedDays for each bus
   for (String busDocId in selectedBusIds) {
-  final busRef = firestore.collection('AvailableBuses').doc(busDocId);
-  await busRef.update({'status': 'reserved'});
+    final busRef = firestore.collection('AvailableBuses').doc(busDocId);
+    final busDoc = await busRef.get();
+
+    if (busDoc.exists) {
+      final data = busDoc.data()!;
+      List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
+      List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
+
+      // Add the new reserved day if it's not already in the list
+      if (!reservedDays.contains(reservationDay)) {
+        reservedDays.add(reservationDay);
+      }
+
+      // Check if all coding days are now reserved
+      final isFullyReserved = codingDays.toSet().difference(reservedDays.toSet()).isEmpty;
+
+      // Update the reservedDays and status fields in the bus document
+      await busRef.update({
+        'reservedDays': reservedDays,
+        'status': isFullyReserved ? 'reserved' : 'active',
+      });
+    }
+  }
 }
 
+  // Get available reservation days for selected buses
+static Future<List<String>> getAvailableReservationDays(List<String> selectedBusIds) async {
+  final firestore = FirebaseFirestore.instance;
+  final Set<String> availableDays = {};
+
+  for (String busId in selectedBusIds) {
+    final doc = await firestore.collection('AvailableBuses').doc(busId).get();
+    if (doc.exists) {
+      final data = doc.data();
+      final List<String> codingDays = List<String>.from(data?['codingDays'] ?? []);
+      final List<String> reservedDays = List<String>.from(data?['reservedDays'] ?? []);
+
+      // Only include days that are in codingDays but NOT in reservedDays
+      final filteredDays = codingDays.where((day) => !reservedDays.contains(day));
+      availableDays.addAll(filteredDays);
+    }
+  }
+
+  return _sortDays(availableDays.toList());
 }
+
+  static List<String> _sortDays(List<String> days) {
+    const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    days.sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)));
+    return days;
+  }
+
 
 }

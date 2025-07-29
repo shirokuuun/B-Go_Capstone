@@ -21,8 +21,6 @@ class _AdminAddBusState extends State<AdminAddBus> {
     'Wednesday',
     'Thursday',
     'Friday',
-    'Saturday',
-    'Sunday',
   ];
 
   Future<void> _submitBus() async {
@@ -108,7 +106,7 @@ class _AdminAddBusState extends State<AdminAddBus> {
                       final selected = _selectedDays.contains(day);
                       return ChoiceChip(
                         label: Text(day),
-                        selected: selected,
+                        selected: selected, 
                         onSelected: (_) => _toggleDay(day),
                         selectedColor: Colors.blue[700],
                         labelStyle: TextStyle(

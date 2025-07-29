@@ -26,20 +26,34 @@ class _BusHomeState extends State<BusHome> {
   }
 
   Future<void> _fetchAvailableBuses() async {
-    final buses = await ReservationService.getAvailableBuses();
+  final buses = await ReservationService.getAvailableBuses();
 
-    final filtered = _selectedDate == null
-        ? buses
-        : buses.where((bus) {
-            final List<dynamic> codingDays = bus['codingDays'] ?? [];
-            final selectedWeekday = DateFormat('EEEE').format(_selectedDate!);
-            return codingDays.contains(selectedWeekday);
-          }).toList();
+  if (_selectedDate != null) {
+    final selectedWeekday = DateFormat('EEEE').format(_selectedDate!);
+
+    // Check for weekend
+    if (selectedWeekday == 'Saturday' || selectedWeekday == 'Sunday') {
+      setState(() {
+        _availableBuses = [];
+      });
+      return;
+    }
+
+    final filtered = buses.where((bus) {
+      final List<dynamic> codingDays = bus['codingDays'] ?? [];
+      return codingDays.contains(selectedWeekday);
+    }).toList();
 
     setState(() {
       _availableBuses = filtered;
     });
+  } else {
+    setState(() {
+      _availableBuses = buses;
+    });
   }
+}
+
 
   Future<void> _selectDate() async {
     final picked = await showDatePicker(
@@ -186,46 +200,73 @@ class _BusHomeState extends State<BusHome> {
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  if (_selectedDate != null)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "Selected: ${DateFormat('EEE, MMM d').format(_selectedDate!)}",
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                if (_selectedDate != null)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          tooltip: 'Clear Filter',
-                          onPressed: () {
-                            setState(() {
-                              _selectedDate = null;
-                            });
-                            _fetchAvailableBuses();
-                          },
-                        )
+                        child: Text(
+                          "Selected: ${DateFormat('EEE, MMM d').format(_selectedDate!)}",
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        tooltip: 'Clear Filter',
+                        onPressed: () {
+                          setState(() {
+                            _selectedDate = null;
+                          });
+                          _fetchAvailableBuses();
+                        },
+                      )
+                    ],
+                  ),
+                const SizedBox(height: 20),
+                if (_selectedDate != null &&
+                    (DateFormat('EEEE').format(_selectedDate!) == 'Saturday' ||
+                    DateFormat('EEEE').format(_selectedDate!) == 'Sunday'))
+                  SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.4,
+                    child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.red,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          "No bus reservations available on weekends.",
+                          style: GoogleFonts.outfit(
+                            fontSize: 15,
+                            color: Colors.red,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
-                ],
-              ),
+                  ),
+                  ),
+              ],
             ),
           ),
+        ),
           _availableBuses.isEmpty
-              ? const SliverFillRemaining(
-                  child: Center(child: Text("No buses available.")),
-                )
+            ? const SliverToBoxAdapter(child: SizedBox.shrink())
               : SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -382,43 +423,47 @@ class _BusHomeState extends State<BusHome> {
           _fetchAvailableBuses();
         },
       ),
-      bottomNavigationBar: SafeArea(
-        bottom: true,
-        top: false,
-        left: false,
-        right: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _selectedBusIds.isNotEmpty
-                  ? const Color(0xFF0091AD)
-                  : Colors.grey.shade400,
-              minimumSize: const Size(double.infinity, 50),
-            ),
-            onPressed: _selectedBusIds.isNotEmpty
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ReservationForm(
-                          selectedBusIds: _selectedBusIds.toList(),
+        bottomNavigationBar: (_selectedDate != null &&
+          (DateFormat('EEEE').format(_selectedDate!) == 'Saturday' ||
+          DateFormat('EEEE').format(_selectedDate!) == 'Sunday'))
+      ? null
+      : SafeArea(
+          bottom: true,
+          top: false,
+          left: false,
+          right: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _selectedBusIds.isNotEmpty
+                    ? const Color(0xFF0091AD)
+                    : Colors.grey.shade400,
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              onPressed: _selectedBusIds.isNotEmpty
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ReservationForm(
+                            selectedBusIds: _selectedBusIds.toList(),
+                          ),
                         ),
-                      ),
-                    );
-                  }
-                : null,
-            child: const Text(
-              'Continue with Selected Bus',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                      );
+                    }
+                  : null,
+              child: const Text(
+                'Continue with Selected Bus',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
         ),
-      ),
     );
   }
 }

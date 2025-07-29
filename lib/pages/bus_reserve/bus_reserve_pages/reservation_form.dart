@@ -13,14 +13,49 @@ class ReservationForm extends StatefulWidget {
   State<ReservationForm> createState() => _ReservationFormState();
 }
 
-final TextEditingController _fromController = TextEditingController();
-final TextEditingController _toController = TextEditingController();
-final TextEditingController _fullNameController = TextEditingController();
-final TextEditingController _emailController = TextEditingController();
-
 bool isRoundTrip = false;
 
 class _ReservationFormState extends State<ReservationForm> {
+
+  late final TextEditingController _fromController;
+  late final TextEditingController _toController;
+  late final TextEditingController _fullNameController;
+  late final TextEditingController _emailController;
+
+
+  String? _selectedReservationDay;
+  List<String> _availableReservationDays = [];
+
+   @override
+  void initState() {
+    super.initState();
+    _loadAvailableReservationDays();
+    _fromController = TextEditingController();
+    _toController = TextEditingController();
+    _fullNameController = TextEditingController();
+    _emailController = TextEditingController();
+    _loadAvailableReservationDays();
+  }
+
+  @override
+  void dispose() {
+    _fromController.dispose();
+    _toController.dispose();
+    _fullNameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAvailableReservationDays() async {
+    final sortedDays = await ReservationService.getAvailableReservationDays(widget.selectedBusIds);
+    setState(() {
+      _availableReservationDays = sortedDays;
+      if (_availableReservationDays.length == 1) {
+        _selectedReservationDay = _availableReservationDays.first;
+      }
+    });
+  }
+
   Future<void> _submitReservation() async {
     final from = _fromController.text.trim();
     final to = _toController.text.trim();
@@ -49,6 +84,7 @@ class _ReservationFormState extends State<ReservationForm> {
         isRoundTrip: isRoundTrip,
         fullName: fullName,
         email: email,
+        reservationDay: _selectedReservationDay!,
       );
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -180,6 +216,42 @@ class _ReservationFormState extends State<ReservationForm> {
                 children: [
                   _buildFormField('From', _fromController),
                   _buildFormField('To', _toController),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.shade200,
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        )
+                      ],
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedReservationDay,
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        labelText: 'Reservation Day',
+                        labelStyle: GoogleFonts.outfit(),
+                      ),
+                      style: GoogleFonts.outfit(fontSize: 16, color: Colors.black),
+                      items: _availableReservationDays
+                          .map((day) => DropdownMenuItem(
+                                value: day,
+                                child: Text(day),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedReservationDay = value;
+                        });
+                      },
+                    ),
+                  ),
                   Row(
                     children: [
                       Checkbox(
@@ -262,14 +334,22 @@ class _ReservationFormState extends State<ReservationForm> {
         );
 
         if (confirmed == true) {
-        await _submitReservation(); // Wait until reservation is saved
-        Navigator.pushReplacement( // Replaces ReservationForm
+        if (_selectedReservationDay == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please select a reservation day')),
+          );
+          return;
+        }
+
+        await _submitReservation(); // or directly handle the reservation logic here
+        Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => UserSelection(),
           ),
         );
       }
+
 
       }
     : null,

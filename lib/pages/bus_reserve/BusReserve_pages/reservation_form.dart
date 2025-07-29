@@ -250,8 +250,8 @@ class _ReservationFormState extends State<ReservationForm> {
                 ),
                 child: Text('Proceed',
                   style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 18,
+                    color: Colors.white,    
+                    fontSize: 18, 
                     fontWeight: FontWeight.bold,
                   ),
                 ),

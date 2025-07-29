@@ -75,6 +75,8 @@ class _UserIDPageState extends State<UserIDPage> {
     final status = idData?['status'] ?? 'pending';
     final frontUrl = idData?['frontUrl'];
     final backUrl = idData?['backUrl'];
+    final idType = idData?['idType'] ?? 'Unknown';
+    
     return Padding(
       padding: EdgeInsets.symmetric(
           horizontal: width * 0.07, vertical: width * 0.04),
@@ -82,9 +84,17 @@ class _UserIDPageState extends State<UserIDPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (status == 'pending')
-            Text('Your ID is pending verification.',
-                style: GoogleFonts.outfit(
-                    fontSize: fontSizeBody, color: Colors.orange)),
+            Column(
+              children: [
+                Text('Your ID is pending verification.',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.orange)),
+                SizedBox(height: 8),
+                Text('ID Type: $idType',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.black87)),
+              ],
+            ),
           SizedBox(height: 12),
           if (status == 'rejected')
             Column(
@@ -92,6 +102,10 @@ class _UserIDPageState extends State<UserIDPage> {
                 Text('Your ID was rejected. Please resubmit.',
                     style: GoogleFonts.outfit(
                         fontSize: fontSizeBody, color: Colors.red)),
+                SizedBox(height: 8),
+                Text('ID Type: $idType',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.black87)),
                 SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () {
@@ -111,9 +125,32 @@ class _UserIDPageState extends State<UserIDPage> {
               ],
             ),
           if (status == 'verified')
-            Text('Your ID is verified!',
-                style: GoogleFonts.outfit(
-                    fontSize: fontSizeBody, color: Colors.green)),
+            Column(
+              children: [
+                Text('Your ID is verified!',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.green)),
+                SizedBox(height: 8),
+                Text('ID Type: $idType',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, color: Colors.black87)),
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Text(
+                    'You will automatically receive discounts on pre-ticketing based on your verified ID type.',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody * 0.9, color: Colors.green[700]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
           SizedBox(height: width * 0.04),
           if (frontUrl != null) _imageCard('Front', frontUrl, width),
           if (backUrl != null) _imageCard('Back', backUrl, width),

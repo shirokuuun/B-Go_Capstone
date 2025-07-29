@@ -16,6 +16,7 @@ class IDVerificationReviewPage extends StatefulWidget {
 class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
   File? frontImage;
   File? backImage;
+  String? idType;
   bool uploading = false;
   String? error;
 
@@ -26,6 +27,11 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
     if (args != null) {
       frontImage = args['front'] as File?;
       backImage = args['back'] as File?;
+      idType = args['idType'] as String?;
+      
+      // Debug: Print the received arguments
+      print('Received arguments: $args');
+      print('ID Type received: $idType');
     }
   }
 
@@ -46,6 +52,9 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
       final backUrl = await backRef.getDownloadURL();
       bool firestoreSuccess = false;
       try {
+        // Debug: Print the idType to console
+        print('Saving ID type: $idType');
+        
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -54,12 +63,14 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
             .set({
           'frontUrl': frontUrl,
           'backUrl': backUrl,
+          'idType': idType ?? 'Unknown', // Ensure it's not null
           'status': 'pending',
           'submittedAt': FieldValue.serverTimestamp(),
         });
         firestoreSuccess = true;
       } catch (e) {
         // Firestore write failed, but upload succeeded
+        print('Firestore error: $e');
         firestoreSuccess = false;
       }
       if (mounted) {
@@ -112,6 +123,15 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            if (idType != null) ...[
+              Text(
+                'ID Type: $idType',
+                style: GoogleFonts.outfit(
+                    fontSize: fontSizeBody, fontWeight: FontWeight.w600, color: cyan),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+            ],
             Text(
               'Please make sure there is enough lighting and the ID lettering is clear before continuing',
               style: GoogleFonts.outfit(

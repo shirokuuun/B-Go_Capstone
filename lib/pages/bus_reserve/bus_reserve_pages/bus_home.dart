@@ -14,6 +14,16 @@ class BusHome extends StatefulWidget {
 }
 
 class _BusHomeState extends State<BusHome> {
+  List<Map<String, dynamic>> _reservations = [];
+  Map<String, dynamic>? _selectedReservation;
+
+  Future<void> _fetchReservations() async {
+    final results = await ReservationService.getAllReservations();
+    setState(() {
+      _reservations = results;
+    });
+  }
+
   List<Map<String, dynamic>> _availableBuses = [];
   Set<String> _selectedBusIds = {};
   DateTime? _selectedDate;
@@ -70,6 +80,85 @@ class _BusHomeState extends State<BusHome> {
       _fetchAvailableBuses();
     }
   }
+
+  //for test purpose only
+  Widget _buildCancelReservationSheet() {
+  return SingleChildScrollView(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Cancel Reservation',
+            style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          if (_reservations.isEmpty)
+            const Text("No reservations found.")
+          else
+            ListView.builder(
+              shrinkWrap: true, // ✅ Add this
+              physics: const NeverScrollableScrollPhysics(), // ✅ Prevent nested scroll conflict
+              itemCount: _reservations.length,
+              itemBuilder: (context, index) {
+                final res = _reservations[index];
+                return ListTile(
+                tileColor: _selectedReservation == res ? Colors.blue.shade50 : null, // Highlight if selected
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(
+                    color: _selectedReservation == res ? Colors.blue : Colors.grey.shade300,
+                    width: 1.5,
+                  ),
+                ),
+                title: Text(res['fullName'] ?? 'No Name'),
+                subtitle: Text('Bus: ${res['selectedBusIds'].join(', ')} | Day: ${res['reservationDay']}'),
+                trailing: Radio<Map<String, dynamic>>(
+                  value: res,
+                  groupValue: _selectedReservation,
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedReservation = val;
+                    });
+                  },
+                ),
+                onTap: () {
+                  setState(() {
+                    _selectedReservation = res;
+                  });
+                },
+              );
+              },
+            ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.delete),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+            label: const Text("Cancel Selected"),
+            onPressed: _selectedReservation == null
+                ? null
+                : () async {
+                    final selected = _selectedReservation!;
+                    final reservationId = selected['id'];
+                    final buses = List<String>.from(selected['selectedBusIds']);
+                    final day = selected['reservationDay'];
+
+                    Navigator.pop(context); // Close sheet
+
+                    await ReservationService.cancelReservation(reservationId, buses, day);
+                    _fetchAvailableBuses();
+                    _fetchReservations(); // ✅ Refresh reservation list
+                  },
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -412,17 +501,42 @@ class _BusHomeState extends State<BusHome> {
                 ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF0091AD),
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AdminAddBus()),
-          );
-          _fetchAvailableBuses();
-        },
-      ),
+       //for test purpose only
+      floatingActionButton: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton(
+          heroTag: 'cancel',
+          backgroundColor: Colors.red,
+          child: const Icon(Icons.cancel),
+          tooltip: 'Manage Reservations',
+          onPressed: () async {
+            await _fetchReservations();
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (context) => _buildCancelReservationSheet(),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        FloatingActionButton(
+          heroTag: 'add',
+          backgroundColor: const Color(0xFF0091AD),
+          child: const Icon(Icons.add),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AdminAddBus()),
+            );
+            _fetchAvailableBuses();
+          },
+        ),
+      ],
+    ),
         bottomNavigationBar: (_selectedDate != null &&
           (DateFormat('EEEE').format(_selectedDate!) == 'Saturday' ||
           DateFormat('EEEE').format(_selectedDate!) == 'Sunday'))

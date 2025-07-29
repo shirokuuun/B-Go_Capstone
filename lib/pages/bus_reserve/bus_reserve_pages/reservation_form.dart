@@ -139,6 +139,7 @@ class _ReservationFormState extends State<ReservationForm> {
   return emailRegex.hasMatch(email);
 }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

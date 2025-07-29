@@ -42,17 +42,14 @@ static Future<List<Map<String, dynamic>>> getAvailableBuses() async {
     final List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
     final List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
 
-    // Filter out reserved days from codingDays
     final unreservedDays = codingDays.where((day) => !reservedDays.contains(day)).toList();
 
-    // Only return buses with any unreserved days still available this week
     return unreservedDays.any((day) => remainingDays.contains(day));
   }).map((doc) {
     final data = doc.data() as Map<String, dynamic>;
     final List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
     final List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
 
-    // Clean version of unreserved days for UI
     final unreservedDays = codingDays.where((day) => !reservedDays.contains(day)).toList();
     data['codingDays'] = unreservedDays;
 
@@ -157,6 +154,55 @@ static Future<List<String>> getAvailableReservationDays(List<String> selectedBus
     days.sort((a, b) => order.indexOf(a).compareTo(order.indexOf(b)));
     return days;
   }
+
+
+// delete and manually update the bus status to active (dito muna habang wala pang admin)
+// Get all reservations
+static Future<List<Map<String, dynamic>>> getAllReservations() async {
+  final snapshot = await FirebaseFirestore.instance.collection('reservations').get();
+  return snapshot.docs.map((doc) {
+    final data = doc.data();
+    data['id'] = doc.id;
+    return data;
+  }).toList();
+}
+
+// Cancel a reservation
+static Future<void> cancelReservation(
+  String reservationId,
+  List<String> busIds,
+  String reservationDay,
+) async {
+  final firestore = FirebaseFirestore.instance;
+
+  // Delete the reservation document
+  await firestore.collection('reservations').doc(reservationId).delete();
+
+  for (String busId in busIds) {
+    final busRef = firestore.collection('AvailableBuses').doc(busId);
+    final doc = await busRef.get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+
+      // Safely extract and convert lists
+      List<String> reservedDays = List<String>.from(data['reservedDays'] ?? []);
+      List<String> codingDays = List<String>.from(data['codingDays'] ?? []);
+
+      // Remove the reservation day
+      reservedDays.remove(reservationDay);
+
+      // Check if the bus is now available again
+      final isFullyReserved = codingDays.toSet().difference(reservedDays.toSet()).isEmpty;
+
+      // Update bus status and reservedDays
+      await busRef.update({
+        'reservedDays': reservedDays,
+        'status': isFullyReserved ? 'reserved' : 'active',
+      });
+    }
+  }
+}
 
 
 }

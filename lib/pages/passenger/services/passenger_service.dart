@@ -13,11 +13,12 @@ class PassengerService extends StatelessWidget {
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,
+            color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF0091AD),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         centerTitle: true,

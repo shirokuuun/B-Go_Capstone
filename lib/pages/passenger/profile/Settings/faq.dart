@@ -94,14 +94,14 @@ class _FAQPageState extends State<FAQPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back,
-              color: Colors.black, size: fontSizeTitle + 2),
+              color: Colors.white, size: fontSizeTitle + 2),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: Text(
           'FAQs',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeTitle,
           ),

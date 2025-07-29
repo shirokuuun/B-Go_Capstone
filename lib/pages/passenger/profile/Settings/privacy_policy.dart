@@ -19,14 +19,14 @@ class PrivacyPolicyPage extends StatelessWidget {
         backgroundColor: cyan,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black, size: fontSizeTitle + 2),
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: fontSizeTitle + 2),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
         title: Text(
           'Privacy Policy',
           style: GoogleFonts.outfit(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.w500,
             fontSize: fontSizeTitle,
           ),

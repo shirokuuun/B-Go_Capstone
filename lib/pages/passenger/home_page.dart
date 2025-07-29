@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:b_go/pages/user_role/user_selection.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -15,7 +16,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final user = FirebaseAuth.instance.currentUser;
   late GoogleMapController mapController;
-
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final LatLng _center =
       const LatLng(13.9407, 121.1529); // Example: Rosario, Batangas
   int _selectedIndex = 0;
@@ -45,16 +46,24 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+                icon: const Icon(Icons.menu, color: Colors.white),
+                onPressed: () {
+                  _scaffoldKey.currentState?.openDrawer();
+                },
+              ),
         title: Text(
           "B-Go Map",
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,
+            color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF0091AD),
         centerTitle: true, // <-- This centers the title
       ),
+      key: _scaffoldKey,
       drawer: Drawer(
         child: ListView(
           padding: EdgeInsets.zero,
@@ -71,7 +80,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-                        ListTile(
+            ListTile(
               leading: Icon(Icons.home),
               title: Text(
                 'Home',
@@ -83,6 +92,23 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, '/home');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.directions_bus),
+              title: Text(
+                'Role Selection',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => UserSelection()),
+                );
               },
             ),
             ListTile(

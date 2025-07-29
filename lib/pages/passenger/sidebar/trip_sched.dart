@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TripSchedPage extends StatelessWidget {
-  const TripSchedPage({Key? key}) : super(key: key);
+  TripSchedPage({Key? key}) : super(key: key);
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: Colors.white),
+          onPressed: () {
+            _scaffoldKey.currentState?.openDrawer();
+          },
+        ),
         title: Text(
           'Trip Schedules',
           style: GoogleFonts.outfit(
             fontSize: 20,
             fontWeight: FontWeight.w500,
+            color: Colors.white,
           ),
         ),
         backgroundColor: const Color(0xFF0091AD),
@@ -49,6 +59,20 @@ class TripSchedPage extends StatelessWidget {
               },
             ),
             ListTile(
+              leading: Icon(Icons.directions_bus),
+              title: Text(
+                'Role Selection',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/user_selection');
+              },
+            ),
+            ListTile(
               leading: Icon(Icons.schedule),
               title: Text(
                 'Trip Schedules',
@@ -77,64 +101,45 @@ class TripSchedPage extends StatelessWidget {
           ],
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          _buildScheduleCard(
-            route: 'Batangas City - SM Lipa',
-            schedules: [
-              '5:00 AM',
-              '5:30 AM',
-              '6:00 AM',
-              '6:30 AM',
-            ],
-          ),
-          SizedBox(height: 16),
-          _buildScheduleCard(
-            route: 'Rosario - SM Lipa',
-            schedules: [
-              '5:00 AM',
-              '5:30 AM',
-              '6:00 AM',
-              '6:30 AM',
-            ],
-          ),
-          SizedBox(height: 16),
-          _buildScheduleCard(
-            route: 'Tiaong - SM Lipa',
-            schedules: [
-              '5:00 AM',
-              '5:30 AM',
-              '6:00 AM',
-              '6:30 AM',
-            ],
-          ),
-          SizedBox(height: 16),
-          _buildScheduleCard(
-            route: 'Mataas na Kahoy - SM Lipa',
-            schedules: [
-              '5:00 AM',
-              '5:30 AM',
-              '6:00 AM',
-              '6:30 AM',
-            ],
-          ),
-          SizedBox(height: 16),
-          _buildScheduleCard(
-            route: 'San Juan - SM Lipa',
-            schedules: [
-              '5:00 AM',
-              '5:30 AM',
-              '6:00 AM',
-              '6:30 AM',
-            ],
-          ),
-        ],
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('trip_sched').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return Center(child: Text('No trip schedules found.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: snapshot.data!.docs.length,
+            itemBuilder: (context, index) {
+              final doc = snapshot.data!.docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final route = data['route'] ?? 'Unknown Route';
+              // Schedules can be a string or a list, handle both
+              final schedulesRaw = data['schedules'];
+              final List<String> schedules = schedulesRaw is String
+                  ? schedulesRaw.split(',').map((s) => s.trim()).toList()
+                  : List<String>.from(schedulesRaw ?? []);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _buildScheduleCard(
+                  route: route,
+                  schedules: schedules,
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }
 
-  Widget _buildScheduleCard({required String route, required List<String> schedules}) {
+  Widget _buildScheduleCard(
+      {required String route, required List<String> schedules}) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

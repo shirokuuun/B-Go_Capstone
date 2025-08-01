@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/pages/terms_and_conditions_page.dart';
 import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:b_go/auth/auth_services.dart';
 import 'dart:math' as math;
 
 class LoginPhonePage extends StatefulWidget {
@@ -15,12 +15,11 @@ class LoginPhonePage extends StatefulWidget {
 class _LoginPhonePageState extends State<LoginPhonePage> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController otpController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthServices _authServices = AuthServices();
 
   String? _verificationId;
   bool _otpSent = false;
   bool _isLoading = false;
-  bool agreedToTerms = false;
 
   // Country code dropdown
   final List<Map<String, String>> countries = [
@@ -33,6 +32,15 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
   String selectedCountryCode = '+63';
 
   @override
+  void initState() {
+    super.initState();
+    // Add listener to phone controller to trigger rebuild when text changes
+    phoneController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
   void dispose() {
     phoneController.dispose();
     otpController.dispose();
@@ -40,51 +48,127 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
   }
 
   Future<void> _sendOTP() async {
-    setState(() => _isLoading = true);
     String phone = phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter a phone number.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     if (phone.startsWith('0')) phone = phone.substring(1);
     String fullPhone = selectedCountryCode + phone;
-    await _auth.verifyPhoneNumber(
-      phoneNumber: fullPhone,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await _auth.signInWithCredential(credential);
-        setState(() => _isLoading = false);
-        Navigator.pushReplacementNamed(context, '/user_selection');
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'Verification failed'), backgroundColor: Colors.red),
-        );
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _verificationId = verificationId;
-          _otpSent = true;
-          _isLoading = false;
-        });
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        setState(() => _verificationId = verificationId);
-      },
-    );
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullPhone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          try {
+            UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+            setState(() => _isLoading = false);
+            Navigator.pushReplacementNamed(context, '/user_selection');
+          } catch (e) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Login failed. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() => _isLoading = false);
+          String errorMessage = 'Verification failed';
+          
+          // Handle specific Firebase Auth errors
+          if (e.code == 'invalid-phone-number') {
+            errorMessage = 'Invalid phone number format';
+          } else if (e.code == 'too-many-requests') {
+            errorMessage = 'Too many attempts. Please try again later.';
+          } else if (e.message != null) {
+            errorMessage = e.message!;
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          setState(() {
+            _verificationId = verificationId;
+            _otpSent = true;
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('OTP sent to $fullPhone'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          setState(() => _verificationId = verificationId);
+        },
+      );
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to send OTP. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _verifyOTP() async {
     if (_verificationId == null) return;
+    
+    String otp = otpController.text.trim();
+    if (otp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter the OTP.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
+    
     try {
       final credential = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
-        smsCode: otpController.text.trim(),
+        smsCode: otp,
       );
-      await _auth.signInWithCredential(credential);
+      
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      
       setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login successful!'),
+          backgroundColor: Colors.green,
+        ),
+      );
       Navigator.pushReplacementNamed(context, '/user_selection');
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invalid OTP or verification failed'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Invalid OTP or verification failed'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -267,13 +351,17 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                               child: CircularProgressIndicator())
                           : ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF1D2B53),
+                                backgroundColor: phoneController.text.trim().isNotEmpty 
+                                    ? Color(0xFF0091AD) 
+                                    : Colors.grey,
                                 minimumSize: Size(double.infinity, 60),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
+                                // Ensure button is not disabled
+                                disabledBackgroundColor: Color(0x68454547),
                               ),
-                              onPressed: agreedToTerms
+                              onPressed: phoneController.text.trim().isNotEmpty 
                                   ? (_otpSent ? _verifyOTP : _sendOTP)
                                   : null,
                               child: Text(

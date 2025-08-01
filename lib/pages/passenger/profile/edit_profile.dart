@@ -40,6 +40,74 @@ class _EditProfileState extends State<EditProfile> {
         }
       });
     }
+    
+    // Add listener to email controller to trigger rebuild when text changes
+    _emailController.addListener(() {
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // Check if user was registered with phone number
+  Future<bool> _isPhoneRegisteredUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+    
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists) {
+        final authMethod = doc.data()?['authMethod'];
+        return authMethod == 'phone';
+      }
+    } catch (e) {
+      print('Error checking user registration method: $e');
+    }
+    return false;
+  }
+
+  // Validate email and password for phone users
+  String? _validateEmailAndPassword() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    // Check if user has email (was registered with email)
+    bool hasEmail = user.email != null && user.email!.isNotEmpty;
+    
+    // If user doesn't have email (phone user) and wants to add email
+    if (!hasEmail && _emailController.text.trim().isNotEmpty) {
+      // Must provide password for email login
+      if (_passwordController.text.trim().isEmpty) {
+        return 'Password is required when adding email for login';
+      }
+      
+      // Validate password strength
+      if (_passwordController.text.length < 6) {
+        return 'Password must be at least 6 characters long';
+      }
+    }
+    
+    // If user has email and wants to change it
+    if (hasEmail && _emailController.text.trim() != user.email) {
+      // Must provide password for email change
+      if (_passwordController.text.trim().isEmpty) {
+        return 'Password is required when changing email';
+      }
+      
+      // Validate password strength
+      if (_passwordController.text.length < 6) {
+        return 'Password must be at least 6 characters long';
+      }
+    }
+    
+    return null;
   }
 
   Future<void> _pickImage() async {
@@ -164,6 +232,30 @@ class _EditProfileState extends State<EditProfile> {
     }
   }
 
+  Future<void> _resendVerificationEmail() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        await user.sendEmailVerification();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification email sent again!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send verification email: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -255,6 +347,84 @@ class _EditProfileState extends State<EditProfile> {
                         icon: Icons.email,
                         keyboardType: TextInputType.emailAddress,
                       ),
+                      // Show email verification status
+                      if (_emailController.text.isNotEmpty && 
+                          FirebaseAuth.instance.currentUser?.email != null &&
+                          FirebaseAuth.instance.currentUser?.email!.isNotEmpty == true) ...[
+                        SizedBox(height: 8),
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                ? Colors.green.shade50 
+                                : Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                  ? Colors.green.shade200 
+                                  : Colors.orange.shade200,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                    ? Icons.verified 
+                                    : Icons.warning,
+                                color: FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                    ? Colors.green.shade700 
+                                    : Colors.orange.shade700,
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                      ? 'Email verified. You can login using email'
+                                      : 'Email not verified. Please check your inbox and verify your email',
+                                  style: GoogleFonts.outfit(
+                                    color: FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                        ? Colors.green.shade700 
+                                        : Colors.orange.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                      ],
+                      // Show helper text for phone users adding email
+                      if (_emailController.text.isNotEmpty && 
+                          (FirebaseAuth.instance.currentUser?.email == null || 
+                           FirebaseAuth.instance.currentUser?.email!.isEmpty == true)) ...[
+                        SizedBox(height: 8),
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Adding email requires a password for login functionality.',
+                                  style: GoogleFonts.outfit(
+                                    color: Colors.blue.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                      ],
                       SizedBox(height: 16),
                       _ProfileTextField(
                         controller: _phoneController,
@@ -265,7 +435,7 @@ class _EditProfileState extends State<EditProfile> {
                       SizedBox(height: 16),
                       _ProfileTextField(
                         controller: _passwordController,
-                        label: 'Password (for email login)',
+                        label: 'Password (required for email login)',
                         icon: Icons.lock,
                         obscureText: true,
                       ),
@@ -298,6 +468,19 @@ class _EditProfileState extends State<EditProfile> {
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
+                      // Additional validation for email and password
+                      String? validationError = _validateEmailAndPassword();
+                      if (validationError != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(validationError),
+                            backgroundColor: Colors.red,
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        return;
+                      }
+
                       final user = FirebaseAuth.instance.currentUser;
                       if (user != null) {
                         try {
@@ -328,8 +511,104 @@ class _EditProfileState extends State<EditProfile> {
                           // Update Firebase Auth profile first
                           await user.updateDisplayName(_nameController.text);
 
+                          // Check if user is adding email for the first time (phone user)
+                          bool isPhoneUser = user.email == null || user.email!.isEmpty;
+                          
+                          if (isPhoneUser && newEmail.isNotEmpty) {
+                            // Phone user is adding email for the first time
+                            try {
+                              // Create email credential and link it
+                              final emailCredential = EmailAuthProvider.credential(
+                                email: newEmail,
+                                password: _passwordController.text,
+                              );
+                              
+                              // Link the email credential to the current user
+                              await user.linkWithCredential(emailCredential);
+                              
+                              // Update Firestore
+                              await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                                'name': _nameController.text,
+                                'email': newEmail,
+                                'phone': newPhone,
+                                'authMethod': 'phone_email', // Indicate both methods are available
+                                'updatedAt': FieldValue.serverTimestamp(),
+                              });
+
+                              // Send verification email
+                              await user.sendEmailVerification();
+                              
+                              // Close loading dialog
+                              Navigator.of(context).pop();
+
+                              // Show verification dialog
+                              await showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text('Verify your email'),
+                                  content: Text('A verification link has been sent to $newEmail.\n\nPlease verify your email before you can login using email.\n\nYou can continue using the app with your phone number while waiting for verification.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      child: Text('OK'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.of(context).pop();
+                                        _resendVerificationEmail();
+                                      },
+                                      child: Text('Resend Email'),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              // Show success message
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Email linked successfully! Please check your email for verification.'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+
+                              // Navigate back to profile page
+                              if (mounted) {
+                                Navigator.pop(context);
+                              }
+                              return;
+                              
+                            } catch (e) {
+                              Navigator.of(context).pop();
+                              String message = 'Failed to link email';
+                              if (e is FirebaseAuthException) {
+                                switch (e.code) {
+                                  case 'email-already-in-use':
+                                    message = 'This email is already in use by another account';
+                                    break;
+                                  case 'invalid-email':
+                                    message = 'Please enter a valid email address';
+                                    break;
+                                  case 'weak-password':
+                                    message = 'Password is too weak';
+                                    break;
+                                  default:
+                                    message = e.message ?? 'Failed to link email';
+                                }
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(message),
+                                  backgroundColor: Colors.red,
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                              return;
+                            }
+                          }
+
                           // If email changed, use verifyBeforeUpdateEmail for secure update
-                          if (newEmail != user.email) {
+                          if (newEmail != user.email && newEmail.isNotEmpty) {
                             try {
                               await user.verifyBeforeUpdateEmail(newEmail);
                               Navigator.of(context).pop();

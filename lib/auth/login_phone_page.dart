@@ -62,6 +62,18 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
     if (phone.startsWith('0')) phone = phone.substring(1);
     String fullPhone = selectedCountryCode + phone;
 
+    // Check if phone number exists in Firestore before sending OTP
+    bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
+    if (!isRegistered) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('This phone number is not registered. Please register first.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {

@@ -55,6 +55,10 @@ class _SOSPageState extends State<SOSPage> {
     final route = widget.route.trim();
     print("🛤️ Route = $route | Collection = $placeCollection");
     final map = {
+      'Batangas': {
+        'Place': 'SM City Lipa - Batangas',
+        'Place 2': 'Batangas - SM City Lipa',
+      },
       'Rosario': {
         'Place': 'SM City Lipa - Rosario',
         'Place 2': 'Rosario - SM City Lipa',

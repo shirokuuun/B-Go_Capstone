@@ -257,55 +257,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                           ),
                         ),
                       ),
-                    Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: agreedToTerms,
-                            onChanged: (bool? value) {
-                              setState(() {
-                                agreedToTerms = value ?? false;
-                              });
-                            },
-                          ),
-                          Flexible(
-                            child: RichText(
-                              text: TextSpan(
-                                style: GoogleFonts.outfit(
-                                    color: Colors.black),
-                                children: [
-                                  TextSpan(
-                                    text: 'I agree to the ',
-                                  ),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
-                                          ),
-                                        );
-                                      },
-                                      child: Text(
-                                        'Terms and Conditions',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.blue,
-                                          decoration: TextDecoration.underline,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+
                     SizedBox(height: 20),
                     Padding(
                       padding:
@@ -339,17 +291,17 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Already have an account?',
+                          'Don\'t have an account?',
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         GestureDetector(
                           onTap: () {
-                            Navigator.pushReplacementNamed(context, '/login');
+                            Navigator.pushReplacementNamed(context, '/phone_register');
                           },
                           child: Text(
-                            ' Login',
+                            ' Register',
                             style: GoogleFonts.outfit(
                               color: Colors.blue,
                               fontWeight: FontWeight.w500,

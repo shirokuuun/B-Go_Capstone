@@ -49,12 +49,42 @@ class _PreTicketState extends State<PreTicket> {
   String selectedPlaceCollection = 'Place';
   int directionIndex = 0; // 0: Place, 1: Place 2
   late Future<List<Map<String, dynamic>>> placesFuture;
+  String? verifiedIDType;
 
   @override
   void initState() {
     super.initState();
     placesFuture =
         RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+    _fetchVerifiedIDType();
+  }
+
+  Future<void> _fetchVerifiedIDType() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('VerifyID')
+          .doc('id')
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        final status = data?['status'];
+        final idType = data?['idType'];
+
+        if (status == 'verified' && idType != null) {
+          setState(() {
+            verifiedIDType = idType;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error fetching verified ID type: $e');
+    }
   }
 
   void _onRouteChanged(String? newRoute) {
@@ -119,7 +149,10 @@ class _PreTicketState extends State<PreTicket> {
       Map<String, dynamic> toPlace, int quantity) async {
     List<String>? fareTypes = await showDialog<List<String>>(
       context: context,
-      builder: (context) => _FareTypeSelectionModal(quantity: quantity),
+      builder: (context) => _FareTypeSelectionModal(
+        quantity: quantity,
+        verifiedIDType: verifiedIDType,
+      ),
     );
     if (fareTypes != null) {
       _showConfirmationModal(fromPlace, toPlace, quantity, fareTypes);
@@ -412,7 +445,8 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
 // Fare Type Selection Modal
 class _FareTypeSelectionModal extends StatefulWidget {
   final int quantity;
-  const _FareTypeSelectionModal({required this.quantity});
+  final String? verifiedIDType;
+  const _FareTypeSelectionModal({required this.quantity, this.verifiedIDType});
   @override
   State<_FareTypeSelectionModal> createState() =>
       _FareTypeSelectionModalState();
@@ -426,6 +460,25 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
   void initState() {
     super.initState();
     selectedTypes = List.generate(widget.quantity, (index) => 'Regular');
+    
+    // Automatically set the first passenger's fare type based on verified ID
+    if (widget.verifiedIDType != null && widget.quantity > 0) {
+      String autoFareType = _mapIDTypeToFareType(widget.verifiedIDType!);
+      selectedTypes[0] = autoFareType;
+    }
+  }
+
+  String _mapIDTypeToFareType(String idType) {
+    switch (idType.toLowerCase()) {
+      case 'student':
+        return 'Student';
+      case 'senior citizen':
+        return 'Senior';
+      case 'pwd':
+        return 'PWD';
+      default:
+        return 'Regular';
+    }
   }
 
   @override
@@ -440,6 +493,23 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.verifiedIDType != null) ...[
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!),
+                  ),
+                  child: Text(
+                    'First passenger automatically set to ${_mapIDTypeToFareType(widget.verifiedIDType!)} based on your verified ID',
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: Colors.green[700]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                SizedBox(height: 12),
+              ],
               for (int i = 0; i < widget.quantity; i++)
                 Row(
                   children: [

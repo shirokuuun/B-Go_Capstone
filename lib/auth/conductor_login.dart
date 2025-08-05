@@ -35,18 +35,28 @@ class _ConductorLoginState extends State<ConductorLogin> {
         _errorMessage = null;
       });
 
+      // Only work with conductors that have uid field (created via admin website)
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        setState(() {
+          _errorMessage = 'Authentication failed. Please try again.';
+        });
+        return;
+      }
+
       final query = await FirebaseFirestore.instance
           .collection('conductors')
-          .where('email', isEqualTo: email)
+          .where('uid', isEqualTo: user.uid)
           .limit(1)
           .get();
 
       if (query.docs.isEmpty) {
         setState(() {
-          _errorMessage = 'No conductor record found for this email.';
+          _errorMessage = 'No conductor record found. This conductor must be created via the admin website.';
         });
         return;
       }
+      
       final doc = query.docs.first;
       final data = doc.data();
       final route = data['route'] ?? '';
@@ -226,7 +236,7 @@ class _ConductorLoginState extends State<ConductorLogin> {
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1D2B53),
+                            backgroundColor: const Color(0xFF0091AD),
                             padding: EdgeInsets.all(20),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),

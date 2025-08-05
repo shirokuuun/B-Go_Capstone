@@ -29,19 +29,112 @@ class BusLocation {
     final data = doc.data() as Map<String, dynamic>;
     final locationData = data['currentLocation'] as Map<String, dynamic>?;
     
-    return BusLocation(
-      conductorId: doc.id,
+    // Only accept conductors with uid field (created via admin website)
+    if (data['uid'] == null) {
+      print('❌ Skipping conductor ${doc.id} - no uid field (not created via admin website)');
+      return BusLocation(
+        conductorId: '',
+        conductorName: '',
+        route: '',
+        busNumber: '',
+        location: const LatLng(0, 0),
+        timestamp: DateTime.now(),
+        speed: 0.0,
+        heading: 0.0,
+        isOnline: false,
+      );
+    }
+    
+    final conductorId = data['uid'] as String;
+    
+    print('🔍 Processing conductor document: ${doc.id}');
+    print('📋 Document data: $data');
+    print('📍 Location data: $locationData');
+    print('🆔 Using conductor ID: $conductorId');
+    
+    // Check if location data is valid
+    LatLng location;
+    if (locationData != null && 
+        locationData['latitude'] != null && 
+        locationData['longitude'] != null) {
+      try {
+        // Handle different number types (int, double, etc.)
+        final lat = locationData['latitude'];
+        final lng = locationData['longitude'];
+        
+        double latitude, longitude;
+        
+        if (lat is int) {
+          latitude = lat.toDouble();
+        } else if (lat is double) {
+          latitude = lat;
+        } else if (lat is num) {
+          latitude = lat.toDouble();
+        } else {
+          print('❌ Invalid latitude type: ${lat.runtimeType}');
+          location = const LatLng(0, 0);
+          return BusLocation(
+            conductorId: conductorId,
+            conductorName: data['name'] ?? 'Unknown',
+            route: data['route'] ?? 'Unknown Route',
+            busNumber: data['busNumber'] ?? 'Unknown',
+            location: location,
+            timestamp: locationData?['timestamp']?.toDate() ?? DateTime.now(),
+            speed: locationData?['speed']?.toDouble() ?? 0.0,
+            heading: locationData?['heading']?.toDouble() ?? 0.0,
+            isOnline: data['isOnline'] ?? false,
+          );
+        }
+        
+        if (lng is int) {
+          longitude = lng.toDouble();
+        } else if (lng is double) {
+          longitude = lng;
+        } else if (lng is num) {
+          longitude = lng.toDouble();
+        } else {
+          print('❌ Invalid longitude type: ${lng.runtimeType}');
+          location = const LatLng(0, 0);
+          return BusLocation(
+            conductorId: conductorId,
+            conductorName: data['name'] ?? 'Unknown',
+            route: data['route'] ?? 'Unknown Route',
+            busNumber: data['busNumber'] ?? 'Unknown',
+            location: location,
+            timestamp: locationData?['timestamp']?.toDate() ?? DateTime.now(),
+            speed: locationData?['speed']?.toDouble() ?? 0.0,
+            heading: locationData?['heading']?.toDouble() ?? 0.0,
+            isOnline: data['isOnline'] ?? false,
+          );
+        }
+        
+        location = LatLng(latitude, longitude);
+        print('✅ Valid location found: ${location.latitude}, ${location.longitude}');
+      } catch (e) {
+        print('❌ Error parsing location data: $e');
+        location = const LatLng(0, 0);
+      }
+    } else {
+      location = const LatLng(0, 0);
+      print('❌ Invalid location data, using default: ${location.latitude}, ${location.longitude}');
+    }
+    
+    final bus = BusLocation(
+      conductorId: conductorId,
       conductorName: data['name'] ?? 'Unknown',
       route: data['route'] ?? 'Unknown Route',
-      busNumber: data['busNumber'] ?? 'Unknown',
-      location: locationData != null 
-          ? LatLng(locationData['latitude'] as double, locationData['longitude'] as double)
-          : const LatLng(0, 0),
+      busNumber: data['busNumber']?.toString() ?? 'Unknown',
+      location: location,
       timestamp: locationData?['timestamp']?.toDate() ?? DateTime.now(),
       speed: locationData?['speed']?.toDouble() ?? 0.0,
       heading: locationData?['heading']?.toDouble() ?? 0.0,
       isOnline: data['isOnline'] ?? false,
     );
+    
+    print('✅ Created bus: ${bus.conductorId} - ${bus.route} at ${bus.location}');
+    print('📍 Bus location check: lat=${bus.location.latitude}, lng=${bus.location.longitude}');
+    print('📍 Is valid location: ${bus.location.latitude != 0 && bus.location.longitude != 0}');
+    return bus;
   }
 }
 
@@ -57,10 +150,22 @@ class BusLocationService {
         .where('isOnline', isEqualTo: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => BusLocation.fromFirestore(doc))
-              .where((bus) => bus.location.latitude != 0 && bus.location.longitude != 0)
-              .toList();
+          print('🔍 Found ${snapshot.docs.length} online conductors');
+          for (final doc in snapshot.docs) {
+            print('  - ${doc.id}: ${doc.data()}');
+          }
+          
+          final allBuses = snapshot.docs.map((doc) => BusLocation.fromFirestore(doc)).toList();
+          print('📊 Total buses created: ${allBuses.length}');
+          
+          final buses = allBuses.where((bus) {
+            final isValid = bus.location.latitude != 0 && bus.location.longitude != 0;
+            print('🔍 Bus ${bus.conductorId}: lat=${bus.location.latitude}, lng=${bus.location.longitude} - Valid: $isValid');
+            return isValid;
+          }).toList();
+          
+          print('✅ Processed ${buses.length} buses with valid location');
+          return buses;
         });
   }
 

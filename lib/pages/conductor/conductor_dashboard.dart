@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/location_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ConductorDashboard extends StatefulWidget {
   final String route;
@@ -20,8 +22,37 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   @override
   void initState() {
     super.initState();
-    _isTracking = _locationService.isTracking;
-    _updateStatusMessage();
+    _checkTrackingState();
+  }
+
+  Future<void> _checkTrackingState() async {
+    try {
+      // Check the actual database state instead of local state
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final query = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('uid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          final data = query.docs.first.data();
+          final isOnlineInDatabase = data['isOnline'] ?? false;
+          
+          setState(() {
+            _isTracking = isOnlineInDatabase;
+          });
+        }
+      }
+      _updateStatusMessage();
+    } catch (e) {
+      print('Error checking tracking state: $e');
+      setState(() {
+        _isTracking = false;
+      });
+      _updateStatusMessage();
+    }
   }
 
   void _updateStatusMessage() {
@@ -52,10 +83,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
       }
       _updateStatusMessage();
     } catch (e) {
-      setState(() {
-        _isTracking = false;
-      });
-      _updateStatusMessage();
+      // If there's an error, check the actual database state
+      await _checkTrackingState();
       
       String errorMessage = 'Error starting location tracking';
       if (e.toString().contains('Location services are disabled')) {

@@ -56,10 +56,10 @@ class RouteService {
   }
 
    // Get conductor document ID from email (e.g., for dynamic document access)
-  static Future<String?> getConductorDocIdFromEmail(String email) async {
+  static Future<String?> getConductorDocIdFromUid(String uid) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('conductors')
-        .where('email', isEqualTo: email)
+        .where('uid', isEqualTo: uid)
         .limit(1)
         .get();
 
@@ -127,7 +127,7 @@ class RouteService {
     String formattedDate = date ?? DateFormat('yyyy-MM-dd').format(now);
 
     final user = FirebaseAuth.instance.currentUser;
-    final conductorId = await RouteService.getConductorDocIdFromEmail(user?.email ?? '');
+          final conductorId = await RouteService.getConductorDocIdFromUid(user?.uid ?? '');
     if (conductorId == null) {
       throw Exception('Conductor not found for email ${user?.email}');
     }
@@ -208,7 +208,7 @@ static Future<Map<String, dynamic>?> fetchTrip(
   String ticketDocName,
 ) async {
   final user = FirebaseAuth.instance.currentUser;
-  final conductorId = await getConductorDocIdFromEmail(user?.email ?? '');
+          final conductorId = await getConductorDocIdFromUid(user?.uid ?? '');
   if (conductorId == null) return null;
 
   final doc = await FirebaseFirestore.instance

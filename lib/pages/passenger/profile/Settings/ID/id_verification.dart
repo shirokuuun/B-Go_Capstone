@@ -93,6 +93,7 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
     final cyan = const Color(0xFF0091AD);
     final paddingH = width * 0.07;
     final fontSizeTitle = width * 0.05;
@@ -117,87 +118,100 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding:
-            EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            if (idType != null) ...[
-              Text(
-                'ID Type: $idType',
-                style: GoogleFonts.outfit(
-                    fontSize: fontSizeBody, fontWeight: FontWeight.w600, color: cyan),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 8),
-            ],
-            Text(
-              'Please make sure there is enough lighting and the ID lettering is clear before continuing',
-              style: GoogleFonts.outfit(
-                  fontSize: fontSizeBody, color: Colors.black87),
-              textAlign: TextAlign.center,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: height - MediaQuery.of(context).padding.top - kToolbarHeight - width * 0.08,
             ),
-            SizedBox(height: width * 0.04),
-            _imageCard('Front', frontImage, width),
-            SizedBox(height: width * 0.03),
-            _imageCard('Back', backImage, width),
-            if (error != null) ...[
-              SizedBox(height: 12),
-              Text(error!,
-                  style: GoogleFonts.outfit(
-                      color: Colors.red, fontSize: fontSizeBody)),
-            ],
-            Spacer(),
-            Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(cardRadius),
-                      ),
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: uploading ? null : () => Navigator.pop(context),
-                    child: Text('Retake',
-                        style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                if (idType != null) ...[
+                  Text(
+                    'ID Type: $idType',
+                    style: GoogleFonts.outfit(
+                        fontSize: fontSizeBody, fontWeight: FontWeight.w600, color: cyan),
+                    textAlign: TextAlign.center,
                   ),
+                  SizedBox(height: 8),
+                ],
+                Text(
+                  'Please make sure there is enough lighting and the ID lettering is clear before continuing',
+                  style: GoogleFonts.outfit(
+                      fontSize: fontSizeBody, color: Colors.black87),
+                  textAlign: TextAlign.center,
                 ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[300],
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(cardRadius),
-                      ),
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: uploading ? null : _uploadAndSubmit,
-                    child: uploading
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Use this photo',
+                SizedBox(height: width * 0.04),
+                _imageCard('Front', frontImage, width),
+                SizedBox(height: width * 0.03),
+                _imageCard('Back', backImage, width),
+                if (error != null) ...[
+                  SizedBox(height: 12),
+                  Text(error!,
+                      style: GoogleFonts.outfit(
+                          color: Colors.red, fontSize: fontSizeBody)),
+                ],
+                SizedBox(height: width * 0.04),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[300],
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(cardRadius),
+                          ),
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: uploading ? null : () {
+                          // Clear the images and go back to retake photos
+                          Navigator.pop(context);
+                        },
+                        child: Text('Retake',
                             style: GoogleFonts.outfit(fontSize: fontSizeBody)),
-                  ),
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey[300],
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(cardRadius),
+                          ),
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: uploading ? null : _uploadAndSubmit,
+                        child: uploading
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2))
+                            : Text('Use this photo',
+                                style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                      ),
+                    ),
+                  ],
                 ),
+                SizedBox(height: width * 0.04), // Add bottom padding for scroll safety
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _imageCard(String label, File? image, double width) {
+    final height = MediaQuery.of(context).size.height;
+    final imageHeight = height * 0.21; // Responsive height calculation
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,7 +221,7 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
         SizedBox(height: 6),
         Container(
           width: double.infinity,
-          height: width * 0.55,
+          height: imageHeight, // Use responsive height
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(12),

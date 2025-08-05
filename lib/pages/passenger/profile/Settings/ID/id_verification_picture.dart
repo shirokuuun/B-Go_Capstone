@@ -29,9 +29,13 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reset _checking when returning to this screen
+    // Reset state when returning to this screen
     setState(() {
       _checking = false;
+      // Clear images when returning from review page
+      _frontImage = null;
+      _backImage = null;
+      _selectedIDType = null;
     });
   }
 
@@ -204,34 +208,47 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
 
   void _next() {
     setState(() => _checking = true);
-    if (!_meetsStandards(_frontImage) || !_meetsStandards(_backImage)) {
+    
+    // Add a timeout to prevent stuck loading state
+    Future.delayed(Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      
+      if (!_meetsStandards(_frontImage) || !_meetsStandards(_backImage)) {
+        setState(() {
+          _checking = false;
+        });
+        _showValidationErrorDialog('Please ensure both front and back images are clear and meet the standards.');
+        return;
+      }
+      if (_selectedIDType == null) {
+        setState(() {
+          _checking = false;
+        });
+        _showValidationErrorDialog('Please select an ID type.');
+        return;
+      }
+      
+      // Reset checking state before navigation
       setState(() {
         _checking = false;
       });
-      _showValidationErrorDialog('Please ensure both front and back images are clear and meet the standards.');
-      return;
-    }
-    if (_selectedIDType == null) {
-      setState(() {
-        _checking = false;
-      });
-      _showValidationErrorDialog('Please select an ID type.');
-      return;
-    }
-    Navigator.pushNamed(
-      context,
-      '/id_verification_review',
-      arguments: {
-        'front': _frontImage,
-        'back': _backImage,
-        'idType': _selectedIDType,
-      },
-    );
+      
+      Navigator.pushNamed(
+        context,
+        '/id_verification_review',
+        arguments: {
+          'front': _frontImage,
+          'back': _backImage,
+          'idType': _selectedIDType,
+        },
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    final height = MediaQuery.of(context).size.height;
     final cyan = const Color(0xFF0091AD);
     final paddingH = width * 0.07;
     final fontSizeTitle = width * 0.05;
@@ -256,67 +273,116 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
         ),
         centerTitle: true,
       ),
-      body: Padding(
-        padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              'Please make sure there is enough lighting and the ID lettering is clear before continuing',
-              style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.black87),
-              textAlign: TextAlign.center,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: height - MediaQuery.of(context).padding.top - kToolbarHeight - width * 0.08,
             ),
-            SizedBox(height: width * 0.04),
-            _imageCard('Front', _frontImage, () => _pickImage(true), width),
-            SizedBox(height: width * 0.03),
-            _imageCard('Back', _backImage, () => _pickImage(false), width),
-            SizedBox(height: width * 0.04),
-            _buildIDTypeDropdown(width, fontSizeBody),
-            Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.lightGreen[400],
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(cardRadius),
-                  ),
-                  elevation: 0,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  'Please make sure there is enough lighting and the ID lettering is clear before continuing',
+                  style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.black87),
+                  textAlign: TextAlign.center,
                 ),
-                onPressed: (_frontImage != null && _backImage != null && _selectedIDType != null && !_checking) ? _next : null,
-                child: _checking
-                    ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text('Next', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
-              ),
-            ),
-            SizedBox(height: 8),
-            TextButton(
-              onPressed: () async {
-                final picker = ImagePicker();
-                final picked = await picker.pickImage(source: ImageSource.gallery);
-                if (picked != null) {
-                  final file = File(picked.path);
-                  // Determine if this should be front or back based on what's missing
-                  final isFront = _frontImage == null;
-                  final validationResult = await _validateIDImage(file, isFront);
-                  if (validationResult.isValid) {
-                    setState(() {
-                      if (_frontImage == null) {
-                        _frontImage = file;
-                      } else {
-                        _backImage = file;
+                SizedBox(height: width * 0.04),
+                _imageCard('Front', _frontImage, () => _pickImage(true), width),
+                SizedBox(height: width * 0.03),
+                _imageCard('Back', _backImage, () => _pickImage(false), width),
+                SizedBox(height: width * 0.04),
+                _buildIDTypeDropdown(width, fontSizeBody),
+                SizedBox(height: width * 0.04),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.lightGreen[400],
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(cardRadius),
+                      ),
+                      elevation: 0,
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: (_frontImage != null && _backImage != null && _selectedIDType != null && !_checking) ? _next : null,
+                    child: _checking
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text('Next', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                  ),
+                ),
+                SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    // Show dialog to choose which side to upload
+                    final String? selectedSide = await showDialog<String>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: Text(
+                            'Upload Image',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w600),
+                          ),
+                          content: Text(
+                            'Which side of your ID would you like to upload?',
+                            style: GoogleFonts.outfit(),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop('front'),
+                              child: Text(
+                                'Front',
+                                style: GoogleFonts.outfit(color: Color(0xFF0091AD)),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop('back'),
+                              child: Text(
+                                'Back',
+                                style: GoogleFonts.outfit(color: Color(0xFF0091AD)),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(null),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(color: Colors.red),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+
+                    if (selectedSide != null) {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: ImageSource.gallery);
+                      if (picked != null) {
+                        final file = File(picked.path);
+                        final isFront = selectedSide == 'front';
+                        final validationResult = await _validateIDImage(file, isFront);
+                        if (validationResult.isValid) {
+                          setState(() {
+                            if (isFront) {
+                              _frontImage = file;
+                            } else {
+                              _backImage = file;
+                            }
+                          });
+                        } else {
+                          _showValidationErrorDialog(validationResult.errorMessage ?? 'Invalid image');
+                        }
                       }
-                    });
-                  } else {
-                    _showValidationErrorDialog(validationResult.errorMessage ?? 'Invalid image');
-                  }
-                }
-              },
-              child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Color(0xFF0091AD))),
+                    }
+                  },
+                  child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Color(0xFF0091AD))),
+                ),
+                SizedBox(height: width * 0.04), // Add bottom padding for scroll safety
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -375,6 +441,9 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
   }
 
   Widget _imageCard(String label, File? image, VoidCallback onTap, double width) {
+    final height = MediaQuery.of(context).size.height;
+    final imageHeight = height * 0.21; // More responsive height calculation 
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -384,7 +453,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            height: width * 0.45, // Reduced from 0.55 to 0.45
+            height: imageHeight, // Use responsive height
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(12),

@@ -48,19 +48,18 @@ class _LoginPageState extends State<LoginPage> {
       emailController.clear();
       passwordController.clear();
 
-      String email = user.email!; // e.g., Batangas_1@gmail.com
-      String username = email.split('@').first; // "Batangas_1
-      String conductorDocId = username[0].toUpperCase() + username.substring(1);
-
-      final conductorDoc = await FirebaseFirestore.instance
+      // Only work with conductors that have uid field (created via admin website)
+      final query = await FirebaseFirestore.instance
           .collection('conductors')
-          .doc(conductorDocId)
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
           .get();
 
       if (!mounted) return; // <--- Add this before using context
 
-      if (conductorDoc.exists) {
-        final route = conductorDoc.data()?['route'] ?? '';
+      if (query.docs.isNotEmpty) {
+        final conductorData = query.docs.first.data();
+        final route = conductorData['route'] ?? '';
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(

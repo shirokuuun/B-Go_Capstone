@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:b_go/auth/auth_services.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -174,7 +175,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     padding: const EdgeInsets.only(bottom: 32.0),
                     child: GestureDetector(
                       onTap: () async {
-                        await FirebaseAuth.instance.signOut();
+                        final authServices = AuthServices();
+                        await authServices.signOut();
                         if (context.mounted) {
                           Navigator.pushNamedAndRemoveUntil(
                               context, '/login', (route) => false);

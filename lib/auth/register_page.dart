@@ -120,7 +120,8 @@ class _RegisterPageState extends State<RegisterPage> {
           ],
         ),
       );
-      await FirebaseAuth.instance.signOut();
+      final authServices = AuthServices();
+      await authServices.signOut();
       widget.showLoginPage();
     }
   }

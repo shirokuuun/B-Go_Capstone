@@ -37,6 +37,9 @@ class AuthServices {
       await _firestore.collection('users').doc(user.uid).set({
         'name': name,
         'email': email,
+        'authMethod': 'google',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
 
@@ -60,6 +63,15 @@ class AuthServices {
         message: 'Please verify your email address before logging in.',
       );
     }
+    
+    // Update user in Firestore if they exist
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).update({
+        'authMethod': 'email',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    
     return credential;
   }
 
@@ -104,6 +116,9 @@ class AuthServices {
         await _firestore.collection('users').doc(user.uid).set({
           'name': name.trim(),
           'email': email.trim(),
+          'authMethod': 'email',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
         });
       }
       return null; // success
@@ -126,6 +141,71 @@ class AuthServices {
     } catch (e) {
       return "An error occurred. Please try again.";
     }
+  }
+
+  // Phone Authentication - Send OTP
+  Future<void> sendOTP({
+    required String phoneNumber,
+    required PhoneCodeSent onCodeSent,
+    required PhoneVerificationFailed onVerificationFailed,
+    required PhoneVerificationCompleted onVerificationCompleted,
+  }) async {
+    await _auth.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      verificationCompleted: onVerificationCompleted,
+      verificationFailed: onVerificationFailed,
+      codeSent: onCodeSent,
+      codeAutoRetrievalTimeout: (String verificationId) {
+        // Handle timeout if needed
+      },
+    );
+  }
+
+  // Phone Authentication - Verify OTP
+  Future<UserCredential> verifyOTP({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    final credential = PhoneAuthProvider.credential(
+      verificationId: verificationId,
+      smsCode: smsCode,
+    );
+    return await _auth.signInWithCredential(credential);
+  }
+
+  // Save phone user to Firestore
+  Future<void> savePhoneUserToFirestore({
+    required String uid,
+    required String phoneNumber,
+    String? name,
+  }) async {
+    await _firestore.collection('users').doc(uid).set({
+      'phone': phoneNumber,
+      'name': name ?? phoneNumber, // Use phone number as name if no name provided
+      'authMethod': 'phone',
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  // Check if phone number exists in Firestore
+  Future<bool> isPhoneNumberRegistered(String phoneNumber) async {
+    final querySnapshot = await _firestore
+        .collection('users')
+        .where('phone', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+    return querySnapshot.docs.isNotEmpty;
+  }
+
+  // Get user by phone number
+  Future<DocumentSnapshot?> getUserByPhone(String phoneNumber) async {
+    final querySnapshot = await _firestore
+        .collection('users')
+        .where('phone', isEqualTo: phoneNumber)
+        .limit(1)
+        .get();
+    return querySnapshot.docs.isNotEmpty ? querySnapshot.docs.first : null;
   }
 
   Future<void> signOut() async {

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
 import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:b_go/auth/auth_services.dart';
 
 class RegisterPhonePage extends StatefulWidget {
   const RegisterPhonePage({super.key});
@@ -15,7 +16,7 @@ class RegisterPhonePage extends StatefulWidget {
 class _RegisterPhonePageState extends State<RegisterPhonePage> {
   final TextEditingController phoneController = TextEditingController();
   final TextEditingController otpController = TextEditingController();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthServices _authServices = AuthServices();
 
   String? _verificationId;
   bool _otpSent = false;
@@ -50,56 +51,151 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
       );
       return;
     }
-    setState(() => _isLoading = true);
+
     String phone = phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter a phone number.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Remove leading 0 if present
     if (phone.startsWith('0')) phone = phone.substring(1);
     String fullPhone = selectedCountryCode + phone;
-    await _auth.verifyPhoneNumber(
-      phoneNumber: fullPhone,
-      verificationCompleted: (PhoneAuthCredential credential) async {
-        await _auth.signInWithCredential(credential);
-        setState(() => _isLoading = false);
-        Navigator.pop(context);
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.message ?? 'Verification failed'),
-              backgroundColor: Colors.red),
-        );
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _verificationId = verificationId;
-          _otpSent = true;
-          _isLoading = false;
-        });
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        setState(() => _verificationId = verificationId);
-      },
-    );
-  }
 
-  Future<void> _verifyOTP() async {
-    if (_verificationId == null) return;
-    setState(() => _isLoading = true);
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otpController.text.trim(),
+    // Check if phone number already exists
+    bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
+    if (isRegistered) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('This phone number is already registered. Please login instead.'),
+          backgroundColor: Colors.red,
+        ),
       );
-      await _auth.signInWithCredential(credential);
-      setState(() => _isLoading = false);
-      Navigator.pop(context);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullPhone,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          try {
+            UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+            final user = userCredential.user;
+            if (user != null) {
+              // Save user to Firestore
+              await _authServices.savePhoneUserToFirestore(
+                uid: user.uid,
+                phoneNumber: fullPhone,
+              );
+              setState(() => _isLoading = false);
+              Navigator.pushReplacementNamed(context, '/user_selection');
+            }
+          } catch (e) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Registration failed. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.message ?? 'Verification failed'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          setState(() {
+            _verificationId = verificationId;
+            _otpSent = true;
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('OTP sent to $fullPhone'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          setState(() => _verificationId = verificationId);
+        },
+      );
     } catch (e) {
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text('Invalid OTP or verification failed'),
-            backgroundColor: Colors.red),
+          content: Text('Failed to send OTP. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _verifyOTP() async {
+    if (_verificationId == null) return;
+    
+    String otp = otpController.text.trim();
+    if (otp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Please enter the OTP.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    try {
+      String phone = phoneController.text.trim();
+      if (phone.startsWith('0')) phone = phone.substring(1);
+      String fullPhone = selectedCountryCode + phone;
+
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: otp,
+      );
+
+      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+      final user = userCredential.user;
+      if (user != null) {
+        // Save user to Firestore
+        await _authServices.savePhoneUserToFirestore(
+          uid: user.uid,
+          phoneNumber: fullPhone,
+        );
+        
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration successful!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/user_selection');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invalid OTP or verification failed'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -332,7 +428,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                               child: CircularProgressIndicator())
                           : ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Color(0xFF1D2B53),
+                                backgroundColor: phoneController.text.trim().isNotEmpty 
+                                    ? Color(0xFF0091AD) 
+                                    : Colors.grey,
                                 minimumSize: Size(double.infinity, 60),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),

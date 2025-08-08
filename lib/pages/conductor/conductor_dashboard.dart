@@ -111,6 +111,147 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     );
   }
 
+  Widget _buildPreBookedPassengersList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('preBookings')
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Text(
+            'Error loading pre-bookings: ${snapshot.error}',
+            style: GoogleFonts.outfit(color: Colors.red),
+          );
+        }
+
+        final allPreBookings = snapshot.data?.docs ?? [];
+        
+        // Filter in memory to avoid index requirements
+        final preBookings = allPreBookings
+            .where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return data['route'] == widget.route && data['status'] == 'paid';
+            })
+            .toList();
+
+        if (preBookings.isEmpty) {
+          return Container(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 48,
+                  color: Colors.grey[400],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'No pre-booked passengers yet',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                Text(
+                  'Passengers with paid pre-bookings will appear here',
+                  style: GoogleFonts.outfit(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: [
+            Text(
+              '${preBookings.length} pre-booked passenger${preBookings.length == 1 ? '' : 's'}',
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 12),
+            ...preBookings.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return Container(
+                margin: EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.person,
+                        color: Colors.green[700],
+                        size: 20,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${data['from']} → ${data['to']}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '${data['quantity']} passenger${data['quantity'] == 1 ? '' : 's'} • ${data['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.green[100],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'PAID',
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -127,11 +268,11 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         foregroundColor: Colors.white,
         centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+             body: SingleChildScrollView(
+         padding: const EdgeInsets.all(16.0),
+         child: Column(
+           crossAxisAlignment: CrossAxisAlignment.start,
+           children: [
             // Welcome Section
             Card(
               elevation: 4,
@@ -229,6 +370,35 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
             ),
             SizedBox(height: 20),
 
+            // Pre-booked Passengers Card
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.people, color: Color(0xFF0091AD)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Pre-booked Passengers',
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    _buildPreBookedPassengersList(),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+
             // Instructions Card
             Card(
               elevation: 4,
@@ -251,11 +421,13 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       ],
                     ),
                     SizedBox(height: 12),
-                    Text(
-                      '• Start location tracking when you begin your route\n'
-                      '• Stop tracking when you end your shift\n'
-                      '• Passengers will see your bus location in real-time\n'
-                      '• Your location updates every 10 meters or 30 seconds',
+                                         Text(
+                       '• Start location tracking when you begin your route\n'
+                       '• Stop tracking when you end your shift\n'
+                       '• Passengers will see your bus location in real-time\n'
+                       '• Your location updates every 10 meters or 30 seconds\n'
+                       '• Check pre-booked passengers below for guaranteed seats\n'
+                       '• Use the Maps tab to see passenger locations',
                       style: GoogleFonts.outfit(
                         fontSize: 14,
                         color: Colors.grey[600],

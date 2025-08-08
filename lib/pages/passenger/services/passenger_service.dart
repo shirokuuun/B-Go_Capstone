@@ -32,7 +32,8 @@ class PassengerService extends StatelessWidget {
             children: [
               // Pre-Ticketing Card
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 16.0),
                 child: InkWell(
                   onTap: () {
                     Navigator.pushNamed(context, '/pre_ticket');
@@ -49,7 +50,8 @@ class PassengerService extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.confirmation_num_outlined, size: 80, color: Colors.black),
+                        Icon(Icons.confirmation_num_outlined,
+                            size: 80, color: Colors.black),
                         SizedBox(height: 16),
                         Text(
                           'Pre-Ticketing',
@@ -87,9 +89,55 @@ class PassengerService extends StatelessWidget {
               ),
               // Pre-Booking Card
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0, vertical: 16.0),
                 child: InkWell(
-                  onTap: () {}, // TODO: Add navigation or logic
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Pre-Booking Notice'),
+                        content: Text(
+                          'By using Pre-Booking, you are reserving a guaranteed seat for the entire trip (from the starting point to the last stop). The payment is fixed for the full route. Do you want to continue?',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: Colors.black,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                color: Colors.red,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Color(0xFF0091AD),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.pushNamed(context, '/pre_book');
+                            },
+                            child: Text(
+                              'Continue',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: double.infinity,
@@ -102,7 +150,8 @@ class PassengerService extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.event_note_outlined, size: 80, color: Colors.black),
+                        Icon(Icons.event_note_outlined,
+                            size: 80, color: Colors.black),
                         SizedBox(height: 16),
                         Text(
                           'Pre-Booking',

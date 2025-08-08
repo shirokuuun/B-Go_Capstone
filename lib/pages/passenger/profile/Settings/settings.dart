@@ -74,7 +74,7 @@ class SettingsPage extends StatelessWidget {
                 if (opt.title == 'Pre-Ticket QRs') {
                   Navigator.pushNamed(context, '/pre_ticket_qr');
                 } else if (opt.title == 'Reservation Confirmations') {
-                  Navigator.pushNamed(context, '/reservation_confirmations');
+                  Navigator.pushNamed(context, '/reservation_confirm');
                 } else if (opt.title == 'Help Center / FAQs') {
                   Navigator.pushNamed(context, '/help_center');
                 } else if (opt.title == 'Privacy Policy') {

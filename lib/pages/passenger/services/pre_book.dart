@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async'; // Added for Timer
 import 'package:b_go/pages/passenger/profile/Settings/reservation_confirm.dart';
+import 'package:geolocator/geolocator.dart'; // Added for location tracking
+import 'package:b_go/pages/passenger/services/passenger_location_service.dart';
 
 class PreBook extends StatefulWidget {
   const PreBook({super.key});
@@ -49,12 +51,18 @@ class _PreBookState extends State<PreBook> {
   int directionIndex = 0; // 0: Place, 1: Place 2
   late Future<List<Map<String, dynamic>>> placesFuture;
   String? verifiedIDType;
+  Position? _currentLocation; // Added for passenger location tracking
+  final PassengerLocationService _locationService = PassengerLocationService();
 
   @override
   void initState() {
     super.initState();
     placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
     _fetchVerifiedIDType();
+    // Delay location request slightly to ensure UI is loaded
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _getCurrentLocation(); // Get passenger's current location
+    });
   }
 
   Future<void> _fetchVerifiedIDType() async {
@@ -82,6 +90,26 @@ class _PreBookState extends State<PreBook> {
     }
   }
 
+  // Added method to get passenger's current location
+  Future<void> _getCurrentLocation() async {
+    print('🚀 PreBook: Starting location capture...');
+    try {
+      print('🚀 PreBook: Calling PassengerLocationService.getCurrentLocation()...');
+      final position = await _locationService.getCurrentLocation(context: context);
+      
+      if (position != null) {
+        setState(() {
+          _currentLocation = position;
+        });
+        print('✅ PreBook: Passenger location captured successfully: ${position.latitude}, ${position.longitude}');
+      } else {
+        print('❌ PreBook: Failed to get passenger location - position is null');
+      }
+    } catch (e) {
+      print('❌ PreBook: Error getting passenger location: $e');
+    }
+  }
+
   void _onRouteChanged(String? newRoute) {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
@@ -100,6 +128,17 @@ class _PreBookState extends State<PreBook> {
   }
 
   void _showToSelectionPage(Map<String, dynamic> fromPlace, List<Map<String, dynamic>> allPlaces) async {
+    // Check if location is captured before proceeding
+    if (_currentLocation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enable location access first so the conductor can find you.'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
@@ -283,6 +322,109 @@ class _PreBookState extends State<PreBook> {
                       child: Text(
                         "Select Location:",
                         style: GoogleFonts.outfit(fontSize: 18, color: Colors.black87),
+                      ),
+                    ),
+                    // Location status indicator
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _currentLocation != null ? Colors.green.shade50 : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _currentLocation != null ? Colors.green : Colors.orange,
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  _currentLocation != null ? Icons.location_on : Icons.location_off,
+                                  color: _currentLocation != null ? Colors.green : Colors.orange,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentLocation != null 
+                                      ? 'Location captured: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}'
+                                      : 'Location access needed for conductor to find you',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      color: _currentLocation != null ? Colors.green.shade700 : Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ),
+                                if (_currentLocation == null)
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, size: 16),
+                                    onPressed: () {
+                                      _getCurrentLocation();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Requesting location access...'),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    },
+                                    color: Colors.orange,
+                                  ),
+                              ],
+                            ),
+                            if (_currentLocation == null) ...[
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    _getCurrentLocation();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Requesting location access...'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.location_on, size: 16),
+                                  label: const Text('Enable Location Access'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            // Debug button to show current location
+                            if (_currentLocation != null) ...[
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Location: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}'),
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.info, size: 16),
+                                  label: const Text('Show Location Details'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                     FutureBuilder<List<Map<String, dynamic>>>(
@@ -690,6 +832,13 @@ class _ReceiptModal extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final now = DateTime.now();
+    
+    // Get passenger's current location from the parent widget
+    final preBookState = context.findAncestorStateOfType<_PreBookState>();
+    final passengerLocation = preBookState?._currentLocation;
+    
+    print('💾 PreBook: Saving booking with passenger location: ${passengerLocation?.latitude}, ${passengerLocation?.longitude}');
+    
     final data = {
       'route': route,
       'direction': directionLabel,
@@ -697,6 +846,14 @@ class _ReceiptModal extends StatelessWidget {
       'to': toPlace['name'],
       'fromKm': fromPlace['km'],
       'toKm': toPlace['km'],
+      'fromLatitude': fromPlace['latitude'] ?? 0.0,
+      'fromLongitude': fromPlace['longitude'] ?? 0.0,
+      'toLatitude': toPlace['latitude'] ?? 0.0,
+      'toLongitude': toPlace['longitude'] ?? 0.0,
+      // Add passenger's current location
+      'passengerLatitude': passengerLocation?.latitude ?? 0.0,
+      'passengerLongitude': passengerLocation?.longitude ?? 0.0,
+      'passengerLocationTimestamp': passengerLocation != null ? FieldValue.serverTimestamp() : null,
       'fare': baseFare,
       'quantity': quantity,
       'amount': totalAmount,
@@ -706,7 +863,11 @@ class _ReceiptModal extends StatelessWidget {
       'status': 'pending_payment', // Status for testing
       'paymentDeadline': now.add(Duration(minutes: 10)), // 10 minutes from now
       'createdAt': now,
+      'userId': user.uid,
     };
+    
+    print('💾 PreBook: Complete booking data: $data');
+    
     await FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)

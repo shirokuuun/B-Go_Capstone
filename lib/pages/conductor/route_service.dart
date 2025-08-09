@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 
 class RouteService {
   static Future<String> fetchRoutePlaceName(String route) async {
@@ -43,6 +44,8 @@ class RouteService {
       return {
         'name': data['Name']?.toString() ?? doc.id,
         'km': data['km'],
+        'latitude': data['latitude'] ?? 0.0,
+        'longitude': data['longitude'] ?? 0.0,
       };
     }).toList();
 
@@ -53,6 +56,26 @@ class RouteService {
     });
 
     return places;
+  }
+
+  // Calculate distance between two coordinates in kilometers
+  static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+    
+    double dLat = _degreesToRadians(lat2 - lat1);
+    double dLon = _degreesToRadians(lon2 - lon1);
+    
+    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.sin(lat1 * math.pi / 180) * math.sin(lat2 * math.pi / 180) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    
+    double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+  
+  static double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
   }
 
    // Get conductor document ID from email (e.g., for dynamic document access)

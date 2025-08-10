@@ -27,22 +27,29 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
     final now = DateTime.now(); // Use device local time
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
-    final tenPm = DateTime(now.year, now.month, now.day, 22);
+    
     final col = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('preTickets');
+    
+    // Only fetch tickets for today
     final snapshot = await col
         .where('createdAt', isGreaterThanOrEqualTo: startOfDay)
         .where('createdAt', isLessThan: endOfDay)
         .get();
-    // Remove tickets after 10pm
-    if (now.isAfter(tenPm)) {
-      for (var doc in snapshot.docs) {
-        await col.doc(doc.id).delete();
-      }
-      return [];
+    
+    // Clean up old tickets from previous days (not current day)
+    final yesterday = startOfDay.subtract(const Duration(days: 1));
+    final oldTicketsSnapshot = await col
+        .where('createdAt', isLessThan: startOfDay)
+        .get();
+    
+    // Delete tickets from previous days
+    for (var doc in oldTicketsSnapshot.docs) {
+      await col.doc(doc.id).delete();
     }
+    
     return snapshot.docs.map((doc) {
       final data = doc.data();
       data['id'] = doc.id;
@@ -188,10 +195,16 @@ class _PreTicketQrsState extends State<PreTicketQrs> {
                                 ),
                               ),
                               SizedBox(height: 4),
-                              Text('Fare: ${t['fare']} PHP',
+                              Text('Total Fare: ${t['totalFare'] ?? t['fare']} PHP',
                                   style: GoogleFonts.outfit(fontSize: 14)),
                               Text('Passengers: ${t['quantity']}',
                                   style: GoogleFonts.outfit(fontSize: 14)),
+                              Text('Status: ${t['status'] ?? 'pending'}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: (t['status'] == 'boarded') ? Colors.green : Colors.orange,
+                                    fontWeight: FontWeight.w500,
+                                  )),
                             ],
                           ),
                         ),

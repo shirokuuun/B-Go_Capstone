@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/services/bus_location_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -190,22 +191,44 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  // Passenger count (placeholder for now)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green, width: 1),
-                    ),
-                    child: Text(
-                      '0/27 Passengers', // Placeholder - you'll update this
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
-                      ),
-                    ),
+                  // Passenger count from Firestore
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('conductors')
+                        .where('uid', isEqualTo: bus.conductorId)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      int passengerCount = 0;
+                      if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>?;
+                        passengerCount = data?['passengerCount'] ?? 0;
+                      }
+                      
+                      final isFull = passengerCount >= 27;
+                      
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isFull 
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isFull ? Colors.red : Colors.green, 
+                            width: 1
+                          ),
+                        ),
+                        child: Text(
+                          '$passengerCount/27 Passengers',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isFull ? Colors.red : Colors.green,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

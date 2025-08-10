@@ -27,6 +27,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
   List<Map<String, dynamic>> _routeDestinations = [];
   Timer? _locationTimer;
   bool _isLoading = true;
+  StreamSubscription<QuerySnapshot>? _conductorSubscription;
 
   // Helper method to convert any numeric value to double
   double? _convertToDouble(dynamic value) {
@@ -40,9 +41,23 @@ class _ConductorMapsState extends State<ConductorMaps> {
     return null;
   }
 
-  // Create circular marker icon
+  // Create custom circular marker icon (small blue circle)
   BitmapDescriptor _getCircularMarkerIcon() {
-    return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+    return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+  }
+
+  // Create custom small circular marker for different types
+  BitmapDescriptor _getSmallCircularMarker(Color color) {
+    return BitmapDescriptor.defaultMarkerWithHue(_colorToHue(color));
+  }
+
+  // Convert Color to BitmapDescriptor hue
+  double _colorToHue(Color color) {
+    if (color == Colors.blue) return BitmapDescriptor.hueAzure;
+    if (color == Colors.yellow) return BitmapDescriptor.hueYellow;
+    if (color == Colors.green) return BitmapDescriptor.hueGreen;
+    if (color == Colors.red) return BitmapDescriptor.hueRed;
+    return BitmapDescriptor.hueAzure; // default
   }
 
   @override
@@ -56,6 +71,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
   void dispose() {
     _locationTimer?.cancel();
     _bookingsSubscription?.cancel();
+    _conductorSubscription?.cancel();
     _mapController?.dispose();
     super.dispose();
   }
@@ -72,6 +88,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
         });
         _startLocationTracking();
         _loadBookings();
+        _loadConductorData();
       }
     } catch (e) {
       print('Error getting current location: $e');
@@ -89,6 +106,28 @@ class _ConductorMapsState extends State<ConductorMaps> {
         _checkPassengerDropoffs();
       }
     });
+  }
+
+  void _loadConductorData() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _conductorSubscription = FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .snapshots()
+          .listen((snapshot) {
+        if (snapshot.docs.isNotEmpty) {
+          final conductorData = snapshot.docs.first.data();
+          final passengerCount = conductorData['passengerCount'] ?? 0;
+          if (mounted) {
+            setState(() {
+              _passengerCount = passengerCount;
+            });
+          }
+        }
+      });
+    }
   }
 
   StreamSubscription<QuerySnapshot>? _bookingsSubscription;
@@ -210,16 +249,41 @@ class _ConductorMapsState extends State<ConductorMaps> {
     }
   }
 
-  void _dropOffPassenger(Map<String, dynamic> booking) {
+  void _dropOffPassenger(Map<String, dynamic> booking) async {
+    final quantity = (booking['quantity'] ?? 1) as int;
+    
     setState(() {
-      _passengerCount -= (booking['quantity'] ?? 1) as int;
+      _passengerCount -= quantity;
       _activeBookings.remove(booking);
     });
+    
+    // Update passenger count in Firestore
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final conductorDoc = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('uid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+        
+        if (conductorDoc.docs.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDoc.docs.first.id)
+              .update({
+                'passengerCount': FieldValue.increment(-quantity)
+              });
+        }
+      } catch (e) {
+        print('Error updating passenger count: $e');
+      }
+    }
     
     // Show notification
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Passengers dropped off at ${booking['to']}'),
+        content: Text('$quantity passenger${quantity > 1 ? 's' : ''} dropped off at ${booking['to']}'),
         backgroundColor: Colors.green,
       ),
     );
@@ -240,7 +304,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
             title: 'Conductor Location',
             snippet: 'Route: ${widget.route} - Passengers: $_passengerCount',
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+                     icon: _getSmallCircularMarker(Colors.blue),
         ),
       );
       print('🗺️ ConductorMaps: Added conductor marker at (${_currentPosition!.latitude}, ${_currentPosition!.longitude})');
@@ -274,7 +338,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
               title: 'Passenger Location',
               snippet: '${booking['from']} → ${booking['to']} (${booking['quantity']} passengers)',
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+                         icon: _getSmallCircularMarker(Colors.yellow),
           ),
         );
         print('🗺️ ConductorMaps: ✅ Added passenger marker for booking ${booking['id']} at ($passengerLat, $passengerLng)');
@@ -292,7 +356,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
               title: 'Pick-up Location',
               snippet: '${booking['from']} → ${booking['to']} (${booking['quantity']} passengers)',
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                         icon: _getSmallCircularMarker(Colors.green),
           ),
         );
       }
@@ -307,7 +371,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
               title: 'Drop-off Location',
               snippet: '${booking['to']} (${booking['quantity']} passengers)',
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                         icon: _getSmallCircularMarker(Colors.red),
           ),
         );
       }
@@ -317,44 +381,36 @@ class _ConductorMapsState extends State<ConductorMaps> {
     return markers;
   }
 
-  // Create Rosario route markers with exact coordinates
+  // Create route markers based on the conductor's assigned route from Firestore
   Set<Marker> _createRouteMarkers() {
     final Set<Marker> markers = {};
     
-    // Define Rosario route coordinates (SM Lipa to Lipa City Proper)
-    final routeCoordinates = [
-      {'name': 'Rosario Proper', 'lat': 13.843257, 'lng': 121.204127, 'km': 1.0},
-      {'name': 'San Roque', 'lat': 13.852393, 'lng': 121.204133, 'km': 2.0},
-      {'name': 'Quilib School', 'lat': 13.858943, 'lng': 121.205942, 'km': 3.0},
-      {'name': 'Quilib Boundary', 'lat': 13.867770, 'lng': 121.208388, 'km': 4.0},
-      {'name': 'Padre Garcia (Pob)', 'lat': 13.876740, 'lng': 121.210798, 'km': 5.0},
-      {'name': 'Edson Lumber', 'lat': 13.883350, 'lng': 121.205956, 'km': 6.0},
-      {'name': 'San Felipe', 'lat': 13.891014, 'lng': 121.201524, 'km': 7.0},
-      {'name': 'Tejero Sampaloc', 'lat': 13.897106, 'lng': 121.197585, 'km': 8.0},
-      {'name': 'Pinagkawitan', 'lat': 13.903381, 'lng': 121.192652, 'km': 9.0},
-      {'name': 'Tower Feeds', 'lat': 13.906773, 'lng': 121.189956, 'km': 10.0},
-      {'name': 'San Adriano', 'lat': 13.910657, 'lng': 121.186624, 'km': 11.0},
-      {'name': 'Antipolo Sur', 'lat': 13.916125, 'lng': 121.179550, 'km': 12.0},
-      {'name': 'Antipolo Norte', 'lat': 13.925642, 'lng': 121.171170, 'km': 13.0},
-      {'name': 'Rancho Jota', 'lat': 13.934412, 'lng': 121.165489, 'km': 14.0},
-      {'name': 'Lipa City Proper', 'lat': 13.953451, 'lng': 121.162575, 'km': 15.0},
-    ];
-    
-    for (final stop in routeCoordinates) {
-      markers.add(
-        Marker(
-          markerId: MarkerId('route_${stop['name']}'),
-          position: LatLng(stop['lat'] as double, stop['lng'] as double),
-          infoWindow: InfoWindow(
-            title: stop['name'] as String,
-            snippet: '${stop['km']} km - Rosario Route',
+    // Use the route destinations loaded from Firestore
+    for (final destination in _routeDestinations) {
+      final name = destination['name'] ?? 'Unknown';
+      final km = destination['km'] ?? 0.0;
+      final latitude = destination['latitude'] ?? 0.0;
+      final longitude = destination['longitude'] ?? 0.0;
+      final direction = destination['direction'] ?? 'unknown';
+      
+      if (latitude != 0.0 && longitude != 0.0) {
+        final markerId = 'route_${name}_$direction';
+        
+        markers.add(
+          Marker(
+            markerId: MarkerId(markerId),
+            position: LatLng(latitude, longitude),
+            infoWindow: InfoWindow(
+              title: name,
+              snippet: '${km} km - ${widget.route} Route (${direction})',
+            ),
+            icon: _getCircularMarkerIcon(),
           ),
-          icon: _getCircularMarkerIcon(),
-        ),
-      );
+        );
+      }
     }
     
-    print('🗺️ ConductorMaps: Created ${markers.length} Rosario route markers');
+    print('🗺️ ConductorMaps: Created ${markers.length} ${widget.route} route markers from Firestore');
     return markers;
   }
 

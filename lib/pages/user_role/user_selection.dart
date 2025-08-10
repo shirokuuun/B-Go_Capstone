@@ -1,7 +1,6 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
-import 'package:b_go/pages/admin/coordinate_uploader.dart';
 
 class UserSelection extends StatefulWidget {
   const UserSelection({super.key});
@@ -11,7 +10,7 @@ class UserSelection extends StatefulWidget {
 }
 
 class _UserSelectionState extends State<UserSelection> {
-  final List<String> roles = ['Passenger', 'Bus Reservation', 'Admin'];
+  final List<String> roles = ['Passenger', 'Bus Reservation'];
   int currentIndex = 0;
 
   @override
@@ -53,12 +52,7 @@ class _UserSelectionState extends State<UserSelection> {
                       context,
                       MaterialPageRoute(builder: (context) => BusHome()),
                     );
-                  } else if (roles[currentIndex] == 'Admin') {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => CoordinateUploaderPage()),
-                    );
-                  }
+                  } 
                 },
                 child: Container(
                   width: MediaQuery.of(context).size.width * 0.7,

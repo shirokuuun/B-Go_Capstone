@@ -302,6 +302,185 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
             ),
             SizedBox(height: 20),
 
+            // Passenger Count Section
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.people, color: Color(0xFF0091AD)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Passenger Count',
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('conductors')
+                          .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                          .limit(1)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+
+                        if (snapshot.hasError) {
+                          return Text(
+                            'Error loading passenger count: ${snapshot.error}',
+                            style: GoogleFonts.outfit(color: Colors.red),
+                          );
+                        }
+
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return Text(
+                            'No conductor data found',
+                            style: GoogleFonts.outfit(color: Colors.grey),
+                          );
+                        }
+
+                        final conductorData = docs.first.data() as Map<String, dynamic>;
+                        final passengerCount = conductorData['passengerCount'] ?? 0;
+                        final maxCapacity = 27;
+                        final percentage = (passengerCount / maxCapacity) * 100;
+
+                        return Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Current Passengers:',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  '$passengerCount/$maxCapacity',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: passengerCount >= maxCapacity ? Colors.red : Color(0xFF0091AD),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            LinearProgressIndicator(
+                              value: percentage / 100,
+                              backgroundColor: Colors.grey[300],
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                passengerCount >= maxCapacity ? Colors.red : Color(0xFF0091AD),
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              '${percentage.toStringAsFixed(1)}% capacity used',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            if (passengerCount >= maxCapacity) ...[
+                              SizedBox(height: 8),
+                              Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.red[200]!),
+                                ),
+                                child: Text(
+                                  'Bus is at full capacity!',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    color: Colors.red[700],
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: passengerCount > 0 ? () async {
+                                      // Reset passenger count
+                                      final user = FirebaseAuth.instance.currentUser;
+                                      if (user != null) {
+                                        try {
+                                          final conductorDoc = await FirebaseFirestore.instance
+                                              .collection('conductors')
+                                              .where('uid', isEqualTo: user.uid)
+                                              .limit(1)
+                                              .get();
+                                          
+                                          if (conductorDoc.docs.isNotEmpty) {
+                                            await FirebaseFirestore.instance
+                                                .collection('conductors')
+                                                .doc(conductorDoc.docs.first.id)
+                                                .update({
+                                                  'passengerCount': 0
+                                                });
+                                            
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Passenger count reset to 0'),
+                                                backgroundColor: Colors.green,
+                                              ),
+                                            );
+                                          }
+                                        } catch (e) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error resetting passenger count: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.orange,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Reset Count',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+
             // Location Tracking Section
             Card(
               elevation: 4,

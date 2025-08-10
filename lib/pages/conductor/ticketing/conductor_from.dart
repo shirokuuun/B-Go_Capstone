@@ -5,6 +5,7 @@ import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/pages/conductor/sos.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:b_go/pages/conductor/ticketing/quantity_selection.dart';
@@ -632,6 +633,41 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                     List<double>.from(discountResult['discounts']);
                                 final List<String> selectedLabels =
                                     List<String>.from(discountResult['fareTypes']);
+                                
+                                // Check passenger count limit before proceeding
+                                final user = FirebaseAuth.instance.currentUser;
+                                if (user != null) {
+                                  final conductorDoc = await FirebaseFirestore.instance
+                                      .collection('conductors')
+                                      .where('uid', isEqualTo: user.uid)
+                                      .limit(1)
+                                      .get();
+                                  
+                                  if (conductorDoc.docs.isNotEmpty) {
+                                    final conductorData = conductorDoc.docs.first.data();
+                                    final currentPassengerCount = conductorData['passengerCount'] ?? 0;
+                                    final newPassengerCount = currentPassengerCount + result['quantity'];
+                                    
+                                    if (newPassengerCount > 27) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Cannot add ${result['quantity']} passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount'),
+                                          backgroundColor: Colors.red,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    
+                                    // Increment passenger count
+                                    await FirebaseFirestore.instance
+                                        .collection('conductors')
+                                        .doc(conductorDoc.docs.first.id)
+                                        .update({
+                                          'passengerCount': FieldValue.increment(result['quantity'])
+                                        });
+                                  }
+                                }
+                                
                                 final ticketDocName = await RouteService.saveTrip(
                                   route: route,
                                   from: fromPlace['name'],
@@ -693,22 +729,56 @@ class _ToSelectionPageConductor extends StatelessWidget {
   }
 }
 
-class QRScanPage extends StatelessWidget {
+class QRScanPage extends StatefulWidget {
+  @override
+  _QRScanPageState createState() => _QRScanPageState();
+}
+
+class _QRScanPageState extends State<QRScanPage> {
+  bool _isProcessing = false;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: MobileScanner(
         onDetect: (capture) async {
+          // Prevent multiple executions
+          if (_isProcessing) {
+            print('QR scan already in progress, ignoring duplicate detection');
+            return;
+          }
+          
+          setState(() {
+            _isProcessing = true;
+          });
+          
           final barcode = capture.barcodes.first;
           final qrData = barcode.rawValue;
           if (qrData != null) {
             try {
+              print('Processing QR scan: $qrData');
               final data = parseQRData(qrData);
               await storePreTicketToFirestore(data);
               Navigator.of(context).pop(true);
             } catch (e) {
+              // Show error message to conductor
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(e.toString().replaceAll('Exception: ', '')),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
               Navigator.of(context).pop(false);
+            } finally {
+              setState(() {
+                _isProcessing = false;
+              });
             }
+          } else {
+            setState(() {
+              _isProcessing = false;
+            });
           }
         },
       ),
@@ -717,11 +787,226 @@ class QRScanPage extends StatelessWidget {
 }
 
 Map<String, dynamic> parseQRData(String qrData) {
-  return Map<String, dynamic>.from(jsonDecode(qrData));
+  print('Raw QR data: $qrData');
+  try {
+    // First try to parse as JSON
+    final result = Map<String, dynamic>.from(jsonDecode(qrData));
+    print('Parsed as JSON: $result');
+    return result;
+  } catch (e) {
+    print('JSON parsing failed, trying Dart Map literal format');
+    // If JSON parsing fails, try to parse Dart Map literal format
+    final result = _parseDartMapLiteral(qrData);
+    print('Parsed as Dart Map literal: $result');
+    return result;
+  }
+}
+
+Map<String, dynamic> _parseDartMapLiteral(String qrData) {
+  // Remove outer braces
+  String data = qrData.trim();
+  if (data.startsWith('{') && data.endsWith('}')) {
+    data = data.substring(1, data.length - 1);
+  }
+  
+  Map<String, dynamic> result = {};
+  
+  // Split by commas, but be careful about commas inside values
+  List<String> pairs = [];
+  int braceCount = 0;
+  int startIndex = 0;
+  
+  for (int i = 0; i < data.length; i++) {
+    if (data[i] == '{') braceCount++;
+    else if (data[i] == '}') braceCount--;
+    else if (data[i] == ',' && braceCount == 0) {
+      pairs.add(data.substring(startIndex, i).trim());
+      startIndex = i + 1;
+    }
+  }
+  // Add the last pair
+  if (startIndex < data.length) {
+    pairs.add(data.substring(startIndex).trim());
+  }
+  
+  for (String pair in pairs) {
+    if (pair.isEmpty) continue;
+    
+    // Find the first colon
+    int colonIndex = pair.indexOf(':');
+    if (colonIndex == -1) continue;
+    
+    String key = pair.substring(0, colonIndex).trim();
+    String value = pair.substring(colonIndex + 1).trim();
+    
+    // Parse the value
+    dynamic parsedValue = _parseValue(value);
+    result[key] = parsedValue;
+  }
+  
+  return result;
+}
+
+dynamic _parseValue(String value) {
+  // Remove quotes if present
+  if ((value.startsWith("'") && value.endsWith("'")) || 
+      (value.startsWith('"') && value.endsWith('"'))) {
+    return value.substring(1, value.length - 1);
+  }
+  
+  // Try to parse as number - be more careful about this
+  // First try exact integer parsing
+  if (int.tryParse(value) != null) {
+    return int.parse(value);
+  }
+  
+  // Then try double parsing
+  if (double.tryParse(value) != null) {
+    double parsed = double.parse(value);
+    // If it's a whole number, return as int
+    if (parsed == parsed.toInt()) {
+      return parsed.toInt();
+    }
+    return parsed;
+  }
+  
+  // Try to parse as boolean
+  if (value.toLowerCase() == 'true') return true;
+  if (value.toLowerCase() == 'false') return false;
+  
+  // Try to parse as list
+  if (value.startsWith('[') && value.endsWith(']')) {
+    String listContent = value.substring(1, value.length - 1);
+    List<String> items = listContent.split(',').map((e) => e.trim()).toList();
+    return items.map((item) => _parseValue(item)).toList();
+  }
+  
+  // Return as string
+  return value;
 }
 
 Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
+  // Debug: Print the parsed data to see what we're working with
+  print('Parsed QR data: $data');
+  
   final route = data['route'];
+  
+  // Get conductor information first to validate route
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    throw Exception('User not authenticated');
+  }
+  
+  final conductorDoc = await FirebaseFirestore.instance
+      .collection('conductors')
+      .where('uid', isEqualTo: user.uid)
+      .limit(1)
+      .get();
+  
+  if (conductorDoc.docs.isEmpty) {
+    throw Exception('Conductor not found');
+  }
+  
+  final conductorData = conductorDoc.docs.first.data();
+  final conductorRoute = conductorData['route'];
+  
+  print('Conductor route: $conductorRoute');
+  print('Pre-ticket route: $route');
+  
+  // Validate that the conductor can scan this pre-ticket
+  if (conductorRoute != route) {
+    throw Exception('Invalid route. You are a $conductorRoute conductor but trying to scan a $route pre-ticket. Only $conductorRoute pre-tickets can be scanned.');
+  }
+  
+  // Check if pre-ticket is already boarded
+  final qrDataString = jsonEncode(data);
+  final existingPreTicketQuery = await FirebaseFirestore.instance
+      .collectionGroup('preTickets')
+      .where('qrData', isEqualTo: qrDataString)
+      .where('status', isEqualTo: 'boarded')
+      .limit(1)
+      .get();
+  
+  if (existingPreTicketQuery.docs.isNotEmpty) {
+    throw Exception('This pre-ticket has already been scanned and boarded.');
+  }
+  
+  // Find the pending pre-ticket
+  final pendingPreTicketQuery = await FirebaseFirestore.instance
+      .collectionGroup('preTickets')
+      .where('qrData', isEqualTo: qrDataString)
+      .where('status', isEqualTo: 'pending')
+      .limit(1)
+      .get();
+  
+  if (pendingPreTicketQuery.docs.isEmpty) {
+    throw Exception('No pending pre-ticket found with this QR code.');
+  }
+  
+  final preTicketDoc = pendingPreTicketQuery.docs.first;
+  print('Found pending pre-ticket: ${preTicketDoc.id}');
+  
+  // Check passenger count limit before proceeding
+  final currentPassengerCount = conductorData['passengerCount'] ?? 0;
+  
+  // Improved quantity parsing - now that we're using JSON, this should be cleaner
+  dynamic rawQuantity = data['quantity'];
+  int quantity = 1; // Default value
+  
+  if (rawQuantity != null) {
+    if (rawQuantity is int) {
+      quantity = rawQuantity;
+    } else if (rawQuantity is double) {
+      quantity = rawQuantity.toInt();
+    } else if (rawQuantity is String) {
+      // Try to parse as integer first
+      int? parsedInt = int.tryParse(rawQuantity);
+      if (parsedInt != null) {
+        quantity = parsedInt;
+      } else {
+        // Try to extract number from string like "3 passengers" or "3.0"
+        String cleanQuantity = rawQuantity.replaceAll(RegExp(r'[^\d.]'), '');
+        if (cleanQuantity.isNotEmpty) {
+          double? parsed = double.tryParse(cleanQuantity);
+          if (parsed != null) {
+            quantity = parsed.toInt();
+          }
+        }
+      }
+    }
+  }
+  
+  print('Current passenger count: $currentPassengerCount');
+  print('Parsed quantity: $quantity');
+  print('Raw quantity from data: $rawQuantity');
+  
+  final newPassengerCount = currentPassengerCount + quantity;
+  
+  if (newPassengerCount > 27) {
+    throw Exception('Cannot add $quantity passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount');
+  }
+  
+  // Update pre-ticket status to "boarded" FIRST
+  print('🔄 Updating pre-ticket status to boarded');
+  await preTicketDoc.reference.update({
+    'status': 'boarded',
+    'boardedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'scannedAt': FieldValue.serverTimestamp(),
+  });
+  print('✅ Successfully updated pre-ticket status to boarded');
+  
+  // Increment passenger count
+  print('🔄 About to increment passenger count by $quantity');
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDoc.docs.first.id)
+      .update({
+        'passengerCount': FieldValue.increment(quantity)
+      });
+  print('✅ Successfully incremented passenger count by $quantity');
+  
+  // Create trip record
   final tripsCollection = FirebaseFirestore.instance
       .collection('trips')
       .doc(route)
@@ -754,5 +1039,9 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
     'totalFare': data['amount'],
     'fareTypes': data['fareTypes'],
     'discountBreakdown': data['discountBreakdown'],
+    'preTicketId': preTicketDoc.id,
+    'scannedBy': user.uid,
   });
+  
+  print('✅ Successfully created trip record: $tripDocName');
 }

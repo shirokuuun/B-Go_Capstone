@@ -186,12 +186,10 @@ class _ConductorMapsState extends State<ConductorMaps> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
-              _passengerCount = preBookings.fold(0, (sum, doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                return sum + (data['quantity'] ?? 1) as int;
-              });
+              // Don't override passenger count here - it's managed by conductor data
+              // _passengerCount is already set by _loadConductorData()
               
-                             _activeBookings = preBookings.map((doc) {
+              _activeBookings = preBookings.map((doc) {
                  final data = doc.data() as Map<String, dynamic>;
                  final booking = {
                    'id': doc.id,
@@ -217,7 +215,6 @@ class _ConductorMapsState extends State<ConductorMaps> {
               }).toList();
               
               print('🗺️ ConductorMaps: Active bookings loaded: ${_activeBookings.length}');
-              print('🗺️ ConductorMaps: Total passengers: $_passengerCount');
             });
           }
         });
@@ -541,25 +538,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
                   ),
                 ),
                 
-                // Refresh button overlay
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: FloatingActionButton(
-                    onPressed: () {
-                      print('🗺️ ConductorMaps: Manual refresh triggered');
-                      _loadBookings();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Refreshed bookings data'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    backgroundColor: Colors.orange,
-                    child: Icon(Icons.refresh, color: Colors.white),
-                  ),
-                ),
+
                 
 
               ],

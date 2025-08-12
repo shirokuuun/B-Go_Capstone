@@ -18,6 +18,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   final LocationService _locationService = LocationService();
   bool _isTracking = false;
   String _statusMessage = 'Location tracking is off';
+  String _conductorName = '';
 
   @override
   void initState() {
@@ -39,9 +40,11 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         if (query.docs.isNotEmpty) {
           final data = query.docs.first.data();
           final isOnlineInDatabase = data['isOnline'] ?? false;
-          
+          final conductorName = data['name'] ?? '';
+
           setState(() {
             _isTracking = isOnlineInDatabase;
+            _conductorName = conductorName;
           });
         }
       }
@@ -282,7 +285,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome, ${widget.role}!',
+                      'Welcome, ${_conductorName.isNotEmpty ? _conductorName : "Conductor"}!',
                       style: GoogleFonts.outfit(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,

@@ -3,7 +3,6 @@ import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/bus_reserve/reservation_service.dart';
-import 'package:b_go/pages/bus_reserve/admin_add_bus.dart';
 import 'package:intl/intl.dart';
 
 class BusHome extends StatefulWidget {
@@ -371,17 +370,7 @@ class _BusHomeState extends State<BusHome> {
                 ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF0091AD),
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => AdminAddBus()),
-          );
-          _fetchAvailableBuses();
-        },
-      ),
+
       bottomNavigationBar: SafeArea(
         bottom: true,
         top: false,

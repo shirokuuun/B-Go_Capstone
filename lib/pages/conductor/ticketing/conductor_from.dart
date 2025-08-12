@@ -637,6 +637,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                 // Check passenger count limit before proceeding
                                 final user = FirebaseAuth.instance.currentUser;
                                 if (user != null) {
+                                  // Check capacity before creating ticket
                                   final conductorDoc = await FirebaseFirestore.instance
                                       .collection('conductors')
                                       .where('uid', isEqualTo: user.uid)
@@ -657,14 +658,6 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                       );
                                       return;
                                     }
-                                    
-                                    // Increment passenger count
-                                    await FirebaseFirestore.instance
-                                        .collection('conductors')
-                                        .doc(conductorDoc.docs.first.id)
-                                        .update({
-                                          'passengerCount': FieldValue.increment(result['quantity'])
-                                        });
                                   }
                                 }
                                 
@@ -1006,7 +999,7 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
       });
   print('✅ Successfully incremented passenger count by $quantity');
   
-  // Create trip record
+  // Create trip record in route-level collection (existing behavior)
   final tripsCollection = FirebaseFirestore.instance
       .collection('trips')
       .doc(route)
@@ -1044,4 +1037,76 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   });
   
   print('✅ Successfully created trip record: $tripDocName');
+
+  // Also create a ticket under the conductor's own trips so it appears in TripsPage
+  try {
+    final conductorDocId = conductorDoc.docs.first.id;
+    final now = DateTime.now();
+    final formattedDate = DateFormat('yyyy-MM-dd').format(now);
+
+    // Ensure the date document exists
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('trips')
+        .doc(formattedDate)
+        .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+
+    final ticketsCollection = FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('trips')
+        .doc(formattedDate)
+        .collection('tickets');
+
+    // Compute next ticket number
+    final ticketsSnapshot = await ticketsCollection.get();
+    int maxTicketNumber = 0;
+    for (var doc in ticketsSnapshot.docs) {
+      final name = doc.id;
+      final parts = name.split(' ');
+      if (parts.length == 2 && int.tryParse(parts[1]) != null) {
+        final n = int.parse(parts[1]);
+        if (n > maxTicketNumber) maxTicketNumber = n;
+      }
+    }
+    final nextTicketNumber = maxTicketNumber + 1;
+    final conductorTicketDocName = 'ticket $nextTicketNumber';
+
+    // Prepare values based on QR data
+    final num startKm = (data['fromKm'] as num);
+    final num endKm = (data['toKm'] as num);
+    final num totalKm = endKm - startKm;
+    final int qty = quantity; // from parsed quantity above
+    final double baseFare = (data['fare'] as num).toDouble();
+    final double totalFare = (data['amount'] as num).toDouble();
+    final double discountAmount = (baseFare * qty) - totalFare;
+    final List<dynamic> passengerFaresDyn = (data['passengerFares'] as List?) ??
+        List.generate(qty, (_) => baseFare);
+    final List<String> passengerFares = passengerFaresDyn
+        .map((e) => (e as num).toStringAsFixed(2))
+        .toList();
+    final List<dynamic>? discountBreakdown = data['discountBreakdown'] as List?;
+
+    await ticketsCollection.doc(conductorTicketDocName).set({
+      'from': data['from'],
+      'to': data['to'],
+      'startKm': startKm,
+      'endKm': endKm,
+      'totalKm': totalKm,
+      'timestamp': FieldValue.serverTimestamp(),
+      'active': true,
+      'quantity': qty,
+      'farePerPassenger': passengerFares,
+      'totalFare': totalFare.toStringAsFixed(2),
+      'discountAmount': discountAmount.toStringAsFixed(2),
+      'discountBreakdown': discountBreakdown,
+      'preTicketId': preTicketDoc.id,
+      'scannedBy': user.uid,
+    });
+
+    print('✅ Also created conductor ticket record: $conductorTicketDocName for $formattedDate');
+  } catch (e) {
+    print('❌ Failed to create conductor ticket record: $e');
+  }
 }

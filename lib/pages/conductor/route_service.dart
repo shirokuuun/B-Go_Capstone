@@ -203,6 +203,14 @@ class RouteService {
       'discountBreakdown': discountBreakdown,
     });
 
+    // Increment passenger count
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .update({
+          'passengerCount': FieldValue.increment(quantity)
+        });
+
     return tripDocName;
   }
 
@@ -347,6 +355,24 @@ static Future<void> deleteTicket(
   String date,
   String ticketId,
 ) async {
+  // First, get the ticket data to know how many passengers to decrement
+  final ticketDoc = await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketId)
+      .get();
+
+  if (!ticketDoc.exists) {
+    throw Exception('Ticket not found');
+  }
+
+  final ticketData = ticketDoc.data()!;
+  final quantity = ticketData['quantity'] ?? 0;
+
+  // Delete the ticket
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorId)
@@ -355,6 +381,16 @@ static Future<void> deleteTicket(
       .collection('tickets')
       .doc(ticketId)
       .delete();
+
+  // Decrement the passenger count
+  if (quantity > 0) {
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .update({
+          'passengerCount': FieldValue.increment(-quantity)
+        });
+  }
 }
 
   // sos saving details

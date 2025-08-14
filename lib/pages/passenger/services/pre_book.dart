@@ -7,6 +7,8 @@ import 'dart:async'; // Added for Timer
 import 'package:b_go/pages/passenger/profile/Settings/reservation_confirm.dart';
 import 'package:geolocator/geolocator.dart'; // Added for location tracking
 import 'package:b_go/pages/passenger/services/passenger_location_service.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // Added for QR code generation
+import 'dart:convert'; // Added for JSON encoding
 
 class PreBook extends StatefulWidget {
   const PreBook({super.key});
@@ -95,6 +97,8 @@ class _PreBookState extends State<PreBook> {
     print('🚀 PreBook: Starting location capture...');
     try {
       print('🚀 PreBook: Calling PassengerLocationService.getCurrentLocation()...');
+      
+      // Try to get location with timeout
       final position = await _locationService.getCurrentLocation(context: context);
       
       if (position != null) {
@@ -102,11 +106,41 @@ class _PreBookState extends State<PreBook> {
           _currentLocation = position;
         });
         print('✅ PreBook: Passenger location captured successfully: ${position.latitude}, ${position.longitude}');
+        
+        // Show success message to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Location captured: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       } else {
         print('❌ PreBook: Failed to get passenger location - position is null');
+        // Show error to user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Failed to get your location. Please check your GPS settings and try again.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       print('❌ PreBook: Error getting passenger location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error getting location: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -132,12 +166,40 @@ class _PreBookState extends State<PreBook> {
     if (_currentLocation == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enable location access first so the conductor can find you.'),
-          duration: Duration(seconds: 3),
+          content: Text('⚠️ Location access required! Please enable location and try again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
         ),
       );
       return;
     }
+
+    // Double-check location is valid
+    if (_currentLocation!.latitude == 0.0 && _currentLocation!.longitude == 0.0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Invalid location detected! Please try capturing location again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    // Additional validation: check if coordinates are reasonable (not in the middle of the ocean)
+    if (_currentLocation!.latitude < -90 || _currentLocation!.latitude > 90 || 
+        _currentLocation!.longitude < -180 || _currentLocation!.longitude > 180) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Invalid coordinates detected! Please try capturing location again.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    print('✅ PreBook: Location verified before proceeding: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
 
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
@@ -203,6 +265,7 @@ class _PreBookState extends State<PreBook> {
         toPlace: toPlace,
         quantity: quantity,
         fareTypes: fareTypes,
+        currentLocation: _currentLocation, // Pass the location directly
       ),
     );
   }
@@ -349,14 +412,37 @@ class _PreBookState extends State<PreBook> {
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: Text(
-                                    _currentLocation != null 
-                                      ? 'Location captured: ${_currentLocation!.latitude.toStringAsFixed(4)}, ${_currentLocation!.longitude.toStringAsFixed(4)}'
-                                      : 'Location access needed for conductor to find you',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 12,
-                                      color: _currentLocation != null ? Colors.green.shade700 : Colors.orange.shade700,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _currentLocation != null 
+                                          ? 'Location captured successfully!'
+                                          : 'Location access needed for conductor to find you',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: _currentLocation != null ? Colors.green.shade700 : Colors.orange.shade700,
+                                        ),
+                                      ),
+                                      if (_currentLocation != null) ...[
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Lat: ${_currentLocation!.latitude.toStringAsFixed(6)}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            color: Colors.green.shade600,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Lng: ${_currentLocation!.longitude.toStringAsFixed(6)}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 10,
+                                            color: Colors.green.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                                 if (_currentLocation == null)
@@ -423,6 +509,32 @@ class _PreBookState extends State<PreBook> {
                                 ),
                               ),
                             ],
+                            // Debug button to test location capture
+                            const SizedBox(height: 8),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () async {
+                                  await _getCurrentLocation();
+                                  if (_currentLocation != null) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Location captured: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}'),
+                                        backgroundColor: Colors.green,
+                                        duration: Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.refresh, size: 16),
+                                label: const Text('Test Location Capture'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.orange,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -807,7 +919,8 @@ class _ReceiptModal extends StatelessWidget {
   final Map<String, dynamic> toPlace;
   final int quantity;
   final List<String> fareTypes;
-  _ReceiptModal({required this.route, required this.directionLabel, required this.fromPlace, required this.toPlace, required this.quantity, required this.fareTypes});
+  final Position? currentLocation; // Added for location passing
+  _ReceiptModal({required this.route, required this.directionLabel, required this.fromPlace, required this.toPlace, required this.quantity, required this.fareTypes, this.currentLocation});
 
   // Calculate full trip fare for pre-booking (from start to end of route)
   double computeFullTripFare(String route) {
@@ -833,11 +946,53 @@ class _ReceiptModal extends StatelessWidget {
     if (user == null) return;
     final now = DateTime.now();
     
-    // Get passenger's current location from the parent widget
-    final preBookState = context.findAncestorStateOfType<_PreBookState>();
-    final passengerLocation = preBookState?._currentLocation;
+    // Use the passed location instead of trying to access parent state
+    Position? passengerLocation = currentLocation;
+    
+    // If location is not available, try to get it again using the location service directly
+    if (passengerLocation == null) {
+      print('⚠️ PreBook: No location found in modal, trying to get location again...');
+      try {
+        // Create a new instance of the location service
+        final locationService = PassengerLocationService();
+        passengerLocation = await locationService.getCurrentLocation(context: context);
+        if (passengerLocation != null) {
+          print('✅ PreBook: Successfully captured location on retry: ${passengerLocation.latitude}, ${passengerLocation.longitude}');
+        } else {
+          print('❌ PreBook: Failed to get location on retry');
+        }
+      } catch (e) {
+        print('❌ PreBook: Error getting location on retry: $e');
+      }
+    }
     
     print('💾 PreBook: Saving booking with passenger location: ${passengerLocation?.latitude}, ${passengerLocation?.longitude}');
+    
+    // Create QR data for the booking
+    final qrData = {
+      'type': 'preBooking',
+      'route': route,
+      'direction': directionLabel,
+      'from': fromPlace['name'],
+      'to': toPlace['name'],
+      'fromKm': fromPlace['km'],
+      'toKm': toPlace['km'],
+      'fromLatitude': fromPlace['latitude'] ?? 0.0,
+      'fromLongitude': fromPlace['longitude'] ?? 0.0,
+      'toLatitude': toPlace['latitude'] ?? 0.0,
+      'toLongitude': toPlace['longitude'] ?? 0.0,
+      'passengerLatitude': passengerLocation?.latitude ?? 0.0,
+      'passengerLongitude': passengerLocation?.longitude ?? 0.0,
+      'fare': baseFare,
+      'quantity': quantity,
+      'amount': totalAmount,
+      'fareTypes': fareTypes,
+      'discountBreakdown': discountBreakdown,
+      'passengerFares': passengerFares,
+      'userId': user.uid,
+      'timestamp': now.millisecondsSinceEpoch,
+      'boardingStatus': 'pending', // Add boarding status
+    };
     
     final data = {
       'route': route,
@@ -861,18 +1016,27 @@ class _ReceiptModal extends StatelessWidget {
       'discountBreakdown': discountBreakdown,
       'passengerFares': passengerFares,
       'status': 'pending_payment', // Status for testing
+      'boardingStatus': 'pending', // Add boarding status
       'paymentDeadline': now.add(Duration(minutes: 10)), // 10 minutes from now
       'createdAt': now,
       'userId': user.uid,
+      // Add QR data for conductor scanning
+      'qrData': jsonEncode(qrData),
     };
     
     print('💾 PreBook: Complete booking data: $data');
     
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('preBookings')
-        .add(data);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preBookings')
+          .add(data);
+      print('✅ PreBook: Booking saved successfully to Firebase');
+    } catch (e) {
+      print('❌ PreBook: Error saving booking to Firebase: $e');
+      throw e;
+    }
   }
 
   @override
@@ -902,10 +1066,35 @@ class _ReceiptModal extends StatelessWidget {
         'Passenger ${i + 1}: $type${isDiscounted ? ' (20% off)' : ' (No discount)'} — ${passengerFare.toStringAsFixed(2)} PHP',
       );
     }
+    
+    // Create QR data for display
+    final qrData = {
+      'type': 'preBooking',
+      'route': route,
+      'direction': directionLabel,
+      'from': fromPlace['name'],
+      'to': toPlace['name'],
+      'fromKm': fromPlace['km'],
+      'toKm': toPlace['km'],
+      'fare': baseFare,
+      'quantity': quantity,
+      'amount': totalAmount,
+      'fareTypes': fareTypes,
+      'discountBreakdown': discountBreakdown,
+      'passengerFares': passengerFares,
+      'timestamp': now.millisecondsSinceEpoch,
+    };
+    
     return AlertDialog(
       title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
-      content: SingleChildScrollView(
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.9,
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        child: SingleChildScrollView(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Route: $route', style: GoogleFonts.outfit(fontSize: 14)),
@@ -923,7 +1112,7 @@ class _ReceiptModal extends StatelessWidget {
             SizedBox(height: 16),
             Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
             ...discountBreakdown.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
-            SizedBox(height: 8),
+            SizedBox(height: 16),
             Container(
               padding: EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -938,10 +1127,23 @@ class _ReceiptModal extends StatelessWidget {
             ),
           ],
         ),
+        ),
       ),
       actions: [
         ElevatedButton(
           onPressed: () async {
+            // Final check: ensure location is captured before saving
+            if (currentLocation == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('⚠️ Location not captured! Please go back and enable location access.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+              return;
+            }
+            
             await savePreBooking(context, baseFare, totalAmount, discountBreakdown, passengerFares);
             Navigator.of(context).pop();
             // Navigate to summary page
@@ -1414,6 +1616,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         final doc = pendingBookings.first;
         await doc.reference.update({
           'status': 'paid',
+          'boardingStatus': 'pending', // Set boarding status to pending when paid
           'paidAt': DateTime.now(),
         });
         

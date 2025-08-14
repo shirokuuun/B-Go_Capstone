@@ -475,20 +475,6 @@ class _HomePageState extends State<HomePage> {
                 Navigator.pushNamed(context, '/trip_sched');
               },
             ),
-            ListTile(
-              leading: Icon(Icons.map),
-              title: Text(
-                'Batrasco Routes',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              onTap: () {
-                // TODO: Navigate to Batrasco Routes page
-                Navigator.pop(context);
-              },
-            ),
           ],
         ),
       ),

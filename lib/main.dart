@@ -69,7 +69,6 @@ class MyApp extends StatelessWidget {
         '/trip_sched': (context) => TripSchedPage(),
         '/settings': (context) => SettingsPage(),
         '/pre_ticket_qr': (context) => PreTicketQrs(),
-        // '/reservation_confirmations': (context) => ReservationConfirmations(),
         '/help_center': (context) => FAQPage(),
         '/privacy_policy': (context) => PrivacyPolicyPage(),
         '/about': (context) => AboutPage(),

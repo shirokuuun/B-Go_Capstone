@@ -991,8 +991,10 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   }
   
   if (type == 'preBooking') {
+    print('🔍 Processing pre-booking with type: $type');
     await _processPreBooking(data, user, conductorDoc, quantity);
   } else {
+    print('🔍 Processing pre-ticket with type: $type');
     await _processPreTicket(data, user, conductorDoc, quantity);
   }
 }
@@ -1110,13 +1112,46 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user, QuerySnapsh
 Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnapshot conductorDoc, int quantity) async {
   final qrDataString = jsonEncode(data);
   
-  // Get all preBookings with matching qrData (single where clause only)
-  final existingPreBookingQuery = await FirebaseFirestore.instance
-      .collectionGroup('preBookings')
-      .where('qrData', isEqualTo: qrDataString)
-      .get();
+  print('🔍 _processPreBooking - Searching for qrData: $qrDataString');
+  print('🔍 _processPreBooking - qrData length: ${qrDataString.length}');
   
-  // Filter documents in memory to avoid compound index requirement
+  // Try collection group query first
+  QuerySnapshot existingPreBookingQuery;
+  try {
+    existingPreBookingQuery = await FirebaseFirestore.instance
+        .collectionGroup('preBookings')
+        .where('qrData', isEqualTo: qrDataString)
+        .where('status', isEqualTo: 'paid')
+        .get();
+    print('✅ Collection group query successful');
+  } catch (e) {
+    print('❌ Collection group query failed: $e');
+    print('🔄 Trying alternative approach...');
+    
+    // Wait a moment for index to be built (if it's a timing issue)
+    await Future.delayed(Duration(seconds: 2));
+    
+    try {
+      existingPreBookingQuery = await FirebaseFirestore.instance
+          .collectionGroup('preBookings')
+          .where('qrData', isEqualTo: qrDataString)
+          .where('status', isEqualTo: 'paid')
+          .get();
+      print('✅ Collection group query successful after delay');
+    } catch (e2) {
+      print('❌ Collection group query still failed after delay: $e2');
+      print('🔄 Using fallback approach...');
+      
+      // Fallback: Get all preBookings and filter in memory
+      existingPreBookingQuery = await FirebaseFirestore.instance
+          .collectionGroup('preBookings')
+          .get();
+    }
+  }
+  
+  print('🔍 _processPreBooking - Found ${existingPreBookingQuery.docs.length} documents');
+  
+  // Since we're querying for status == 'paid' directly, we should find the document
   DocumentSnapshot? paidPreBooking;
   bool hasBoarded = false;
   
@@ -1124,21 +1159,29 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnaps
     final docData = doc.data() as Map<String, dynamic>?;
     if (docData == null) continue;
     
-    final status = docData['status'];
-    if (status == 'boarded') {
-      hasBoarded = true;
-      break;
-    } else if (status == 'paid' && paidPreBooking == null) {
+    print('🔍 _processPreBooking - Document ${doc.id}: status = ${docData['status']}');
+    
+    // Check if this document matches our qrData
+    final docQrData = docData['qrData'];
+    if (docQrData != qrDataString) {
+      print('🔍 _processPreBooking - QR data mismatch, skipping');
+      continue;
+    }
+    
+    // Since we're querying for 'paid' status, we should find the document
+    if (paidPreBooking == null) {
       paidPreBooking = doc;
     }
   }
   
-  if (hasBoarded) {
-    throw Exception('This pre-booking has already been scanned and boarded.');
-  }
-  
   if (paidPreBooking == null) {
     throw Exception('No paid pre-booking found with this QR code. Please ensure payment is completed.');
+  }
+  
+  // Check if this pre-booking has already been boarded
+  final preBookingData = paidPreBooking.data() as Map<String, dynamic>;
+  if (preBookingData['status'] == 'boarded' || preBookingData['boardingStatus'] == 'boarded') {
+    throw Exception('This pre-booking has already been scanned and boarded.');
   }
   
   print('Found paid pre-booking: ${paidPreBooking.id}');
@@ -1150,6 +1193,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnaps
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
+    'boardingStatus': 'boarded', // Add explicit boarding status
   });
   print('✅ Successfully updated pre-booking status to boarded');
   
@@ -1171,6 +1215,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnaps
         'scannedBy': user.uid,
         'qr': true, // Indicates this came from QR scan
         'status': 'boarded',
+        'boardingStatus': 'boarded', // Add explicit boarding status
         'data': data, // Store the parsed QR data
       });
   print('✅ Successfully stored QR data in conductor collection');

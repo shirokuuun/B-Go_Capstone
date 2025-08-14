@@ -120,8 +120,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
   }
 
   String _generateQRData(Map<String, dynamic> booking) {
-    // Generate unique QR data for the booking
-    return 'PREBOOK_${booking['id']}_${booking['route']}_${booking['from']}_${booking['to']}_${booking['quantity']}';
+    // Use the stored qrData from Firebase, which contains the proper JSON format
+    return booking['qrData'] ?? '{}';
   }
 
   @override
@@ -413,9 +413,8 @@ class BookingDetailsPage extends StatelessWidget {
                     SizedBox(height: 16),
                     Center(
                       child: Container(
-                        width: 250.0,
-                        height: 250.0,
-                        padding: EdgeInsets.all(16),
+                        width: 350.0,
+                        height: 350.0,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),

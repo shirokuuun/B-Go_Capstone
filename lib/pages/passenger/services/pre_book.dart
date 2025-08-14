@@ -991,6 +991,7 @@ class _ReceiptModal extends StatelessWidget {
       'passengerFares': passengerFares,
       'userId': user.uid,
       'timestamp': now.millisecondsSinceEpoch,
+      'boardingStatus': 'pending', // Add boarding status
     };
     
     final data = {
@@ -1015,6 +1016,7 @@ class _ReceiptModal extends StatelessWidget {
       'discountBreakdown': discountBreakdown,
       'passengerFares': passengerFares,
       'status': 'pending_payment', // Status for testing
+      'boardingStatus': 'pending', // Add boarding status
       'paymentDeadline': now.add(Duration(minutes: 10)), // 10 minutes from now
       'createdAt': now,
       'userId': user.uid,
@@ -1614,6 +1616,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         final doc = pendingBookings.first;
         await doc.reference.update({
           'status': 'paid',
+          'boardingStatus': 'pending', // Set boarding status to pending when paid
           'paidAt': DateTime.now(),
         });
         

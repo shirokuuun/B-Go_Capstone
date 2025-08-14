@@ -273,7 +273,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                                 style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600]),
                               ),
                               Text(
-                                'Fare: ${booking['fare']?.toStringAsFixed(2) ?? '0.00'} PHP',
+                                'Total Amount: ${booking['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
                                 style: GoogleFonts.outfit(fontSize: 14),
                               ),
                               Text(
@@ -320,13 +320,10 @@ class BookingDetailsPage extends StatelessWidget {
     required this.booking,
   }) : super(key: key);
 
-  String _generateQRData(Map<String, dynamic> booking) {
-    return 'PREBOOK_${booking['id']}_${booking['route']}_${booking['from']}_${booking['to']}_${booking['quantity']}';
-  }
-
   @override
   Widget build(BuildContext context) {
-    final qrData = _generateQRData(booking);
+    // Use the stored qrData from Firebase, which contains the proper JSON format
+    final qrData = booking['qrData'] ?? '{}';
     final size = MediaQuery.of(context).size;
     
     return Scaffold(
@@ -384,6 +381,57 @@ class BookingDetailsPage extends StatelessWidget {
               ),
               SizedBox(height: 32),
               
+              // QR Code Section
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Boarding QR Code',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Show this to the conductor when boarding',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 16),
+                    Center(
+                      child: Container(
+                        width: 250.0,
+                        height: 250.0,
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: QrImageView(
+                          data: qrData, // Use the stored qrData from Firebase
+                          version: QrVersions.auto,
+                          size: 218.0,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               
               SizedBox(height: 24),
               

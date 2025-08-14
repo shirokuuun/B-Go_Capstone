@@ -638,6 +638,7 @@ class _ReceiptModal extends StatelessWidget {
     }
 
     final qrData = {
+      'type': 'preTicket', // Add type field for scanning compatibility
       'route': route,
       'date': formattedDate,
       'time': formattedTime,
@@ -941,6 +942,10 @@ class QRCodeFullScreenPage extends StatelessWidget {
     if (user == null) return;
     final now = DateTime.now(); // Use device local time
     
+    print('🔍 savePreTicket - Starting save process');
+    print('🔍 savePreTicket - User ID: ${user.uid}');
+    print('🔍 savePreTicket - QR Data: $qrData');
+    
     // Calculate total fare from discount breakdown
     double totalFare = 0.0;
     if (discountBreakdown != null) {
@@ -966,11 +971,20 @@ class QRCodeFullScreenPage extends StatelessWidget {
       'status': 'pending', // Add status field
       'createdAt': now, // Save as local time
     };
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('preTickets')
-        .add(data);
+    
+    print('🔍 savePreTicket - Data to save: $data');
+    
+    try {
+      final docRef = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preTickets')
+          .add(data);
+      print('✅ savePreTicket - Successfully saved with ID: ${docRef.id}');
+    } catch (e) {
+      print('❌ savePreTicket - Error saving: $e');
+      rethrow;
+    }
   }
 
   @override

@@ -51,6 +51,11 @@ class _ConductorMapsState extends State<ConductorMaps> {
     return BitmapDescriptor.defaultMarkerWithHue(_colorToHue(color));
   }
 
+  // Create custom human icon for passengers
+  BitmapDescriptor _getHumanIcon() {
+    return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+  }
+
   // Convert Color to BitmapDescriptor hue
   double _colorToHue(Color color) {
     if (color == Colors.blue) return BitmapDescriptor.hueAzure;
@@ -102,9 +107,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
 
   void _startLocationTracking() {
     _locationTimer = Timer.periodic(Duration(seconds: 5), (timer) {
-      if (_currentPosition != null) {
-        _checkPassengerDropoffs();
-      }
+      // Removed automatic passenger drop-off check
+      // Passengers will only be removed when scanned by the conductor
     });
   }
 
@@ -119,12 +123,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
           .listen((snapshot) {
         if (snapshot.docs.isNotEmpty) {
           final conductorData = snapshot.docs.first.data();
-          final passengerCount = conductorData['passengerCount'] ?? 0;
-          if (mounted) {
-            setState(() {
-              _passengerCount = passengerCount;
-            });
-          }
+          // Don't override passenger count here - it will be calculated from active bookings
+          print('🗺️ ConductorMaps: Conductor data loaded');
         }
       });
     }
@@ -175,8 +175,9 @@ class _ConductorMapsState extends State<ConductorMaps> {
               final matchesRoute = data['route'] == widget.route;
               final isPaid = data['status'] == 'paid';
               final isPending = data['status'] == 'pending_payment';
-              print('🗺️ ConductorMaps: Booking ${doc.id} - Route: ${data['route']} (matches: $matchesRoute), Status: ${data['status']} (paid: $isPaid, pending: $isPending)');
-              return matchesRoute && (isPaid || isPending); // Show both paid and pending bookings for testing
+              final isNotBoarded = data['status'] != 'boarded';
+              print('🗺️ ConductorMaps: Booking ${doc.id} - Route: ${data['route']} (matches: $matchesRoute), Status: ${data['status']} (paid: $isPaid, pending: $isPending, not boarded: $isNotBoarded)');
+              return matchesRoute && (isPaid || isPending) && isNotBoarded; // Only show paid/pending bookings that are not boarded
             })
             .toList();
 
@@ -186,16 +187,18 @@ class _ConductorMapsState extends State<ConductorMaps> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             setState(() {
-              // Don't override passenger count here - it's managed by conductor data
-              // _passengerCount is already set by _loadConductorData()
-              
+              // Calculate passenger count from active bookings
+              int totalPassengers = 0;
               _activeBookings = preBookings.map((doc) {
                  final data = doc.data() as Map<String, dynamic>;
+                 final quantity = (data['quantity'] ?? 1) as int;
+                 totalPassengers += quantity; // Add to total count
+                 
                  final booking = {
                    'id': doc.id,
                    'from': data['from'],
                    'to': data['to'],
-                   'quantity': data['quantity'],
+                   'quantity': quantity,
                    'fromLatitude': _convertToDouble(data['fromLatitude']),
                    'fromLongitude': _convertToDouble(data['fromLongitude']),
                    'toLatitude': _convertToDouble(data['toLatitude']),
@@ -214,7 +217,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
                 return booking;
               }).toList();
               
-              print('🗺️ ConductorMaps: Active bookings loaded: ${_activeBookings.length}');
+              _passengerCount = totalPassengers;
+              print('🗺️ ConductorMaps: Active bookings loaded: ${_activeBookings.length}, Total passengers: $_passengerCount');
             });
           }
         });
@@ -222,69 +226,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
     });
   }
 
-  void _checkPassengerDropoffs() {
-    if (_currentPosition == null) return;
-    
-    for (int i = _activeBookings.length - 1; i >= 0; i--) {
-      final booking = _activeBookings[i];
-      final toLat = booking['toLatitude'] ?? 0.0;
-      final toLng = booking['toLongitude'] ?? 0.0;
-      
-      if (toLat != 0.0 && toLng != 0.0) {
-        final distance = RouteService.calculateDistance(
-          _currentPosition!.latitude,
-          _currentPosition!.longitude,
-          toLat,
-          toLng,
-        );
-        
-        // If conductor is within 200 meters of drop-off location
-        if (distance <= 0.2) {
-          _dropOffPassenger(booking);
-        }
-      }
-    }
-  }
-
-  void _dropOffPassenger(Map<String, dynamic> booking) async {
-    final quantity = (booking['quantity'] ?? 1) as int;
-    
-    setState(() {
-      _passengerCount -= quantity;
-      _activeBookings.remove(booking);
-    });
-    
-    // Update passenger count in Firestore
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      try {
-        final conductorDoc = await FirebaseFirestore.instance
-            .collection('conductors')
-            .where('uid', isEqualTo: user.uid)
-            .limit(1)
-            .get();
-        
-        if (conductorDoc.docs.isNotEmpty) {
-          await FirebaseFirestore.instance
-              .collection('conductors')
-              .doc(conductorDoc.docs.first.id)
-              .update({
-                'passengerCount': FieldValue.increment(-quantity)
-              });
-        }
-      } catch (e) {
-        print('Error updating passenger count: $e');
-      }
-    }
-    
-    // Show notification
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$quantity passenger${quantity > 1 ? 's' : ''} dropped off at ${booking['to']}'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+  // Note: Passengers are automatically removed from the map when their QR code is scanned
+  // and their status is updated to 'boarded' in Firebase. No manual removal needed.
 
   Set<Marker> _buildMarkers() {
     final Set<Marker> markers = {};
@@ -312,65 +255,31 @@ class _ConductorMapsState extends State<ConductorMaps> {
     markers.addAll(routeMarkers);
     print('🗺️ ConductorMaps: Added ${routeMarkers.length} route markers');
 
-    // Add passenger markers
+    // Add passenger markers (only if they have coordinates)
     for (int i = 0; i < _activeBookings.length; i++) {
       final booking = _activeBookings[i];
       
-      final fromLat = booking['fromLatitude'] ?? 0.0;
-      final fromLng = booking['fromLongitude'] ?? 0.0;
-      final toLat = booking['toLatitude'] ?? 0.0;
-      final toLng = booking['toLongitude'] ?? 0.0;
       final passengerLat = booking['passengerLatitude'] ?? 0.0;
       final passengerLng = booking['passengerLongitude'] ?? 0.0;
       
       print('🗺️ ConductorMaps: Booking ${booking['id']} - Passenger location: ($passengerLat, $passengerLng)');
       
-      // Passenger current location marker (if available)
+      // Only show passenger marker if they have valid coordinates
       if (passengerLat != 0.0 && passengerLng != 0.0) {
         markers.add(
           Marker(
             markerId: MarkerId('passenger_${booking['id']}'),
             position: LatLng(passengerLat, passengerLng),
             infoWindow: InfoWindow(
-              title: 'Passenger Location',
-              snippet: '${booking['from']} → ${booking['to']} (${booking['quantity']} passengers)',
+              title: 'Pre-booked Passenger',
+              snippet: '${booking['from']} → ${booking['to']} (${booking['quantity']} passengers) - Scan QR to board',
             ),
-                         icon: _getSmallCircularMarker(Colors.yellow),
+            icon: _getHumanIcon(),
           ),
         );
         print('🗺️ ConductorMaps: ✅ Added passenger marker for booking ${booking['id']} at ($passengerLat, $passengerLng)');
       } else {
         print('🗺️ ConductorMaps: ❌ No passenger location available for booking ${booking['id']}');
-      }
-      
-      // Pick-up location marker
-      if (fromLat != 0.0 && fromLng != 0.0) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('pickup_${booking['id']}'),
-            position: LatLng(fromLat, fromLng),
-            infoWindow: InfoWindow(
-              title: 'Pick-up Location',
-              snippet: '${booking['from']} → ${booking['to']} (${booking['quantity']} passengers)',
-            ),
-                         icon: _getSmallCircularMarker(Colors.green),
-          ),
-        );
-      }
-      
-      // Drop-off location marker
-      if (toLat != 0.0 && toLng != 0.0) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('dropoff_${booking['id']}'),
-            position: LatLng(toLat, toLng),
-            infoWindow: InfoWindow(
-              title: 'Drop-off Location',
-              snippet: '${booking['to']} (${booking['quantity']} passengers)',
-            ),
-                         icon: _getSmallCircularMarker(Colors.red),
-          ),
-        );
       }
     }
     

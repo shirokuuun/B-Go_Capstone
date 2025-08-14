@@ -255,6 +255,180 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     );
   }
 
+  Widget _buildScannedQRDataList() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Text('User not authenticated', style: GoogleFonts.outfit(color: Colors.red));
+    }
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .snapshots(),
+      builder: (context, conductorSnapshot) {
+        if (conductorSnapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (conductorSnapshot.hasError || conductorSnapshot.data?.docs.isEmpty == true) {
+          return Text(
+            'Error loading conductor data',
+            style: GoogleFonts.outfit(color: Colors.red),
+          );
+        }
+
+        final conductorDocId = conductorSnapshot.data!.docs.first.id;
+
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('preBookings')
+              .where('qr', isEqualTo: true)
+              .snapshots(),
+          builder: (context, qrSnapshot) {
+            if (qrSnapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            if (qrSnapshot.hasError) {
+              return Text(
+                'Error loading scanned QR data: ${qrSnapshot.error}',
+                style: GoogleFonts.outfit(color: Colors.red),
+              );
+            }
+
+            final scannedQRs = qrSnapshot.data?.docs ?? [];
+
+            if (scannedQRs.isEmpty) {
+              return Container(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.qr_code_scanner,
+                      size: 48,
+                      color: Colors.grey[400],
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'No scanned QR codes yet',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      'Scanned pre-bookings will appear here',
+                      style: GoogleFonts.outfit(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Column(
+              children: [
+                Text(
+                  '${scannedQRs.length} scanned QR code${scannedQRs.length == 1 ? '' : 's'}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 12),
+                ...scannedQRs.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  final qrData = data['data'] as Map<String, dynamic>? ?? {};
+                  final scannedAt = data['scannedAt'] as Timestamp?;
+                  
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 8),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.qr_code_scanner,
+                            color: Colors.blue[700],
+                            size: 20,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${qrData['from'] ?? 'Unknown'} → ${qrData['to'] ?? 'Unknown'}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${qrData['quantity'] ?? 1} passenger${(qrData['quantity'] ?? 1) == 1 ? '' : 's'} • ${qrData['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              if (scannedAt != null)
+                                Text(
+                                  'Scanned: ${scannedAt.toDate().toString().substring(0, 19)}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    color: Colors.grey[500],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'BOARDED',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -575,6 +749,35 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                     ),
                     SizedBox(height: 12),
                     _buildPreBookedPassengersList(),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+
+            // Scanned QR Data Card
+            Card(
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.qr_code_scanner, color: Color(0xFF0091AD)),
+                        SizedBox(width: 8),
+                        Text(
+                          'Scanned QR Codes',
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    _buildScannedQRDataList(),
                   ],
                 ),
               ),

@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
 class PreTicket extends StatefulWidget {
   const PreTicket({super.key});
@@ -637,6 +638,7 @@ class _ReceiptModal extends StatelessWidget {
     }
 
     final qrData = {
+      'type': 'preTicket', // Add type field for scanning compatibility
       'route': route,
       'date': formattedDate,
       'time': formattedTime,
@@ -672,11 +674,10 @@ class _ReceiptModal extends StatelessWidget {
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('Base Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP',
                 style: GoogleFonts.outfit(fontSize: 14)),
+            Text('Total Fare: ${totalAmount.toStringAsFixed(2)} PHP',
+                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
             Text('Quantity: $quantity',
                 style: GoogleFonts.outfit(fontSize: 14)),
-            Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP',
-                style: GoogleFonts.outfit(
-                    fontSize: 14, fontWeight: FontWeight.w600)),
             SizedBox(height: 16),
             Text('Discounts:',
                 style: GoogleFonts.outfit(
@@ -695,9 +696,9 @@ class _ReceiptModal extends StatelessWidget {
                   from: fromPlace['name'] ?? '',
                   to: toPlace['name'] ?? '',
                   km: '${fromPlace['km']} - ${toPlace['km']}',
-                  fare: baseFare.toStringAsFixed(2),
+                  fare: totalAmount.toStringAsFixed(2),
                   quantity: quantity,
-                  qrData: qrData.toString(),
+                  qrData: jsonEncode(qrData),
                   discountBreakdown: discountBreakdown,
                   showConfirmButton: true,
                 ),
@@ -940,21 +941,50 @@ class QRCodeFullScreenPage extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
     final now = DateTime.now(); // Use device local time
+    
+    print('🔍 savePreTicket - Starting save process');
+    print('🔍 savePreTicket - User ID: ${user.uid}');
+    print('🔍 savePreTicket - QR Data: $qrData');
+    
+    // Calculate total fare from discount breakdown
+    double totalFare = 0.0;
+    if (discountBreakdown != null) {
+      for (String breakdown in discountBreakdown!) {
+        // Extract fare amount from breakdown string like "Passenger 1: Student (20% off) — 20.80 PHP"
+        final regex = RegExp(r'— ([\d.]+) PHP');
+        final match = regex.firstMatch(breakdown);
+        if (match != null) {
+          totalFare += double.parse(match.group(1)!);
+        }
+      }
+    }
+    
     final data = {
       'from': from,
       'to': to,
       'km': km,
       'fare': fare,
+      'totalFare': totalFare.toStringAsFixed(2), // Add total fare
       'quantity': quantity,
       'qrData': qrData,
       'discountBreakdown': discountBreakdown,
+      'status': 'pending', // Add status field
       'createdAt': now, // Save as local time
     };
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('preTickets')
-        .add(data);
+    
+    print('🔍 savePreTicket - Data to save: $data');
+    
+    try {
+      final docRef = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preTickets')
+          .add(data);
+      print('✅ savePreTicket - Successfully saved with ID: ${docRef.id}');
+    } catch (e) {
+      print('❌ savePreTicket - Error saving: $e');
+      rethrow;
+    }
   }
 
   @override
@@ -1014,7 +1044,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
                           style: GoogleFonts.outfit(fontSize: 14)),
                       Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
                       Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
-                      Text('Fare: $fare Pesos',
+                      Text('Total Fare: $fare Pesos',
                           style: GoogleFonts.outfit(fontSize: 14)),
                       Text('Total Passengers: $quantity',
                           style: GoogleFonts.outfit(fontSize: 14)),

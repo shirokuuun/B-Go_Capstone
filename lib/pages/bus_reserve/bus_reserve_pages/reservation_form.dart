@@ -275,7 +275,12 @@ class _ReservationFormState extends State<ReservationForm> {
           ),
         ],
       ),
-       bottomNavigationBar: Padding(
+       bottomNavigationBar: SafeArea(
+        bottom: true,
+        top: false,
+        left: false,
+        right: false,
+        child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -363,6 +368,7 @@ class _ReservationFormState extends State<ReservationForm> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

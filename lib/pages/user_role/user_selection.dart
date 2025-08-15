@@ -52,7 +52,7 @@ class _UserSelectionState extends State<UserSelection> {
                       context,
                       MaterialPageRoute(builder: (context) => BusHome()),
                     );
-                  }
+                  } 
                 },
                 child: Container(
                   width: MediaQuery.of(context).size.width * 0.7,

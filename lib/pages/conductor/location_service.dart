@@ -17,6 +17,9 @@ class LocationService {
     if (_isTracking) return;
 
     print('🚀 Starting location tracking...');
+    
+    // Debug authentication state
+    await debugAuthState();
 
     try {
       // Check if location services are enabled
@@ -97,25 +100,29 @@ class LocationService {
         return;
       }
 
-      print('🔍 Looking for conductor with email: ${user.email}');
+      print('🔍 Looking for conductor with UID: ${user.uid}');
+      print('📧 Current user email: ${user.email}');
+      print('🆔 Current user display name: ${user.displayName}');
 
-      // Get conductor document ID
+      // Only work with conductors that have uid field (created via admin website)
       final query = await FirebaseFirestore.instance
           .collection('conductors')
-          .where('email', isEqualTo: user.email)
+          .where('uid', isEqualTo: user.uid)
           .limit(1)
           .get();
 
       print('📊 Query results: ${query.docs.length} documents found');
-
+      
       if (query.docs.isEmpty) {
-        print('❌ No conductor document found for email: ${user.email}');
+        print('❌ No conductor document found with UID: ${user.uid}');
+        print('💡 This conductor must be created via the admin website to have a uid field');
         print('💡 Available conductors:');
         final allConductors = await FirebaseFirestore.instance
             .collection('conductors')
             .get();
         for (final doc in allConductors.docs) {
-          print('  - ${doc.id}: ${doc.data()}');
+          final data = doc.data();
+          print('    ${doc.id}: uid=${data['uid']}, email=${data['email']}');
         }
         return;
       }
@@ -141,6 +148,8 @@ class LocationService {
         'route': conductorData['route'] ?? '',
         'busNumber': conductorData['busNumber'] ?? '',
         'name': conductorData['name'] ?? 'Unknown Conductor',
+        // Ensure uid field is set for consistency
+        'uid': conductorData['uid'] ?? conductorDocId,
       };
 
       print('🔄 Updating Firestore with data: $updateData');
@@ -164,21 +173,20 @@ class LocationService {
 
       final query = await FirebaseFirestore.instance
           .collection('conductors')
-          .where('email', isEqualTo: user.email)
+          .where('uid', isEqualTo: user.uid)
           .limit(1)
           .get();
 
-      if (query.docs.isEmpty) return;
-
-      final conductorDocId = query.docs.first.id;
-
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorDocId)
-          .update({
-        'isOnline': false,
-        'lastSeen': FieldValue.serverTimestamp(),
-      });
+      if (query.docs.isNotEmpty) {
+        final conductorDocId = query.docs.first.id;
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .update({
+          'isOnline': false,
+          'lastSeen': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       print('Error marking conductor offline: $e');
     }
@@ -212,4 +220,49 @@ class LocationService {
 
   // Check if location tracking is active
   bool get isTracking => _isTracking;
+  
+  // Debug method to check current authentication state
+  Future<void> debugAuthState() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      print('❌ No user is currently authenticated');
+      return;
+    }
+    
+    print('🔍 Current authentication state:');
+    print('  - UID: ${user.uid}');
+    print('  - Email: ${user.email}');
+    print('  - Display Name: ${user.displayName}');
+    print('  - Email Verified: ${user.emailVerified}');
+    print('  - Is Anonymous: ${user.isAnonymous}');
+    
+    // Check if this user exists in the conductors collection
+    final query = await FirebaseFirestore.instance
+        .collection('conductors')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+    
+    if (query.docs.isEmpty) {
+      print('❌ No conductor document found for this user');
+    } else {
+      final data = query.docs.first.data();
+      print('✅ Found conductor document:');
+      print('  - Document ID: ${query.docs.first.id}');
+      print('  - Name: ${data['name']}');
+      print('  - Email: ${data['email']}');
+      print('  - Route: ${data['route']}');
+      print('  - Is Online: ${data['isOnline']}');
+    }
+  }
+  
+  // Force sign out to clear any cached authentication state
+  Future<void> forceSignOut() async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      print('✅ Successfully signed out');
+    } catch (e) {
+      print('❌ Error signing out: $e');
+    }
+  }
 } 

@@ -35,7 +35,7 @@ import 'package:b_go/auth/auth_services.dart';
 
   Future<void> loadInitialData() async {
   final currentUser = FirebaseAuth.instance.currentUser;
-  final conductorId = await RouteService.getConductorDocIdFromEmail(currentUser?.email ?? '');
+      final conductorId = await RouteService.getConductorDocIdFromUid(currentUser?.uid ?? '');
 
   if (conductorId == null) {
     // Show error if conductorId could not be retrieved
@@ -91,8 +91,8 @@ import 'package:b_go/auth/auth_services.dart';
   if (picked != null) {
     final formattedDate = DateFormat('yyyy-MM-dd').format(picked);
 
-    final conductorId = await RouteService.getConductorDocIdFromEmail(
-      FirebaseAuth.instance.currentUser?.email ?? '',
+    final conductorId = await RouteService.getConductorDocIdFromUid(
+      FirebaseAuth.instance.currentUser?.uid ?? '',
     );
 
     if (conductorId == null) {
@@ -379,9 +379,9 @@ import 'package:b_go/auth/auth_services.dart';
                             },
                             onDismissed: (direction) async {
                               try {
-                                final conductorId = await RouteService.getConductorDocIdFromEmail(
-                                  FirebaseAuth.instance.currentUser?.email ?? '',
-                                );
+                                                                  final conductorId = await RouteService.getConductorDocIdFromUid(
+                                    FirebaseAuth.instance.currentUser?.uid ?? '',
+                                  );
 
                                 await RouteService.deleteTicket(
                                   conductorId!,

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/services/bus_location_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -43,14 +44,13 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _createCustomBusIcons() async {
     // Create custom bus icons with different colors for each route
+    // Use the same colors as defined in _getColorForRoute method
     _busIcons = {
       'batangas': await _createCustomBusIcon(Colors.red),
-      'lipa': await _createCustomBusIcon(Colors.blue),
-      'tanauan': await _createCustomBusIcon(Colors.green),
-      'santo tomas': await _createCustomBusIcon(Colors.yellow),
-      'malvar': await _createCustomBusIcon(Colors.orange),
       'mataas na kahoy': await _createCustomBusIcon(Colors.purple),
-      'rosario': await _createCustomBusIcon(Colors.pink),
+      'rosario': await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
+      'tiaong': await _createCustomBusIcon(Colors.green),
+      'san juan': await _createCustomBusIcon(Colors.yellow),
       'default': await _createCustomBusIcon(Colors.cyan),
     };
   }
@@ -87,10 +87,6 @@ class _HomePageState extends State<HomePage> {
   void _startBusTracking() {
     // Listen to all online buses
     _busLocationService.getOnlineBuses().listen((buses) {
-      print('🔄 Received ${buses.length} online buses:');
-      for (final bus in buses) {
-        print('  - ${bus.conductorId}: ${bus.route.trim()} (${bus.isOnline ? 'Online' : 'Offline'})');
-      }
       setState(() {
         _buses = buses;
         _updateMarkers();
@@ -101,18 +97,12 @@ class _HomePageState extends State<HomePage> {
   void _updateMarkers() {
     _markers.clear();
     
-    print('🎯 Updating markers. Selected route: ${_selectedRoute ?? "All"}');
-    print('📊 Total buses: ${_buses.length}');
-    
     for (final bus in _buses) {
       // Skip if route filter is applied and bus doesn't match
       if (_selectedRoute != null && !_matchesRoute(bus.route, _selectedRoute!)) {
-        print('❌ Skipping ${bus.conductorId} - route "${bus.route.trim()}" doesn\'t match "${_selectedRoute!.trim()}"');
         continue;
       }
 
-      print('✅ Adding marker for ${bus.conductorId} - route: "${bus.route.trim()}"');
-      
       final marker = Marker(
         markerId: MarkerId(bus.conductorId),
         position: bus.location,
@@ -126,8 +116,6 @@ class _HomePageState extends State<HomePage> {
       
       _markers.add(marker);
     }
-    
-    print('🎯 Final markers count: ${_markers.length}');
   }
 
   void _showBusInfoPopup(BusLocation bus) {
@@ -203,22 +191,44 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  // Passenger count (placeholder for now)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.green, width: 1),
-                    ),
-                    child: Text(
-                      '0/27 Passengers', // Placeholder - you'll update this
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
-                      ),
-                    ),
+                  // Passenger count from Firestore
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('conductors')
+                        .where('uid', isEqualTo: bus.conductorId)
+                        .limit(1)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      int passengerCount = 0;
+                      if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>?;
+                        passengerCount = data?['passengerCount'] ?? 0;
+                      }
+                      
+                      final isFull = passengerCount >= 27;
+                      
+                      return Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isFull 
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isFull ? Colors.red : Colors.green, 
+                            width: 1
+                          ),
+                        ),
+                        child: Text(
+                          '$passengerCount/27 Passengers',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isFull ? Colors.red : Colors.green,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -261,11 +271,14 @@ class _HomePageState extends State<HomePage> {
 
   BitmapDescriptor _getBusIcon(String route) {
     final routeKey = route.trim().toLowerCase();
+    
     // Return default marker if icons are not ready yet
     if (_busIcons.isEmpty) {
       return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
     }
-    return _busIcons[routeKey] ?? _busIcons['default'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    
+    final icon = _busIcons[routeKey] ?? _busIcons['default'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    return icon;
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -282,7 +295,8 @@ class _HomePageState extends State<HomePage> {
           context,
           MaterialPageRoute(builder: (context) => PassengerService()),
         );
-        break;
+        break; 
+        
       case 2:
         Navigator.pushNamed(context, '/profile');
         break;
@@ -461,20 +475,6 @@ class _HomePageState extends State<HomePage> {
                 Navigator.pushNamed(context, '/trip_sched');
               },
             ),
-            ListTile(
-              leading: Icon(Icons.map),
-              title: Text(
-                'Batrasco Routes',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              onTap: () {
-                // TODO: Navigate to Batrasco Routes page
-                Navigator.pop(context);
-              },
-            ),
           ],
         ),
       ),
@@ -646,7 +646,7 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
-                          children: _busIcons.entries.map((entry) => Padding(
+                          children: _getUniqueRoutes().map((route) => Padding(
                             padding: EdgeInsets.symmetric(vertical: 2),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -655,14 +655,14 @@ class _HomePageState extends State<HomePage> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: _getColorForRoute(entry.key),
+                                    color: _getColorForRoute(route),
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 SizedBox(width: 8),
                                 Flexible(
                                   child: Text(
-                                    entry.key.toUpperCase(),
+                                    route.toUpperCase(),
                                     style: GoogleFonts.outfit(fontSize: 12),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -701,22 +701,35 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  List<String> _getUniqueRoutes() {
+    Set<String> uniqueRoutes = {};
+    
+    // Add routes from available routes
+    uniqueRoutes.addAll(_availableRoutes);
+    
+    // Add routes from online buses
+    for (final bus in _buses) {
+      if (bus.isOnline && bus.route.trim().isNotEmpty) {
+        uniqueRoutes.add(bus.route.trim());
+      }
+    }
+    
+    // Convert to list and sort
+    return uniqueRoutes.toList()..sort();
+  }
+
   Color _getColorForRoute(String route) {
     switch (route.trim().toLowerCase()) {
       case 'batangas':
         return Colors.red;
-      case 'lipa':
+      case 'rosario':
         return Colors.blue;
-      case 'tanauan':
+      case 'tiaong':
         return Colors.green;
-      case 'santo tomas':
+      case 'san juan':
         return Colors.yellow;
-      case 'malvar':
-        return Colors.orange;
       case 'mataas na kahoy':
         return Colors.purple;
-      case 'rosario':
-        return Colors.pink;
       default:
         return Colors.cyan;
     }

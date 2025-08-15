@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
+import 'package:b_go/pages/conductor/conductor_maps.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
@@ -26,16 +27,20 @@ class _ConductorHomeState extends State<ConductorHome> {
 
     _pages = [
       ConductorDashboard(
-      route: widget.route,
-      role: widget.role,
-    ),
-    Container(),
-    TripsPage(
-      route: widget.route,
-      role: widget.role,
-      placeCollection: widget.placeCollection,
-    ),
-  ];
+        route: widget.route,
+        role: widget.role,
+      ),
+      Container(),
+      ConductorMaps(
+        route: widget.route,
+        role: widget.role,
+      ),
+      TripsPage(
+        route: widget.route,
+        role: widget.role,
+        placeCollection: widget.placeCollection,
+      ),
+    ];
   }
 
   void _onItemTapped(int index) {
@@ -64,6 +69,7 @@ class _ConductorHomeState extends State<ConductorHome> {
       child: Scaffold(
         body: _pages[_selectedIndex],
         bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
               icon: Icon(Icons.home),
@@ -72,6 +78,10 @@ class _ConductorHomeState extends State<ConductorHome> {
             BottomNavigationBarItem(
               icon: Icon(Icons.confirmation_number),
               label: 'Ticketing',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map),
+              label: 'Maps',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.directions_bus),

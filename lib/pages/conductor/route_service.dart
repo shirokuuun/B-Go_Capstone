@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'dart:math' as math;
 
 class RouteService {
   static Future<String> fetchRoutePlaceName(String route) async {
@@ -43,6 +44,8 @@ class RouteService {
       return {
         'name': data['Name']?.toString() ?? doc.id,
         'km': data['km'],
+        'latitude': data['latitude'] ?? 0.0,
+        'longitude': data['longitude'] ?? 0.0,
       };
     }).toList();
 
@@ -55,11 +58,31 @@ class RouteService {
     return places;
   }
 
+  // Calculate distance between two coordinates in kilometers
+  static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371; // Earth's radius in kilometers
+    
+    double dLat = _degreesToRadians(lat2 - lat1);
+    double dLon = _degreesToRadians(lon2 - lon1);
+    
+    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.sin(lat1 * math.pi / 180) * math.sin(lat2 * math.pi / 180) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    
+    double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    
+    return earthRadius * c;
+  }
+  
+  static double _degreesToRadians(double degrees) {
+    return degrees * (math.pi / 180);
+  }
+
    // Get conductor document ID from email (e.g., for dynamic document access)
-  static Future<String?> getConductorDocIdFromEmail(String email) async {
+  static Future<String?> getConductorDocIdFromUid(String uid) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('conductors')
-        .where('email', isEqualTo: email)
+        .where('uid', isEqualTo: uid)
         .limit(1)
         .get();
 
@@ -127,7 +150,7 @@ class RouteService {
     String formattedDate = date ?? DateFormat('yyyy-MM-dd').format(now);
 
     final user = FirebaseAuth.instance.currentUser;
-    final conductorId = await RouteService.getConductorDocIdFromEmail(user?.email ?? '');
+          final conductorId = await RouteService.getConductorDocIdFromUid(user?.uid ?? '');
     if (conductorId == null) {
       throw Exception('Conductor not found for email ${user?.email}');
     }
@@ -180,6 +203,14 @@ class RouteService {
       'discountBreakdown': discountBreakdown,
     });
 
+    // Increment passenger count
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .update({
+          'passengerCount': FieldValue.increment(quantity)
+        });
+
     return tripDocName;
   }
 
@@ -208,7 +239,7 @@ static Future<Map<String, dynamic>?> fetchTrip(
   String ticketDocName,
 ) async {
   final user = FirebaseAuth.instance.currentUser;
-  final conductorId = await getConductorDocIdFromEmail(user?.email ?? '');
+          final conductorId = await getConductorDocIdFromUid(user?.uid ?? '');
   if (conductorId == null) return null;
 
   final doc = await FirebaseFirestore.instance
@@ -324,6 +355,24 @@ static Future<void> deleteTicket(
   String date,
   String ticketId,
 ) async {
+  // First, get the ticket data to know how many passengers to decrement
+  final ticketDoc = await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorId)
+      .collection('trips')
+      .doc(date)
+      .collection('tickets')
+      .doc(ticketId)
+      .get();
+
+  if (!ticketDoc.exists) {
+    throw Exception('Ticket not found');
+  }
+
+  final ticketData = ticketDoc.data()!;
+  final quantity = ticketData['quantity'] ?? 0;
+
+  // Delete the ticket
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorId)
@@ -332,6 +381,16 @@ static Future<void> deleteTicket(
       .collection('tickets')
       .doc(ticketId)
       .delete();
+
+  // Decrement the passenger count
+  if (quantity > 0) {
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .update({
+          'passengerCount': FieldValue.increment(-quantity)
+        });
+  }
 }
 
   // sos saving details

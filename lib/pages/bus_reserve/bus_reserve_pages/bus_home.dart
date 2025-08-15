@@ -3,7 +3,6 @@ import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/bus_reserve/reservation_service.dart';
-import 'package:b_go/pages/bus_reserve/admin_add_bus.dart';
 import 'package:intl/intl.dart';
 
 class BusHome extends StatefulWidget {
@@ -501,69 +500,30 @@ class _BusHomeState extends State<BusHome> {
                 ),
         ],
       ),
-       //for test purpose only
-      floatingActionButton: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton(
-          heroTag: 'cancel',
-          backgroundColor: Colors.red,
-          child: const Icon(Icons.cancel),
-          tooltip: 'Manage Reservations',
-          onPressed: () async {
-            await _fetchReservations();
-            showModalBottomSheet(
-              context: context,
-              isScrollControlled: true,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              builder: (context) => _buildCancelReservationSheet(),
-            );
-          },
-        ),
-        const SizedBox(height: 10),
-        FloatingActionButton(
-          heroTag: 'add',
-          backgroundColor: const Color(0xFF0091AD),
-          child: const Icon(Icons.add),
-          onPressed: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => AdminAddBus()),
-            );
-            _fetchAvailableBuses();
-          },
-        ),
-      ],
-    ),
-        bottomNavigationBar: (_selectedDate != null &&
-          (DateFormat('EEEE').format(_selectedDate!) == 'Saturday' ||
-          DateFormat('EEEE').format(_selectedDate!) == 'Sunday'))
-      ? null
-      : SafeArea(
-          bottom: true,
-          top: false,
-          left: false,
-          right: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _selectedBusIds.isNotEmpty
-                    ? const Color(0xFF0091AD)
-                    : Colors.grey.shade400,
-                minimumSize: const Size(double.infinity, 50),
-              ),
-              onPressed: _selectedBusIds.isNotEmpty
-                  ? () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ReservationForm(
-                            selectedBusIds: _selectedBusIds.toList(),
-                          ),
+
+      bottomNavigationBar: SafeArea(
+        bottom: true,
+        top: false,
+        left: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _selectedBusIds.isNotEmpty
+                  ? const Color(0xFF0091AD)
+                  : Colors.grey.shade400,
+              minimumSize: const Size(double.infinity, 50),
+            ),
+            onPressed: _selectedBusIds.isNotEmpty
+                ? () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ReservationForm(
+                          selectedBusIds: _selectedBusIds.toList(),
                         ),
+                      )
                       );
                     }
                   : null,

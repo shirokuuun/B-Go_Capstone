@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'remittance_service.dart';
 
 class RouteService {
   static Future<String> fetchRoutePlaceName(String route) async {
@@ -155,23 +156,23 @@ class RouteService {
       throw Exception('Conductor not found for email ${user?.email}');
     }
 
-  try {
-    await FirebaseFirestore.instance
-    .collection('conductors')
-    .doc(conductorId)
-    .collection('trips')
-    .doc(formattedDate)
-    .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-  } catch (e) {
-    print('Failed to ensure date document exists: $e');
-  }
+     try {
+     await FirebaseFirestore.instance
+     .collection('conductors')
+     .doc(conductorId)
+     .collection('remittance')
+     .doc(formattedDate)
+     .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+   } catch (e) {
+     print('Failed to ensure date document exists: $e');
+   }
 
-    final tripsCollection = FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorId)
-        .collection('trips')
-        .doc(formattedDate)
-        .collection('tickets');
+         final tripsCollection = FirebaseFirestore.instance
+         .collection('conductors')
+         .doc(conductorId)
+         .collection('remittance')
+         .doc(formattedDate)
+         .collection('tickets');
 
 
     final snapshot = await tripsCollection.get();
@@ -203,6 +204,50 @@ class RouteService {
       'discountBreakdown': discountBreakdown,
     });
 
+         // Also save to daily trip structure (trip1 or trip2)
+     try {
+       final dailyTripDoc = await FirebaseFirestore.instance
+           .collection('conductors')
+           .doc(conductorId)
+           .collection('dailyTrips')
+           .doc(formattedDate)
+           .get();
+       
+       if (dailyTripDoc.exists) {
+         final dailyTripData = dailyTripDoc.data();
+         final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+         final tripCollection = 'trip$currentTrip';
+         
+         await FirebaseFirestore.instance
+             .collection('conductors')
+             .doc(conductorId)
+             .collection('dailyTrips')
+             .doc(formattedDate)
+             .collection(tripCollection)
+             .doc('tickets')
+             .collection('tickets')
+             .doc(tripDocName)
+             .set({
+               'from': from,
+               'to': to,
+               'startKm': startKm,
+               'endKm': endKm,
+               'totalKm': totalKm,
+               'timestamp': FieldValue.serverTimestamp(),
+               'active': true,
+               'quantity': quantity,
+               'farePerPassenger': formattedFares,
+               'totalFare': totalFareStr,
+               'discountAmount': totalDiscountStr,
+               'discountList': discountList,
+               'discountBreakdown': discountBreakdown,
+             });
+       }
+     } catch (e) {
+       print('Failed to save to daily trip structure: $e');
+       // Continue with normal operation even if daily trip structure fails
+     }
+
     // Increment passenger count
     await FirebaseFirestore.instance
         .collection('conductors')
@@ -210,6 +255,15 @@ class RouteService {
         .update({
           'passengerCount': FieldValue.increment(quantity)
         });
+
+    // Calculate and save remittance summary
+    try {
+      final remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, formattedDate);
+      await RemittanceService.saveRemittanceSummary(conductorId, formattedDate, remittanceSummary);
+      print('✅ Remittance summary updated for $formattedDate');
+    } catch (e) {
+      print('Error updating remittance summary: $e');
+    }
 
     return tripDocName;
   }

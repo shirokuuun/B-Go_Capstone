@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:b_go/pages/conductor/conductor_home.dart';
+import 'package:b_go/pages/conductor/conductor_departure.dart';
 import 'package:b_go/pages/conductor/sos.dart';
+import 'package:b_go/pages/conductor/remittance_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -35,6 +37,11 @@ class _ConductorFromState extends State<ConductorFrom> {
   @override
   void initState() {
     super.initState();
+    _initializeRouteDirections();
+    _checkActiveTrip();
+  }
+
+  void _initializeRouteDirections() {
     if ('${widget.route.trim()}' == 'Rosario') {
       routeDirections = [
         {'label': 'SM City Lipa - Rosario', 'collection': 'Place'},
@@ -56,16 +63,44 @@ class _ConductorFromState extends State<ConductorFrom> {
         {'label': 'Tiaong - SM City Lipa', 'collection': 'Place 2'},
       ];
     } else if ('${widget.route.trim()}' == 'San Juan') {
-    routeDirections = [
-      {'label': 'SM City Lipa - San Juan', 'collection': 'Place'},
-      {'label': 'San Juan - SM City Lipa', 'collection': 'Place 2'},
-    ];
-  } else {
+      routeDirections = [
+        {'label': 'SM City Lipa - San Juan', 'collection': 'Place'},
+        {'label': 'San Juan - SM City Lipa', 'collection': 'Place 2'},
+      ];
+    } else {
       routeDirections = [
         {'label': 'SM City Lipa - Unknown', 'collection': 'Place'},
         {'label': 'Unknown - SM City Lipa', 'collection': 'Place 2'},
       ];
     }
+  }
+
+  Future<void> _checkActiveTrip() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorDoc.docs.isNotEmpty) {
+        final conductorData = conductorDoc.docs.first.data();
+        final activeTrip = conductorData['activeTrip'];
+        
+        if (activeTrip != null && activeTrip['isActive'] == true) {
+          setState(() {
+            selectedPlaceCollection = activeTrip['placeCollection'] ?? 'Place';
+          });
+        }
+      }
+    } catch (e) {
+      print('Error checking active trip: $e');
+    }
+
+    // Initialize places future after determining the correct collection
     placesFuture = RouteService.fetchPlaces(widget.route,
         placeCollection: selectedPlaceCollection);
   }
@@ -122,11 +157,9 @@ class _ConductorFromState extends State<ConductorFrom> {
                             onPressed: () {
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
-                                  builder: (context) => ConductorHome(
+                                  builder: (context) => ConductorDeparture(
                                     route: widget.route,
                                     role: widget.role,
-                                    placeCollection: selectedPlaceCollection,
-                                    selectedIndex: 0,
                                   ),
                                 ),
                               );
@@ -217,53 +250,41 @@ class _ConductorFromState extends State<ConductorFrom> {
                       ],
                     ),
                   ),
-                  // Route directions display (clickable)
+                  // Route directions display (not clickable during active trip)
                   Padding(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16.0, vertical: 8.0),
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedPlaceCollection =
-                              selectedPlaceCollection == 'Place'
-                                  ? 'Place 2'
-                                  : 'Place';
-                          placesFuture = RouteService.fetchPlaces(widget.route,
-                              placeCollection: selectedPlaceCollection);
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF007A8F),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.swap_horiz, color: Colors.white),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                routeDirections.firstWhere((r) =>
-                                    r['collection'] ==
-                                    selectedPlaceCollection)['label']!,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF007A8F),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.swap_horiz, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              routeDirections.firstWhere((r) =>
+                                  r['collection'] ==
+                                  selectedPlaceCollection)['label']!,
+                              style: GoogleFonts.outfit(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -1284,20 +1305,20 @@ Future<void> _createConductorTicketRecord(Map<String, dynamic> data, String docu
     final now = DateTime.now();
     final formattedDate = DateFormat('yyyy-MM-dd').format(now);
 
-    // Ensure the date document exists
-    await FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorDocId)
-        .collection('trips')
-        .doc(formattedDate)
-        .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+         // Ensure the date document exists
+     await FirebaseFirestore.instance
+         .collection('conductors')
+         .doc(conductorDocId)
+         .collection('remittance')
+         .doc(formattedDate)
+         .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
 
-    final ticketsCollection = FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorDocId)
-        .collection('trips')
-        .doc(formattedDate)
-        .collection('tickets');
+     final ticketsCollection = FirebaseFirestore.instance
+         .collection('conductors')
+         .doc(conductorDocId)
+         .collection('remittance')
+         .doc(formattedDate)
+         .collection('tickets');
 
     // Compute next ticket number
     final ticketsSnapshot = await ticketsCollection.get();
@@ -1345,6 +1366,61 @@ Future<void> _createConductorTicketRecord(Map<String, dynamic> data, String docu
       'documentType': type,
       'scannedBy': user.uid,
     });
+
+         // Also save to daily trip structure (trip1 or trip2)
+     try {
+       final dailyTripDoc = await FirebaseFirestore.instance
+           .collection('conductors')
+           .doc(conductorDocId)
+           .collection('dailyTrips')
+           .doc(formattedDate)
+           .get();
+       
+       if (dailyTripDoc.exists) {
+         final dailyTripData = dailyTripDoc.data();
+         final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+         final tripCollection = 'trip$currentTrip';
+         
+         await FirebaseFirestore.instance
+             .collection('conductors')
+             .doc(conductorDocId)
+             .collection('dailyTrips')
+             .doc(formattedDate)
+             .collection(tripCollection)
+             .doc('tickets')
+             .collection('tickets')
+             .doc(conductorTicketDocName)
+             .set({
+               'from': data['from'],
+               'to': data['to'],
+               'startKm': startKm,
+               'endKm': endKm,
+               'totalKm': totalKm,
+               'timestamp': FieldValue.serverTimestamp(),
+               'active': true,
+               'quantity': qty,
+               'farePerPassenger': passengerFares,
+               'totalFare': totalFare.toStringAsFixed(2),
+               'discountAmount': discountAmount.toStringAsFixed(2),
+               'discountBreakdown': discountBreakdown,
+               'documentId': documentId,
+               'documentType': type,
+               'scannedBy': user.uid,
+             });
+       }
+     } catch (e) {
+       print('Failed to save to daily trip structure: $e');
+       // Continue with normal operation even if daily trip structure fails
+     }
+
+    // Calculate and save remittance summary
+    try {
+      final remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorDocId, formattedDate);
+      await RemittanceService.saveRemittanceSummary(conductorDocId, formattedDate, remittanceSummary);
+      print('✅ Remittance summary updated for $formattedDate');
+    } catch (e) {
+      print('Error updating remittance summary: $e');
+    }
 
     print('✅ Also created conductor ticket record: $conductorTicketDocName for $formattedDate ($type)');
   } catch (e) {

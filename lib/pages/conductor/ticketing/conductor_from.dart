@@ -1414,12 +1414,34 @@ Future<void> _createConductorTicketRecord(Map<String, dynamic> data, String docu
      }
 
     // Calculate and save remittance summary
+    Map<String, dynamic>? remittanceSummary;
     try {
-      final remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorDocId, formattedDate);
+      remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorDocId, formattedDate);
       await RemittanceService.saveRemittanceSummary(conductorDocId, formattedDate, remittanceSummary);
       print('✅ Remittance summary updated for $formattedDate');
     } catch (e) {
       print('Error updating remittance summary: $e');
+    }
+
+    // Also update the remittance summary in the daily trip document
+    if (remittanceSummary != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('dailyTrips')
+            .doc(formattedDate)
+            .update({
+              'ticketCount': remittanceSummary['ticketCount'],
+              'totalPassengers': remittanceSummary['totalPassengers'],
+              'totalFare': remittanceSummary['totalFare'],
+              'totalFareFormatted': remittanceSummary['totalFareFormatted'],
+              'lastRemittanceUpdate': FieldValue.serverTimestamp(),
+            });
+        print('✅ Daily trip remittance summary updated');
+      } catch (e) {
+        print('Error updating daily trip remittance summary: $e');
+      }
     }
 
     print('✅ Also created conductor ticket record: $conductorTicketDocName for $formattedDate ($type)');

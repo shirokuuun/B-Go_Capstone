@@ -1,17 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class PassengerService extends StatelessWidget {
   const PassengerService({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final cardTitleFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final cardSubtitleFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final orFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final iconSize = isMobile ? 80.0 : isTablet ? 100.0 : 120.0;
+    final horizontalPadding = isMobile ? 24.0 : isTablet ? 32.0 : 40.0;
+    final verticalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final cardVerticalPadding = isMobile ? 32.0 : isTablet ? 40.0 : 48.0;
+    final spacing = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final smallSpacing = isMobile ? 4.0 : isTablet ? 6.0 : 8.0;
+    final orSpacing = isMobile ? 8.0 : isTablet ? 12.0 : 16.0;
+    
     return Scaffold(
       appBar: AppBar(
         title: Text(
           "Services",
           style: GoogleFonts.outfit(
-            fontSize: 20,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
@@ -32,8 +51,8 @@ class PassengerService extends StatelessWidget {
             children: [
               // Pre-Ticketing Card
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 16.0),
+                padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding, vertical: verticalPadding),
                 child: InkWell(
                   onTap: () {
                     Navigator.pushNamed(context, '/pre_ticket');
@@ -41,7 +60,7 @@ class PassengerService extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    padding: EdgeInsets.symmetric(vertical: cardVerticalPadding),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: Colors.grey, width: 2),
@@ -51,21 +70,21 @@ class PassengerService extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.confirmation_num_outlined,
-                            size: 80, color: Colors.black),
-                        SizedBox(height: 16),
+                            size: iconSize, color: Colors.black),
+                        SizedBox(height: spacing),
                         Text(
                           'Pre-Ticketing',
                           style: GoogleFonts.outfit(
-                            fontSize: 24,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.w500,
                             color: Colors.black,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        SizedBox(height: smallSpacing),
                         Text(
                           '(Boarding)',
                           style: GoogleFonts.outfit(
-                            fontSize: 14,
+                            fontSize: cardSubtitleFontSize,
                             color: Colors.grey,
                             fontWeight: FontWeight.w500,
                           ),
@@ -77,11 +96,11 @@ class PassengerService extends StatelessWidget {
               ),
               // OR text
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                padding: EdgeInsets.symmetric(vertical: orSpacing),
                 child: Text(
                   'OR',
                   style: GoogleFonts.outfit(
-                    fontSize: 24,
+                    fontSize: orFontSize,
                     fontWeight: FontWeight.w500,
                     color: Colors.black,
                   ),
@@ -89,8 +108,8 @@ class PassengerService extends StatelessWidget {
               ),
               // Pre-Booking Card
               Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24.0, vertical: 16.0),
+                padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding, vertical: verticalPadding),
                 child: InkWell(
                   onTap: () {
                     showDialog(
@@ -100,7 +119,7 @@ class PassengerService extends StatelessWidget {
                         content: Text(
                           'By using Pre-Booking, you are reserving a guaranteed seat for the entire trip (from the starting point to the last stop). The payment is fixed for the full route. Do you want to continue?',
                           style: GoogleFonts.outfit(
-                            fontSize: 14,
+                            fontSize: isMobile ? 14 : 16,
                             color: Colors.black,
                             fontWeight: FontWeight.w500,
                           ),
@@ -111,7 +130,7 @@ class PassengerService extends StatelessWidget {
                             child: Text(
                               'Cancel',
                               style: GoogleFonts.outfit(
-                                fontSize: 16,
+                                fontSize: isMobile ? 16 : 18,
                                 color: Colors.red,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -128,7 +147,7 @@ class PassengerService extends StatelessWidget {
                             child: Text(
                               'Continue',
                               style: GoogleFonts.outfit(
-                                fontSize: 16,
+                                fontSize: isMobile ? 16 : 18,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -141,7 +160,7 @@ class PassengerService extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 32),
+                    padding: EdgeInsets.symmetric(vertical: cardVerticalPadding),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: Colors.grey, width: 2),
@@ -151,21 +170,21 @@ class PassengerService extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.event_note_outlined,
-                            size: 80, color: Colors.black),
-                        SizedBox(height: 16),
+                            size: iconSize, color: Colors.black),
+                        SizedBox(height: spacing),
                         Text(
                           'Pre-Booking',
                           style: GoogleFonts.outfit(
-                            fontSize: 24,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.w500,
                             color: Colors.black,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        SizedBox(height: smallSpacing),
                         Text(
                           '(Reservation)',
                           style: GoogleFonts.outfit(
-                            fontSize: 14,
+                            fontSize: cardSubtitleFontSize,
                             color: Colors.grey,
                             fontWeight: FontWeight.w500,
                           ),

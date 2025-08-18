@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -389,6 +390,21 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
+    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final busCountFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final busCountSubFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final routeFilterFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final legendTitleFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final legendRouteFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -400,7 +416,7 @@ class _HomePageState extends State<HomePage> {
         title: Text(
           "B-Go Map",
           style: GoogleFonts.outfit(
-            fontSize: 20,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
@@ -433,7 +449,7 @@ class _HomePageState extends State<HomePage> {
                 'Menu',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: 30,
+                  fontSize: drawerHeaderFontSize,
                 ),
               ),
             ),
@@ -442,7 +458,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Home',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -456,7 +472,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Role Selection',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -473,7 +489,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Trip Schedules',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -502,14 +518,17 @@ class _HomePageState extends State<HomePage> {
           ),
           // Bus count indicator with enhanced styling
           Positioned(
-            top: 16,
-            left: 16,
+            top: isMobile ? 16 : 20,
+            left: isMobile ? 16 : 20,
             child: Container(
               constraints: BoxConstraints(
-                minWidth: 100,
-                maxWidth: 200,
+                minWidth: isMobile ? 100 : 120,
+                maxWidth: isMobile ? 200 : 250,
               ),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 20, 
+                vertical: isMobile ? 12 : 16
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -526,8 +545,8 @@ class _HomePageState extends State<HomePage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.directions_bus,
-                      color: Color(0xFF0091AD), size: 24),
-                  SizedBox(width: 8),
+                      color: Color(0xFF0091AD), size: isMobile ? 24 : 28),
+                  SizedBox(width: isMobile ? 8 : 12),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -536,7 +555,7 @@ class _HomePageState extends State<HomePage> {
                         Text(
                           '${_markers.length}',
                           style: GoogleFonts.outfit(
-                            fontSize: 18,
+                            fontSize: busCountFontSize,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0091AD),
                           ),
@@ -544,7 +563,7 @@ class _HomePageState extends State<HomePage> {
                         Text(
                           'buses online',
                           style: GoogleFonts.outfit(
-                            fontSize: 12,
+                            fontSize: busCountSubFontSize,
                             fontWeight: FontWeight.w500,
                             color: Colors.grey[600],
                           ),
@@ -559,14 +578,17 @@ class _HomePageState extends State<HomePage> {
           // Route filter indicator with enhanced styling
           if (_selectedRoute != null)
             Positioned(
-              top: 16,
-              right: 16,
+              top: isMobile ? 16 : 20,
+              right: isMobile ? 16 : 20,
               child: Container(
                 constraints: BoxConstraints(
-                  minWidth: 100,
-                  maxWidth: 250,
+                  minWidth: isMobile ? 100 : 120,
+                  maxWidth: isMobile ? 250 : 300,
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 20, 
+                  vertical: isMobile ? 12 : 16
+                ),
                 decoration: BoxDecoration(
                   color: Color(0xFF0091AD),
                   borderRadius: BorderRadius.circular(25),
@@ -581,20 +603,20 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.filter_list, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
+                    Icon(Icons.filter_list, color: Colors.white, size: isMobile ? 20 : 24),
+                    SizedBox(width: isMobile ? 8 : 12),
                     Flexible(
                       child: Text(
                         _selectedRoute!,
                         style: GoogleFonts.outfit(
-                          fontSize: 14,
+                          fontSize: routeFilterFontSize,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: isMobile ? 8 : 12),
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -603,12 +625,12 @@ class _HomePageState extends State<HomePage> {
                         });
                       },
                       child: Container(
-                        padding: EdgeInsets.all(4),
+                        padding: EdgeInsets.all(isMobile ? 4 : 6),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.close, color: Colors.white, size: 16),
+                        child: Icon(Icons.close, color: Colors.white, size: isMobile ? 16 : 20),
                       ),
                     ),
                   ],
@@ -618,14 +640,14 @@ class _HomePageState extends State<HomePage> {
           // Legend for bus colors - show all routes
           if (_busIcons.isNotEmpty)
             Positioned(
-              bottom: 100,
-              left: 16,
+              bottom: isMobile ? 100 : 120,
+              left: isMobile ? 16 : 20,
               child: Container(
                 constraints: BoxConstraints(
-                  maxWidth: 200,
-                  maxHeight: 200,
+                  maxWidth: isMobile ? 200 : 250,
+                  maxHeight: isMobile ? 200 : 250,
                 ),
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(isMobile ? 12 : 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -644,11 +666,11 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       'Route Colors',
                       style: GoogleFonts.outfit(
-                        fontSize: 14,
+                        fontSize: legendTitleFontSize,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    SizedBox(height: isMobile ? 8 : 12),
                     Flexible(
                       child: SingleChildScrollView(
                         child: Column(
@@ -656,24 +678,24 @@ class _HomePageState extends State<HomePage> {
                           mainAxisSize: MainAxisSize.min,
                           children: _getUniqueRoutes()
                               .map((route) => Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 2),
+                                    padding: EdgeInsets.symmetric(vertical: isMobile ? 2 : 4),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Container(
-                                          width: 12,
-                                          height: 12,
+                                          width: isMobile ? 12 : 16,
+                                          height: isMobile ? 12 : 16,
                                           decoration: BoxDecoration(
                                             color: _getColorForRoute(route),
                                             shape: BoxShape.circle,
                                           ),
                                         ),
-                                        SizedBox(width: 8),
+                                        SizedBox(width: isMobile ? 8 : 12),
                                         Flexible(
                                           child: Text(
                                             route.toUpperCase(),
                                             style: GoogleFonts.outfit(
-                                                fontSize: 12),
+                                                fontSize: legendRouteFontSize),
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                         ),

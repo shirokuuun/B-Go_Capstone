@@ -22,9 +22,20 @@ class _PreBookState extends State<PreBook> {
     'Batangas',
     'Rosario',
     'Mataas na Kahoy',
+    'Lipa Palengke Mataas na Kahoy',
     'Tiaong',
     'San Juan',
   ];
+
+  // Map display names to Firestore document names
+  final Map<String, String> _routeFirestoreNames = {
+    'Batangas': 'Batangas',
+    'Rosario': 'Rosario',
+    'Mataas na Kahoy': 'Mataas na Kahoy',
+    'Lipa Palengke Mataas na Kahoy': 'Mataas Na Kahoy Palengke',
+    'Tiaong': 'Tiaong',
+    'San Juan': 'San Juan',
+  };
 
   final Map<String, List<String>> routeLabels = {
     'Batangas': [
@@ -38,6 +49,10 @@ class _PreBookState extends State<PreBook> {
     'Mataas na Kahoy': [
       'SM Lipa to Mataas na Kahoy',
       'Mataas na Kahoy to SM Lipa',
+    ],
+    'Lipa Palengke Mataas na Kahoy': [
+      'Lipa Palengke to Mataas na Kahoy',
+      'Mataas na Kahoy to Lipa Palengke',
     ],
     'Tiaong': [
       'SM Lipa to Tiaong',
@@ -55,11 +70,15 @@ class _PreBookState extends State<PreBook> {
   String? verifiedIDType;
   Position? _currentLocation; // Added for passenger location tracking
   final PassengerLocationService _locationService = PassengerLocationService();
+  String selectedPlaceCollection = 'Place'; // Added for direction selection
 
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+    placesFuture = RouteService.fetchPlaces(
+      _routeFirestoreNames[selectedRoute] ?? selectedRoute,
+      placeCollection: 'Place'
+    );
     _fetchVerifiedIDType();
     // Delay location request slightly to ensure UI is loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -149,7 +168,13 @@ class _PreBookState extends State<PreBook> {
       setState(() {
         selectedRoute = newRoute;
         directionIndex = 0;
-        placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+        selectedPlaceCollection = 'Place';
+        // Use the Firestore route name instead of the display name
+        String firestoreRouteName = _routeFirestoreNames[newRoute] ?? newRoute;
+        placesFuture = RouteService.fetchPlaces(
+          firestoreRouteName,
+          placeCollection: selectedPlaceCollection
+        );
       });
     }
   }
@@ -157,7 +182,13 @@ class _PreBookState extends State<PreBook> {
   void _toggleDirection() {
     setState(() {
       directionIndex = directionIndex == 0 ? 1 : 0;
-      placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: directionIndex == 0 ? 'Place' : 'Place 2');
+      selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
+      // Use the Firestore route name instead of the display name
+      String firestoreRouteName = _routeFirestoreNames[selectedRoute] ?? selectedRoute;
+      placesFuture = RouteService.fetchPlaces(
+        firestoreRouteName,
+        placeCollection: selectedPlaceCollection
+      );
     });
   }
 
@@ -581,7 +612,7 @@ class _PreBookState extends State<PreBook> {
                                   ),
                                   if (item['km'] != null)
                                     Text(
-                                      '${item['km']} km',
+                                      '${(item['km'] as num).toInt()} km',
                                       style: TextStyle(fontSize: 12, color: Colors.white70),
                                     ),
                                 ],
@@ -732,7 +763,7 @@ class _ToSelectionPage extends StatelessWidget {
                               ),
                               if (place['km'] != null)
                                 Text(
-                                  '${place['km']} km',
+                                  '${(place['km'] as num).toInt()} km',
                                   style: TextStyle(fontSize: 12, color: Colors.white70),
                                 ),
                             ],
@@ -929,6 +960,7 @@ class _ReceiptModal extends StatelessWidget {
       'Batangas': 28.0, // SM Lipa to Batangas City (0-14km)
       'Rosario': 14.0,  // SM Lipa to Rosario (0-14km)
       'Mataas na Kahoy': 8.0, // SM Lipa to Mataas na Kahoy (0-14km)
+      'Mataas na Kahoy Lipa Palengke': 8.0, // SM Lipa to Lipa Palengke (0-14km)
       'Tiaong': 30.0,   // SM Lipa to Tiaong (0-14km)
       'San Juan': 37.0, // SM Lipa to San Juan (0-14km)
     };
@@ -975,8 +1007,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fromLatitude': fromPlace['latitude'] ?? 0.0,
       'fromLongitude': fromPlace['longitude'] ?? 0.0,
       'toLatitude': toPlace['latitude'] ?? 0.0,
@@ -999,8 +1031,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fromLatitude': fromPlace['latitude'] ?? 0.0,
       'fromLongitude': fromPlace['longitude'] ?? 0.0,
       'toLatitude': toPlace['latitude'] ?? 0.0,
@@ -1074,8 +1106,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fare': baseFare,
       'quantity': quantity,
       'amount': totalAmount,
@@ -1103,8 +1135,8 @@ class _ReceiptModal extends StatelessWidget {
             Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
             Text('From: ${fromPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
             Text('To: ${toPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('From KM: ${fromPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('To KM: ${toPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From KM: ${(fromPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To KM: ${(toPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
             Text('Selected Distance: ${(endKm - startKm).toStringAsFixed(1)} km', style: GoogleFonts.outfit(fontSize: 14)),
             Text('Full Trip Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
             Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
@@ -1463,8 +1495,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
                       _buildDetailRow('Time:', formattedTime),
                       _buildDetailRow('From:', widget.fromPlace['name']),
                       _buildDetailRow('To:', widget.toPlace['name']),
-                      _buildDetailRow('From KM:', '${widget.fromPlace['km']}'),
-                      _buildDetailRow('To KM:', '${widget.toPlace['km']}'),
+                      _buildDetailRow('From KM:', '${(widget.fromPlace['km'] as num).toInt()}'),
+                      _buildDetailRow('To KM:', '${(widget.toPlace['km'] as num).toInt()}'),
                       _buildDetailRow('Selected Distance:', '${distance.toStringAsFixed(1)} km'),
                       _buildDetailRow('Full Trip Fare (Regular):', '${widget.baseFare.toStringAsFixed(2)} PHP'),
                       _buildDetailRow('Quantity:', '${widget.quantity}'),

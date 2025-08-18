@@ -18,6 +18,7 @@ class _PreTicketState extends State<PreTicket> {
     'Batangas',
     'Rosario',
     'Mataas na Kahoy',
+    'Lipa Palengke Mataas na Kahoy',
     'Tiaong',
     'San Juan',
   ];
@@ -36,6 +37,10 @@ class _PreTicketState extends State<PreTicket> {
       'SM Lipa to Mataas na Kahoy',
       'Mataas na Kahoy to SM Lipa',
     ],
+    'Lipa Palengke Mataas na Kahoy': [
+      'Lipa Palengke to Mataas na Kahoy',
+      'Mataas na Kahoy to Lipa Palengke',
+    ],
     'Tiaong': [
       'SM Lipa to Tiaong',
       'Tiaong to SM Lipa',
@@ -52,11 +57,23 @@ class _PreTicketState extends State<PreTicket> {
   late Future<List<Map<String, dynamic>>> placesFuture;
   String? verifiedIDType;
 
+  // Map display names to Firestore document names
+  final Map<String, String> _routeFirestoreNames = {
+    'Batangas': 'Batangas',
+    'Rosario': 'Rosario',
+    'Mataas na Kahoy': 'Mataas na Kahoy',
+    'Lipa Palengke Mataas na Kahoy': 'Mataas Na Kahoy Palengke',
+    'Tiaong': 'Tiaong',
+    'San Juan': 'San Juan',
+  };
+
   @override
   void initState() {
     super.initState();
-    placesFuture =
-        RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+    placesFuture = RouteService.fetchPlaces(
+      _routeFirestoreNames[selectedRoute] ?? selectedRoute,
+      placeCollection: 'Place'
+    );
     _fetchVerifiedIDType();
   }
 
@@ -88,14 +105,20 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
+
+
   void _onRouteChanged(String? newRoute) {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
         selectedRoute = newRoute;
         directionIndex = 0;
         selectedPlaceCollection = 'Place';
-        placesFuture = RouteService.fetchPlaces(selectedRoute,
-            placeCollection: selectedPlaceCollection);
+        // Use the Firestore route name instead of the display name
+        String firestoreRouteName = _routeFirestoreNames[newRoute] ?? newRoute;
+        placesFuture = RouteService.fetchPlaces(
+          firestoreRouteName,
+          placeCollection: selectedPlaceCollection
+        );
       });
     }
   }
@@ -104,8 +127,12 @@ class _PreTicketState extends State<PreTicket> {
     setState(() {
       directionIndex = directionIndex == 0 ? 1 : 0;
       selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
-      placesFuture = RouteService.fetchPlaces(selectedRoute,
-          placeCollection: selectedPlaceCollection);
+      // Use the Firestore route name instead of the display name
+      String firestoreRouteName = _routeFirestoreNames[selectedRoute] ?? selectedRoute;
+      placesFuture = RouteService.fetchPlaces(
+        firestoreRouteName,
+        placeCollection: selectedPlaceCollection
+      );
     });
   }
 
@@ -378,12 +405,12 @@ class _PreTicketState extends State<PreTicket> {
                                         fontSize: 14, color: Colors.white),
                                     textAlign: TextAlign.center,
                                   ),
-                                  if (item['km'] != null)
-                                    Text(
-                                      '${item['km']} km',
-                                      style: TextStyle(
-                                          fontSize: 12, color: Colors.white70),
-                                    ),
+                                                                if (item['km'] != null)
+                                Text(
+                                  '${(item['km'] as num).toInt()} km',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.white70),
+                                ),
                                 ],
                               ),
                             );
@@ -391,6 +418,8 @@ class _PreTicketState extends State<PreTicket> {
                         );
                       },
                     ),
+                    // Debug button to test route service
+                    const SizedBox(height: 8),
                   ],
                 ),
               ),
@@ -644,8 +673,8 @@ class _ReceiptModal extends StatelessWidget {
       'time': formattedTime,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+                        'fromKm': (fromPlace['km'] as num).toInt(),
+                  'toKm': (toPlace['km'] as num).toInt(),
       'fare': baseFare,
       'quantity': quantity,
       'amount': totalAmount,
@@ -668,9 +697,9 @@ class _ReceiptModal extends StatelessWidget {
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('To: ${toPlace['name']}',
                 style: GoogleFonts.outfit(fontSize: 14)),
-            Text('From KM: ${fromPlace['km']}',
+            Text('From KM: ${(fromPlace['km'] as num).toInt()}',
                 style: GoogleFonts.outfit(fontSize: 14)),
-            Text('To KM: ${toPlace['km']}',
+            Text('To KM: ${(toPlace['km'] as num).toInt()}',
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('Base Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP',
                 style: GoogleFonts.outfit(fontSize: 14)),
@@ -695,7 +724,7 @@ class _ReceiptModal extends StatelessWidget {
                 builder: (context) => QRCodeFullScreenPage(
                   from: fromPlace['name'] ?? '',
                   to: toPlace['name'] ?? '',
-                  km: '${fromPlace['km']} - ${toPlace['km']}',
+                  km: '${(fromPlace['km'] as num).toInt()} - ${(toPlace['km'] as num).toInt()}',
                   fare: totalAmount.toStringAsFixed(2),
                   quantity: quantity,
                   qrData: jsonEncode(qrData),
@@ -878,7 +907,7 @@ class ToSelectionPage extends StatelessWidget {
                               ),
                               if (place['km'] != null)
                                 Text(
-                                  '${place['km']} km',
+                                  '${(place['km'] as num).toInt()} km',
                                   style: TextStyle(
                                       fontSize: 12, color: Colors.white70),
                                 ),

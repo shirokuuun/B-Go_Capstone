@@ -9,45 +9,52 @@ import 'package:intl/intl.dart';
 class ConductorTicket extends StatefulWidget {
   final String route;
   final String ticketDocName;
-  final String placeCollection; 
+  final String placeCollection;
   final String date;
 
-  ConductorTicket({Key? key, 
-  required this.route, 
-  required this.ticketDocName,
-  required this.placeCollection,
-  required this.date
- }) : super(key: key);
+  ConductorTicket(
+      {Key? key,
+      required this.route,
+      required this.ticketDocName,
+      required this.placeCollection,
+      required this.date})
+      : super(key: key);
 
   @override
   State<ConductorTicket> createState() => _ConductorTicketState();
 }
 
 class _ConductorTicketState extends State<ConductorTicket> {
+  String getRouteLabel(String placeCollection) {
+    final route = widget.route.trim();
 
-   String getRouteLabel(String placeCollection) {
-  final route = widget.route.trim();
-
-  if (route == 'Rosario') {
-    switch (placeCollection) {
-      case 'Place':
-        return 'SM City Lipa - Rosario';
-      case 'Place 2':
-        return 'Rosario - SM City Lipa';
-    }
-  } else if (route == 'Batangas') {
-    switch (placeCollection) {
-      case 'Place':
-        return 'SM City Lipa - Batangas City';
-      case 'Place 2':
-        return 'Batangas City - SM City Lipa';
-    }
-  } else if (route == 'Mataas na Kahoy') {
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
       switch (placeCollection) {
         case 'Place':
           return 'SM City Lipa - Mataas na Kahoy';
         case 'Place 2':
           return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Lipa Palengke Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'Lipa Palengke - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - Lipa Palengke';
       }
     } else if (route == 'Tiaong') {
       switch (placeCollection) {
@@ -65,8 +72,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
       }
     }
 
-  return 'Unknown Route';
-}
+    return 'Unknown Route';
+  }
 
   Map<String, dynamic>? latestTrip;
   bool isLoading = true;
@@ -96,7 +103,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
 
       // Approach 1: Try the original RouteService.fetchTrip
       try {
-        tripData = await RouteService.fetchTrip(widget.route, widget.date, widget.ticketDocName);
+        tripData = await RouteService.fetchTrip(
+            widget.route, widget.date, widget.ticketDocName);
         if (tripData != null && tripData.isNotEmpty) {
           print('✅ Found trip data using RouteService.fetchTrip');
         }
@@ -124,7 +132,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
           errorMessage = 'No trip data found. This might be a QR scan ticket.';
         });
       }
-
     } catch (e) {
       print('❌ Error fetching trip: $e');
       setState(() {
@@ -137,7 +144,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
   Future<Map<String, dynamic>?> fetchTripDirectly() async {
     try {
       print('🔄 Trying direct Firestore query...');
-      
+
       // Try fetching from trips collection
       final tripsDoc = await FirebaseFirestore.instance
           .collection('trips')
@@ -175,7 +182,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
   Future<Map<String, dynamic>?> fetchFromConductorRemittance() async {
     try {
       print('🔄 Trying to fetch from conductor remittance...');
-      
+
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return null;
 
@@ -258,7 +265,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 child: Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF007A8F),
                       borderRadius: BorderRadius.circular(16),
@@ -428,10 +436,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
     // Safely extract data with null checks and defaults
     final List<dynamic>? discountBreakdown = latestTrip?['discountBreakdown'];
     final timestamp = latestTrip?['timestamp'];
-    
+
     String formattedDate = 'N/A';
     String formattedTime = 'N/A';
-    
+
     if (timestamp != null) {
       try {
         DateTime dateTime;
@@ -442,7 +450,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
         } else {
           dateTime = DateTime.now();
         }
-        
+
         formattedDate = DateFormat('yyyy-MM-dd').format(dateTime);
         formattedTime = TimeOfDay.fromDateTime(dateTime).format(context);
       } catch (e) {
@@ -454,7 +462,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
     final to = latestTrip?['to']?.toString() ?? 'N/A';
     final startKm = latestTrip?['startKm']?.toString() ?? 'N/A';
     final endKm = latestTrip?['endKm']?.toString() ?? 'N/A';
-    
+
     // Handle different fare formats
     String baseFare = 'N/A';
     final fareData = latestTrip?['farePerPassenger'];
@@ -467,7 +475,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
         baseFare = '$fareData PHP';
       }
     }
-    
+
     final quantity = latestTrip?['quantity']?.toString() ?? 'N/A';
     final totalFare = latestTrip?['totalFare']?.toString() ?? 'N/A';
     final discountAmount = latestTrip?['discountAmount']?.toString() ?? '0.00';
@@ -491,14 +499,11 @@ class _ConductorTicketState extends State<ConductorTicket> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Receipt', 
-              style: GoogleFonts.outfit(
-                fontSize: 22, 
-                fontWeight: FontWeight.bold, 
-                color: Color(0xFF0091AD)
-              )
-            ),
+            Text('Receipt',
+                style: GoogleFonts.outfit(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0091AD))),
             SizedBox(height: 16),
             _buildReceiptRow('Route:', getRouteLabel(widget.placeCollection)),
             _buildReceiptRow('Date:', formattedDate),
@@ -511,29 +516,21 @@ class _ConductorTicketState extends State<ConductorTicket> {
             _buildReceiptRow('Quantity:', quantity),
             _buildReceiptRow('Total Amount:', '$totalFare PHP', isTotal: true),
             SizedBox(height: 16),
-            Text(
-              'Discounts:', 
-              style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w500, 
-                fontSize: 16
-              )
-            ),
+            Text('Discounts:',
+                style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.w500, fontSize: 16)),
             SizedBox(height: 8),
             if (discountBreakdown != null && discountBreakdown.isNotEmpty)
               ...discountBreakdown.map((e) => Padding(
-                padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
-                child: Text(
-                  e.toString(), 
-                  style: GoogleFonts.outfit(fontSize: 15)
-                ),
-              ))
+                    padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
+                    child: Text(e.toString(),
+                        style: GoogleFonts.outfit(fontSize: 15)),
+                  ))
             else
               Padding(
                 padding: const EdgeInsets.only(left: 16.0),
-                child: Text(
-                  'No discounts.', 
-                  style: GoogleFonts.outfit(fontSize: 15)
-                ),
+                child: Text('No discounts.',
+                    style: GoogleFonts.outfit(fontSize: 15)),
               ),
             if (discountAmount != '0.00' && discountAmount != 'N/A') ...[
               SizedBox(height: 8),

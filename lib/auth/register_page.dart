@@ -38,42 +38,6 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  Future<void> signUpWithTerms() async {
-    if (!agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('You must agree to the Terms and Conditions to sign up.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    final errorMessage = await _authServices.signUpWithEmail(
-      name: nameController.text,
-      email: emailController.text,
-      password: passwordController.text,
-      confirmPassword: confirmPasswordController.text,
-    );
-
-    if (errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future addUsername(String uid, String name, String email) async {
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'name': name,
-      'email': email,
-    });
-  }
-
   Future<void> signUp() async {
     if (!agreedToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,23 +70,58 @@ class _RegisterPageState extends State<RegisterPage> {
     // If registration is successful, send verification email
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && !user.emailVerified) {
-      await user.sendEmailVerification();
-      await showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Verify your email'),
-          content: Text('A verification link has been sent to your email address. Please verify your email before logging in.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('OK'),
+      try {
+        await user.sendEmailVerification();
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              'Verify your email',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+              ),
             ),
-          ],
-        ),
-      );
-      final authServices = AuthServices();
-      await authServices.signOut();
-      widget.showLoginPage();
+            content: Text(
+              'A verification link has been sent to ${user.email}. Please verify your email before logging in.',
+              style: GoogleFonts.outfit(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'OK',
+                  style: GoogleFonts.outfit(
+                    color: Color(0xFF0091AD),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        // Sign out user after registration (they need to verify email first)
+        await _authServices.signOut();
+        
+        // Clear form fields
+        nameController.clear();
+        emailController.clear();
+        passwordController.clear();
+        confirmPasswordController.clear();
+        setState(() {
+          agreedToTerms = false;
+        });
+        
+        // Navigate back to login page
+        widget.showLoginPage();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send verification email. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -375,7 +374,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 25.0),
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF1D2B53),
+                          backgroundColor: Color(0xFF0091AD),
                           minimumSize: Size(double.infinity, 60),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),

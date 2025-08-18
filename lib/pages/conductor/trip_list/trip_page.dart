@@ -141,7 +141,14 @@ import 'package:b_go/auth/auth_services.dart';
           case 'Place 2':
             return 'Mataas na Kahoy - SM City Lipa';
         }
-      } else if (route == 'Tiaong') {
+      } else if (route == 'Lipa Palengke Mataas na Kahoy') {
+          switch (placeCollection) {
+            case 'Place':
+              return 'Lipa Palengke - Mataas na Kahoy';
+            case 'Place 2':
+              return 'Mataas na Kahoy - Lipa Palengke';
+          }
+        } else if (route == 'Tiaong') {
         switch (placeCollection) {
           case 'Place':
             return 'SM City Lipa - Tiaong';
@@ -349,156 +356,104 @@ import 'package:b_go/auth/auth_services.dart';
                         final ticket = tickets.reversed.toList()[index];
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
-                          child: Dismissible(
-                            key: Key(ticket['id'] ?? index.toString()),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                              color: Colors.red,
-                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
-                            ),
-                            confirmDismiss: (direction) async {
-                              return await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Delete Ticket', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-                                  content: Text('Are you sure you want to delete this ticket?', style: GoogleFonts.outfit()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(false),
-                                      child: Text('Cancel', style: GoogleFonts.outfit()),
+                          child: Container(
+                            child: GestureDetector(
+                              onTap: () {
+                                final discountBreakdown = ticket['discountBreakdown'] as List<dynamic>?;
+                                final timestamp = ticket['timestamp'];
+                                final formattedDate = timestamp != null
+                                    ? DateFormat('yyyy-MM-dd').format((timestamp as Timestamp).toDate())
+                                    : 'N/A';
+                                final formattedTime = timestamp != null
+                                    ? DateFormat('hh:mm a').format((timestamp as Timestamp).toDate())
+                                    : 'N/A';
+                                final fromKm = ticket['startKm'] ?? '';
+                                final toKm = ticket['endKm'] ?? '';
+                                final baseFare = ticket['farePerPassenger'] ?? '';
+                                final quantity = ticket['quantity'] ?? '';
+                                final totalFare = ticket['totalFare'] ?? '';
+                                
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0091AD))),
+                                    content: SingleChildScrollView(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Route: ${getRouteLabel(widget.placeCollection)}', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('From: ${ticket['from']}', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('To: ${ticket['to']}', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('From KM: $fromKm', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('To KM: $toKm', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Base Fare (Regular): ${baseFare is List ? (baseFare as List).first.toString() : baseFare} PHP', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Total Amount: $totalFare PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                                          SizedBox(height: 16),
+                                          Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
+                                          if (discountBreakdown != null)
+                                            ...discountBreakdown.map((e) => Text(e.toString(), style: GoogleFonts.outfit(fontSize: 13))),
+                                          if (discountBreakdown == null)
+                                            Text('No discounts.', style: GoogleFonts.outfit(fontSize: 13)),
+                                        ],
+                                      ),
                                     ),
-                                    TextButton(
-                                      onPressed: () => Navigator.of(context).pop(true),
-                                      child: Text('Delete', style: GoogleFonts.outfit(color: Colors.red)),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: Text('Close', style: GoogleFonts.outfit()),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black12,
+                                      blurRadius: 8,
+                                      offset: Offset(0, 2),
                                     ),
                                   ],
                                 ),
-                              );
-                            },
-                            onDismissed: (direction) async {
-                              try {
-                                                                  final conductorId = await RouteService.getConductorDocIdFromUid(
-                                    FirebaseAuth.instance.currentUser?.uid ?? '',
-                                  );
-
-                                await RouteService.deleteTicket(
-                                  conductorId!,
-                                  selectedDate,
-                                  ticket['id'],
-                                );
-                                setState(() {
-                                  tickets.removeWhere((t) => t['id'] == ticket['id']);
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Ticket deleted')),
-                                );
-                              } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Failed to delete ticket: $e')),
-                                );
-                              }
-                            },
-                            child: Container(
-                              child: GestureDetector(
-                                onTap: () {
-                                  final discountBreakdown = ticket['discountBreakdown'] as List<dynamic>?;
-                                  final timestamp = ticket['timestamp'];
-                                  final formattedDate = timestamp != null
-                                      ? DateFormat('yyyy-MM-dd').format((timestamp as Timestamp).toDate())
-                                      : 'N/A';
-                                  final formattedTime = timestamp != null
-                                      ? DateFormat('hh:mm a').format((timestamp as Timestamp).toDate())
-                                      : 'N/A';
-                                  final fromKm = ticket['startKm'] ?? '';
-                                  final toKm = ticket['endKm'] ?? '';
-                                  final baseFare = ticket['farePerPassenger'] ?? '';
-                                  final quantity = ticket['quantity'] ?? '';
-                                  final totalFare = ticket['totalFare'] ?? '';
-                                  
-                                  showDialog(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0091AD))),
-                                      content: SingleChildScrollView(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('Route: ${getRouteLabel(widget.placeCollection)}', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('From: ${ticket['from']}', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('To: ${ticket['to']}', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('From KM: $fromKm', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('To KM: $toKm', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('Base Fare (Regular): ${baseFare is List ? (baseFare as List).first.toString() : baseFare} PHP', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
-                                            Text('Total Amount: $totalFare PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
-                                            SizedBox(height: 16),
-                                            Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
-                                            if (discountBreakdown != null)
-                                              ...discountBreakdown.map((e) => Text(e.toString(), style: GoogleFonts.outfit(fontSize: 13))),
-                                            if (discountBreakdown == null)
-                                              Text('No discounts.', style: GoogleFonts.outfit(fontSize: 13)),
-                                          ],
+                                padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${ticket['from']} → ${ticket['to']}',
+                                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.pop(context),
-                                          child: Text('Close', style: GoogleFonts.outfit()),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          '${ticket['totalFare']} pesos',
+                                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Color(0xFF0091AD), fontSize: 16),
                                         ),
                                       ],
                                     ),
-                                  );
-                                },
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(18),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black12,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              '${ticket['from']} → ${ticket['to']}',
-                                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            '${ticket['totalFare']} pesos',
-                                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Color(0xFF0091AD), fontSize: 16),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'Quantity: ${ticket['quantity']}',
-                                        style: GoogleFonts.outfit(fontSize: 14, color: Colors.black87),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        'Date: ' + (ticket['timestamp'] != null ? DateFormat('yyyy-MM-dd').format((ticket['timestamp'] as Timestamp).toDate()) : 'N/A'),
-                                        style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[700]),
-                                      ),
-                                    ],
-                                  ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Quantity: ${ticket['quantity']}',
+                                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.black87),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Date: ' + (ticket['timestamp'] != null ? DateFormat('yyyy-MM-dd').format((ticket['timestamp'] as Timestamp).toDate()) : 'N/A'),
+                                      style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[700]),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),

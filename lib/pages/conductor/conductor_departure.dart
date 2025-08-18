@@ -6,11 +6,8 @@ import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
-import 'package:b_go/pages/conductor/sos.dart';
 import 'package:b_go/pages/conductor/remittance_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:b_go/main.dart';
 
 class ConductorDeparture extends StatefulWidget {
   final String route;
@@ -56,6 +53,11 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
       routeDirections = [
         {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
         {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
+      ];
+    } else if ('${widget.route.trim()}' == 'Lipa Palengke Mataas na Kahoy') {
+      routeDirections = [
+        {'label': 'Lipa Palengke - Mataas na Kahoy', 'collection': 'Place'},
+        {'label': 'Mataas na Kahoy - Lipa Palengke', 'collection': 'Place 2'},
       ];
     } else if ('${widget.route.trim()}' == 'Tiaong') {
       routeDirections = [
@@ -564,7 +566,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             floating: true,
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF0091AD),
-            expandedHeight: 60,
+            expandedHeight: 80,
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [

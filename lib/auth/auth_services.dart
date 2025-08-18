@@ -38,6 +38,7 @@ class AuthServices {
         'name': name,
         'email': email,
         'authMethod': 'google',
+        'isEmailVerified': true, // Google emails are always verified
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -64,10 +65,11 @@ class AuthServices {
       );
     }
     
-    // Update user in Firestore if they exist
-    if (user != null) {
+    // Update user in Firestore if they exist and email is verified
+    if (user != null && user.emailVerified) {
       await _firestore.collection('users').doc(user.uid).update({
         'authMethod': 'email',
+        'isEmailVerified': true, // Update verification status
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
@@ -117,6 +119,7 @@ class AuthServices {
           'name': name.trim(),
           'email': email.trim(),
           'authMethod': 'email',
+          'isEmailVerified': false, // Initially false until they verify email
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -140,6 +143,26 @@ class AuthServices {
       return message;
     } catch (e) {
       return "An error occurred. Please try again.";
+    }
+  }
+
+  // Method to update email verification status
+  Future<void> updateEmailVerificationStatus(String uid, bool isVerified) async {
+    await _firestore.collection('users').doc(uid).update({
+      'isEmailVerified': isVerified,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Method to check and update verification status
+  Future<void> checkAndUpdateEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.reload(); // Refresh user data
+      final updatedUser = _auth.currentUser;
+      if (updatedUser != null && updatedUser.emailVerified) {
+        await updateEmailVerificationStatus(updatedUser.uid, true);
+      }
     }
   }
 
@@ -183,6 +206,7 @@ class AuthServices {
       'phone': phoneNumber,
       'name': name ?? phoneNumber, // Use phone number as name if no name provided
       'authMethod': 'phone',
+      'isEmailVerified': false, // Phone users don't have email verification
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

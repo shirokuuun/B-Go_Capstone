@@ -100,6 +100,33 @@ breakpoints: [
 - ✅ Responsive padding and spacing
 - ✅ Responsive instructions text (14px → 16px → 18px)
 
+### 9. Pre-Booking Page (`lib/pages/passenger/services/pre_book.dart`)
+
+- ✅ **Enhanced Responsive Design**: Now uses screen dimensions for proportional scaling
+- ✅ **Responsive App Bar**: Title, route text, and dropdown scale appropriately
+- ✅ **Responsive Layout Heights**: Expanded height adapts proportionally (18% → 20% → 22% of screen height)
+- ✅ **Responsive Location Status**: Text sizes scale from mobile to desktop with overflow protection
+- ✅ **Responsive Grid Layout**:
+  - Mobile: 2 columns with compact spacing
+  - Tablet: 3 columns with moderate spacing
+  - Desktop: 4 columns with generous spacing
+- ✅ **Screen-Based Sizing**: All dimensions now scale with actual screen size
+- ✅ **Overflow Prevention**: Text overflow handled with ellipsis and maxLines
+- ✅ **Responsive Button Sizing**: Heights and padding scale with screen dimensions
+- ✅ **Responsive Icon Sizing**: Icons scale appropriately (18px → 22px → 26px)
+- ✅ **Responsive Spacing**: All padding and margins scale proportionally
+
+### 10. Pre-Ticketing Page (`lib/pages/passenger/services/pre_ticket.dart`)
+
+- ✅ **Enhanced Responsive Design**: Now uses screen dimensions for proportional scaling
+- ✅ **Responsive App Bar**: Consistent with Pre-Booking page
+- ✅ **Responsive Grid System**: Same adaptive column layout with screen-based sizing
+- ✅ **Responsive ToSelectionPage**: Drop-off selection also responsive with overflow protection
+- ✅ **Responsive Spacing**: All padding and margins scale with screen dimensions
+- ✅ **Responsive Text Sizing**: Font sizes adapt across breakpoints with overflow handling
+- ✅ **Screen-Based Heights**: App bar heights scale proportionally with screen size
+- ✅ **Overflow Prevention**: Text overflow handled consistently across all components
+
 ## Responsive Design Patterns
 
 ### Font Size Scaling
@@ -126,6 +153,21 @@ breakpoints: [
 - **Tablet**: Optimized for medium screens
 - **Desktop**: Enhanced layouts with better proportions
 
+### Grid Layouts
+
+- **Mobile**: 2 columns with compact spacing
+- **Tablet**: 3 columns with moderate spacing
+- **Desktop**: 4 columns with generous spacing
+
+### Enhanced Screen-Based Responsiveness
+
+- **Proportional Scaling**: All dimensions scale with actual screen size (height/width percentages)
+- **Overflow Prevention**: Text overflow handled with `maxLines` and `TextOverflow.ellipsis`
+- **Dynamic Heights**: App bar heights scale proportionally (18% → 20% → 22% of screen height)
+- **Adaptive Spacing**: Padding and margins scale with screen dimensions
+- **Responsive Grids**: Grid layouts adapt to prevent content overflow
+- **Content Fitting**: UI elements automatically adjust to prevent layout overflow warnings
+
 ## Usage Examples
 
 ### Basic Responsive Implementation
@@ -149,6 +191,31 @@ Widget build(BuildContext context) {
 }
 ```
 
+### Enhanced Screen-Based Responsiveness
+
+```dart
+@override
+Widget build(BuildContext context) {
+  // Get screen dimensions for proportional scaling
+  final screenHeight = MediaQuery.of(context).size.height;
+  final screenWidth = MediaQuery.of(context).size.width;
+
+  // Responsive heights based on screen size
+  final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
+  final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
+
+  // Responsive padding that scales with screen size
+  final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+  final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+
+  return Container(
+    height: expandedHeight,
+    padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
+    child: Text('Responsive Content'),
+  );
+}
+```
+
 ### Responsive Spacing
 
 ```dart
@@ -163,6 +230,41 @@ SizedBox(height: smallSpacing),
 SizedBox(height: mediumSpacing),
 ```
 
+### Responsive Grid Layouts
+
+```dart
+// Responsive grid configuration
+final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
+final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
+final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
+
+// Usage in GridView
+gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+  crossAxisCount: gridCrossAxisCount,
+  mainAxisSpacing: gridSpacing,
+  crossAxisSpacing: gridSpacing,
+  childAspectRatio: gridAspectRatio,
+),
+```
+
+### Overflow Prevention
+
+```dart
+// Prevent text overflow with responsive design
+Text(
+  'Long text that might overflow on small screens',
+  style: TextStyle(fontSize: fontSize),
+  maxLines: 2,
+  overflow: TextOverflow.ellipsis,
+),
+
+// Responsive container sizing
+Container(
+  width: isMobile ? (screenWidth * 0.9) : isTablet ? (screenWidth * 0.8) : (screenWidth * 0.7),
+  child: YourContent(),
+)
+```
+
 ## Benefits
 
 1. **Cross-Platform Compatibility**: App works seamlessly across mobile, tablet, and desktop
@@ -170,6 +272,11 @@ SizedBox(height: mediumSpacing),
 3. **Maintainable Code**: Centralized responsive logic
 4. **Future-Proof**: Easy to add new breakpoints or modify existing ones
 5. **Performance**: Efficient responsive calculations
+6. **Layout Overflow Prevention**: Enhanced responsive design eliminates UI overflow issues
+7. **Consistent UI**: Uniform responsive patterns across all pages
+8. **Proportional Scaling**: All elements scale proportionally with screen size
+9. **Overflow Protection**: Built-in overflow prevention with ellipsis and maxLines
+10. **Device Adaptation**: Automatically adapts to any device size without manual adjustments
 
 ## Testing
 
@@ -180,6 +287,11 @@ To test responsive design:
 3. Verify layouts at breakpoint boundaries
 4. Check text readability across all sizes
 5. Ensure touch targets remain accessible
+6. Verify no layout overflow warnings appear
+7. Test grid layouts on different screen sizes
+8. Test on extremely small and large screens
+9. Verify proportional scaling works correctly
+10. Check that overflow prevention works on all devices
 
 ## Maintenance
 
@@ -187,9 +299,14 @@ When adding new pages or components:
 
 1. Import `responsive_framework`
 2. Get responsive breakpoints in build method
-3. Define responsive sizing variables
-4. Apply responsive values to all UI elements
-5. Test across different screen sizes
+3. Get screen dimensions for proportional scaling
+4. Define responsive sizing variables using screen percentages
+5. Apply responsive values to all UI elements
+6. Add overflow prevention (maxLines, TextOverflow.ellipsis)
+7. Test across different screen sizes
+8. Ensure no layout overflow issues
+9. Use consistent responsive patterns
+10. Test on edge cases (very small/large screens)
 
 ## Dependencies
 
@@ -205,3 +322,8 @@ dependencies:
 - Performance impact is minimal
 - Easy to disable responsive features if needed
 - Consistent responsive patterns across all pages
+- Layout overflow issues have been completely resolved
+- Grid layouts now adapt to screen sizes automatically
+- All UI elements scale proportionally across devices
+- Enhanced responsive implementation prevents "BOTTOM OVERFLOWED" warnings
+- Screen-based proportional scaling ensures optimal layouts on all devices

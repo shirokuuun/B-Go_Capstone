@@ -5,6 +5,7 @@ import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class PreTicket extends StatefulWidget {
   const PreTicket({super.key});
@@ -220,6 +221,36 @@ class _PreTicketState extends State<PreTicket> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Get screen dimensions for better responsive calculations
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Responsive sizing with better screen size adaptation
+    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final dropdownFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
+    // Responsive heights based on screen size
+    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
+    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
+    
+    // Responsive padding that scales with screen size
+    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    
+    // Responsive grid configuration
+    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
+    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
+    
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -227,17 +258,17 @@ class _PreTicketState extends State<PreTicket> {
             floating: true,
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF007A8F),
-            expandedHeight: 140,
+            expandedHeight: expandedHeight,
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
                   // App bar content
                   Padding(
-                    padding: const EdgeInsets.only(top: 50.0),
+                    padding: EdgeInsets.only(top: topPadding),
                     child: Row(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
+                          padding: EdgeInsets.only(left: 8.0),
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back,
                                 color: Colors.white),
@@ -248,18 +279,18 @@ class _PreTicketState extends State<PreTicket> {
                           child: Text(
                             'Pre-Ticketing',
                             style: GoogleFonts.outfit(
-                              fontSize: 18,
+                              fontSize: titleFontSize,
                               color: Colors.white,
                             ),
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(right: 10.0),
+                          padding: EdgeInsets.only(right: 10.0),
                           child: DropdownButton<String>(
                             value: selectedRoute,
                             dropdownColor: const Color(0xFF007A8F),
                             style: GoogleFonts.outfit(
-                                fontSize: 13, color: Colors.white),
+                                fontSize: dropdownFontSize, color: Colors.white),
                             iconEnabledColor: Colors.white,
                             underline: Container(),
                             items: routeChoices
@@ -278,13 +309,13 @@ class _PreTicketState extends State<PreTicket> {
                   ),
                   // Route directions display (clickable)
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding, vertical: verticalPadding),
                     child: GestureDetector(
                       onTap: _toggleDirection,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: containerPadding, vertical: verticalPadding),
                         decoration: BoxDecoration(
                           color: const Color(0xFF007A8F),
                           borderRadius: BorderRadius.circular(16),
@@ -299,15 +330,17 @@ class _PreTicketState extends State<PreTicket> {
                         child: Row(
                           children: [
                             const Icon(Icons.swap_horiz, color: Colors.white),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isMobile ? 12 : 16),
                             Expanded(
                               child: Text(
                                 routeLabels[selectedRoute]![directionIndex],
                                 style: GoogleFonts.outfit(
-                                  fontSize: 18,
+                                  fontSize: routeFontSize,
                                   color: Colors.white,
                                   fontWeight: FontWeight.w600,
                                 ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -320,14 +353,13 @@ class _PreTicketState extends State<PreTicket> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.only(top: 20.0),
+            padding: EdgeInsets.only(top: isMobile ? (screenHeight * 0.02) : (screenHeight * 0.025)),
           ),
           SliverToBoxAdapter(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.02),
+                margin: EdgeInsets.only(top: screenHeight * 0.02),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -340,17 +372,17 @@ class _PreTicketState extends State<PreTicket> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 24.0),
+                padding: EdgeInsets.symmetric(
+                    horizontal: cardPadding, vertical: cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 10),
+                      padding: EdgeInsets.only(left: isMobile ? 10 : 12),
                       child: Text(
                         "Select Location:",
                         style: GoogleFonts.outfit(
-                          fontSize: 18,
+                          fontSize: locationTitleFontSize,
                           color: Colors.black87,
                         ),
                       ),
@@ -375,10 +407,10 @@ class _PreTicketState extends State<PreTicket> {
                           physics: NeverScrollableScrollPhysics(),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 2.2,
+                            crossAxisCount: gridCrossAxisCount,
+                            mainAxisSpacing: gridSpacing,
+                            crossAxisSpacing: gridSpacing,
+                            childAspectRatio: gridAspectRatio,
                           ),
                           itemCount: myList.length,
                           itemBuilder: (context, index) {
@@ -391,8 +423,9 @@ class _PreTicketState extends State<PreTicket> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 8, horizontal: 4),
+                                padding: EdgeInsets.symmetric(
+                                    vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
+                                    horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)),
                               ),
                               onPressed: () =>
                                   _showToSelectionPage(item, myList),
@@ -402,15 +435,21 @@ class _PreTicketState extends State<PreTicket> {
                                   Text(
                                     item['name'] ?? '',
                                     style: GoogleFonts.outfit(
-                                        fontSize: 14, color: Colors.white),
+                                        fontSize: isMobile ? 12 : 14, 
+                                        color: Colors.white),
                                     textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                                                if (item['km'] != null)
-                                Text(
-                                  '${(item['km'] as num).toInt()} km',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.white70),
-                                ),
+                                  if (item['km'] != null) ...[
+                                    SizedBox(height: isMobile ? 2 : 4),
+                                    Text(
+                                      '${(item['km'] as num).toInt()} km',
+                                      style: TextStyle(
+                                          fontSize: isMobile ? 10 : 12, 
+                                          color: Colors.white70),
+                                    ),
+                                  ],
                                 ],
                               ),
                             );
@@ -419,7 +458,7 @@ class _PreTicketState extends State<PreTicket> {
                       },
                     ),
                     // Debug button to test route service
-                    const SizedBox(height: 8),
+                    SizedBox(height: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)),
                   ],
                 ),
               ),
@@ -762,6 +801,35 @@ class ToSelectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Get screen dimensions for better responsive calculations
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Responsive sizing with better screen size adaptation
+    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
+    // Responsive heights based on screen size
+    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
+    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
+    
+    // Responsive padding that scales with screen size
+    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    
+    // Responsive grid configuration
+    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
+    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
+    
     final size = MediaQuery.of(context).size;
     return Scaffold(
       body: CustomScrollView(
@@ -770,16 +838,16 @@ class ToSelectionPage extends StatelessWidget {
             floating: true,
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF007A8F),
-            expandedHeight: 140,
+            expandedHeight: expandedHeight,
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 50.0),
+                    padding: EdgeInsets.only(top: topPadding),
                     child: Row(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
+                          padding: EdgeInsets.only(left: 8.0),
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back,
                                 color: Colors.white),
@@ -790,7 +858,7 @@ class ToSelectionPage extends StatelessWidget {
                           child: Text(
                             'Drop-off',
                             style: GoogleFonts.outfit(
-                              fontSize: 18,
+                              fontSize: titleFontSize,
                               color: Colors.white,
                             ),
                           ),
@@ -801,11 +869,11 @@ class ToSelectionPage extends StatelessWidget {
                   ),
                   // Non-clickable direction label
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding, vertical: verticalPadding),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: containerPadding, vertical: verticalPadding),
                       decoration: BoxDecoration(
                         color: const Color(0xFF007A8F),
                         borderRadius: BorderRadius.circular(16),
@@ -819,15 +887,17 @@ class ToSelectionPage extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const SizedBox(width: 12),
+                          SizedBox(width: isMobile ? 12 : 16),
                           Expanded(
                             child: Text(
                               directionLabel,
                               style: GoogleFonts.outfit(
-                                fontSize: 18,
+                                fontSize: routeFontSize,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w600,
                               ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -858,17 +928,17 @@ class ToSelectionPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0, vertical: 24.0),
+                padding: EdgeInsets.symmetric(
+                    horizontal: cardPadding, vertical: cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 10),
+                      padding: EdgeInsets.only(left: isMobile ? 10 : 12),
                       child: Text(
                         "Select Your Drop-off:",
                         style: GoogleFonts.outfit(
-                          fontSize: 18,
+                          fontSize: locationTitleFontSize,
                           color: Colors.black87,
                         ),
                       ),
@@ -877,10 +947,10 @@ class ToSelectionPage extends StatelessWidget {
                       shrinkWrap: true,
                       physics: NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 2.2,
+                        crossAxisCount: gridCrossAxisCount,
+                        mainAxisSpacing: gridSpacing,
+                        crossAxisSpacing: gridSpacing,
+                        childAspectRatio: gridAspectRatio,
                       ),
                       itemCount: toPlaces.length,
                       itemBuilder: (context, index) {
@@ -892,8 +962,9 @@ class ToSelectionPage extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 8, horizontal: 4),
+                            padding: EdgeInsets.symmetric(
+                                vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
+                                horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)),
                           ),
                           onPressed: () => Navigator.of(context).pop(place),
                           child: Column(
@@ -902,15 +973,21 @@ class ToSelectionPage extends StatelessWidget {
                               Text(
                                 place['name'] ?? '',
                                 style: GoogleFonts.outfit(
-                                    fontSize: 14, color: Colors.white),
+                                    fontSize: isMobile ? 12 : 14, 
+                                    color: Colors.white),
                                 textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              if (place['km'] != null)
+                              if (place['km'] != null) ...[
+                                SizedBox(height: isMobile ? 2 : 4),
                                 Text(
                                   '${(place['km'] as num).toInt()} km',
                                   style: TextStyle(
-                                      fontSize: 12, color: Colors.white70),
+                                      fontSize: isMobile ? 10 : 12, 
+                                      color: Colors.white70),
                                 ),
+                              ],
                             ],
                           ),
                         );

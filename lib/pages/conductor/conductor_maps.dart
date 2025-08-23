@@ -134,8 +134,50 @@ class _ConductorMapsState extends State<ConductorMaps> {
 
   void _loadRouteDestinations() async {
     try {
+      print('🗺️ ConductorMaps: Loading destinations for route: ${widget.route}');
+      
+      // Get the route ID from conductor data since the route parameter is the route name
+      String routeId = '';
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          // First, get the conductor data to find the route name
+          final conductorQuery = await FirebaseFirestore.instance
+              .collection('conductors')
+              .where('uid', isEqualTo: user.uid)
+              .limit(1)
+              .get();
+          
+          if (conductorQuery.docs.isNotEmpty) {
+            final conductorData = conductorQuery.docs.first.data();
+            final routeName = conductorData['route'] as String?;
+            
+            if (routeName != null && routeName.isNotEmpty) {
+              print('🗺️ ConductorMaps: Route name from conductor: $routeName');
+              
+              // Use the route name directly as the document ID since they now match
+              routeId = routeName;
+              print('🗺️ ConductorMaps: Using route name as document ID: $routeId');
+            }
+          }
+        }
+      } catch (e) {
+        print('🗺️ ConductorMaps: Could not get route ID from conductor data: $e');
+      }
+      
+      // If we still don't have a route ID, use the original route parameter
+      if (routeId.isEmpty) {
+        routeId = widget.route;
+        print('🗺️ ConductorMaps: Using original route parameter as route ID: $routeId');
+      }
+      
+      print('🗺️ ConductorMaps: Final route ID being used: $routeId');
+      
       final destinations =
-          await DestinationService.fetchRouteDestinations(widget.route);
+          await DestinationService.fetchRouteDestinations(routeId);
+      
+      print('🗺️ ConductorMaps: Raw destinations data: $destinations');
+      
       if (mounted) {
         setState(() {
           _routeDestinations = destinations;
@@ -144,17 +186,168 @@ class _ConductorMapsState extends State<ConductorMaps> {
         // Get route range for display
         final routeRange = DestinationService.getRouteRange(destinations);
         print(
-            '🗺️ ConductorMaps: Route ${widget.route} range: ${routeRange['firstKm']}-${routeRange['lastKm']} km');
+            '🗺️ ConductorMaps: Route $routeId range: ${routeRange['firstKm']}-${routeRange['lastKm']} km');
         print('🗺️ ConductorMaps: Loaded ${destinations.length} destinations');
 
-        // Debug: Print all destinations
+        // Debug: Print all destinations with more detail
         for (final dest in destinations) {
           print(
-              '🗺️ Destination: ${dest['name']} at (${dest['latitude']}, ${dest['longitude']}) - ${dest['direction']} route');
+              '🗺️ Destination: ${dest['name']} at (${dest['latitude']}, ${dest['longitude']}) - ${dest['direction']} route - km: ${dest['km']}');
+        }
+        
+        // If no destinations loaded, try to debug the issue
+        if (destinations.isEmpty) {
+          print('🗺️ ConductorMaps: ⚠️ No destinations loaded! This might indicate a data structure issue.');
+          print('🗺️ ConductorMaps: Route ID being searched: $routeId');
+          
+          // Try manual fallback fetch with the route ID
+          await _manualFetchDestinations(routeId);
         }
       }
     } catch (e) {
       print('Error loading route destinations: $e');
+      // Try manual fallback fetch on error
+      await _manualFetchDestinations(widget.route);
+    }
+  }
+
+  // Manual fallback method to fetch destinations directly from Firestore
+  Future<void> _manualFetchDestinations(String routeName) async {
+    try {
+      print('🗺️ ConductorMaps: Attempting manual fallback fetch for route: $routeName');
+      
+      // Try to fetch directly from Firestore
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Destinations')
+          .doc(routeName)
+          .get();
+      
+      if (snapshot.exists) {
+        print('🗺️ ConductorMaps: Found route document: ${snapshot.data()}');
+        
+        // Try to get Place collection
+        final placeSnapshot = await FirebaseFirestore.instance
+            .collection('Destinations')
+            .doc(routeName)
+            .collection('Place')
+            .get();
+            
+        print('🗺️ ConductorMaps: Place collection has ${placeSnapshot.docs.length} documents');
+        
+        // Try to get Place 2 collection
+        final place2Snapshot = await FirebaseFirestore.instance
+            .collection('Destinations')
+            .doc(routeName)
+            .collection('Place 2')
+            .get();
+            
+        print('🗺️ ConductorMaps: Place 2 collection has ${place2Snapshot.docs.length} documents');
+        
+        // If we found documents, process them manually
+        if (placeSnapshot.docs.isNotEmpty || place2Snapshot.docs.isNotEmpty) {
+          List<Map<String, dynamic>> manualDestinations = [];
+          
+          // Process Place collection
+          for (var doc in placeSnapshot.docs) {
+            final data = doc.data();
+            print('🗺️ ConductorMaps: Place doc ${doc.id}: $data');
+            
+            final latitude = _convertToDouble(data['latitude']);
+            final longitude = _convertToDouble(data['longitude']);
+            
+            if (latitude != null && longitude != null) {
+              manualDestinations.add({
+                'name': data['Name']?.toString() ?? doc.id,
+                'km': _convertToDouble(data['km']) ?? 0.0,
+                'latitude': latitude,
+                'longitude': longitude,
+                'direction': 'forward',
+              });
+            }
+          }
+          
+          // Process Place 2 collection
+          for (var doc in place2Snapshot.docs) {
+            final data = doc.data();
+            print('🗺️ ConductorMaps: Place 2 doc ${doc.id}: $data');
+            
+            final latitude = _convertToDouble(data['latitude']);
+            final longitude = _convertToDouble(data['longitude']);
+            
+            if (latitude != null && longitude != null) {
+              manualDestinations.add({
+                'name': data['Name']?.toString() ?? doc.id,
+                'km': _convertToDouble(data['km']) ?? 0.0,
+                'latitude': latitude,
+                'longitude': longitude,
+                'direction': 'reverse',
+              });
+            }
+          }
+          
+          if (manualDestinations.isNotEmpty && mounted) {
+            setState(() {
+              _routeDestinations = manualDestinations;
+            });
+            print('🗺️ ConductorMaps: ✅ Manual fetch successful! Loaded ${manualDestinations.length} destinations');
+          }
+        } else {
+          print('🗺️ ConductorMaps: ⚠️ Both Place and Place 2 collections are empty');
+          
+          // Try some other common collection names that might exist
+          final possibleCollections = ['Destinations', 'Stops', 'Locations', 'Points'];
+          
+          for (final collectionName in possibleCollections) {
+            try {
+              print('🗺️ ConductorMaps: Trying collection: $collectionName');
+              final otherSnapshot = await FirebaseFirestore.instance
+                  .collection('Destinations')
+                  .doc(routeName)
+                  .collection(collectionName)
+                  .get();
+              
+              print('🗺️ ConductorMaps: Collection $collectionName has ${otherSnapshot.docs.length} documents');
+              
+              if (otherSnapshot.docs.isNotEmpty) {
+                // Process this collection
+                List<Map<String, dynamic>> otherDestinations = [];
+                
+                for (var doc in otherSnapshot.docs) {
+                  final data = doc.data();
+                  print('🗺️ ConductorMaps: $collectionName doc ${doc.id}: $data');
+                  
+                  final latitude = _convertToDouble(data['latitude']);
+                  final longitude = _convertToDouble(data['longitude']);
+                  
+                  if (latitude != null && longitude != null) {
+                    otherDestinations.add({
+                      'name': data['Name']?.toString() ?? doc.id,
+                      'km': _convertToDouble(data['km']) ?? 0.0,
+                      'latitude': latitude,
+                      'longitude': longitude,
+                      'direction': collectionName,
+                    });
+                  }
+                }
+                
+                if (otherDestinations.isNotEmpty && mounted) {
+                  setState(() {
+                    _routeDestinations = otherDestinations;
+                  });
+                  print('🗺️ ConductorMaps: ✅ Found destinations in collection $collectionName! Loaded ${otherDestinations.length} destinations');
+                  break;
+                }
+              }
+            } catch (e) {
+              print('🗺️ ConductorMaps: Could not access collection $collectionName: $e');
+            }
+          }
+        }
+      } else {
+        print('🗺️ ConductorMaps: ❌ Route document $routeName does not exist in Destinations collection');
+      }
+    } catch (e) {
+      print('🗺️ ConductorMaps: Manual fetch failed: $e');
     }
   }
 
@@ -339,6 +532,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
   // Create route markers based on the conductor's assigned route from Firestore
   Set<Marker> _createRouteMarkers() {
     final Set<Marker> markers = {};
+    
+    print('🗺️ ConductorMaps: Creating route markers from ${_routeDestinations.length} destinations');
 
     // Use the route destinations loaded from Firestore
     for (final destination in _routeDestinations) {
@@ -347,6 +542,8 @@ class _ConductorMapsState extends State<ConductorMaps> {
       final latitude = destination['latitude'] ?? 0.0;
       final longitude = destination['longitude'] ?? 0.0;
       final direction = destination['direction'] ?? 'unknown';
+
+      print('🗺️ ConductorMaps: Processing destination: $name - lat: $latitude, lng: $longitude, km: $km, direction: $direction');
 
       if (latitude != 0.0 && longitude != 0.0) {
         final markerId = 'route_${name}_$direction';
@@ -362,12 +559,60 @@ class _ConductorMapsState extends State<ConductorMaps> {
             icon: _getCircularMarkerIcon(),
           ),
         );
+        print('🗺️ ConductorMaps: ✅ Added route marker for $name at ($latitude, $longitude)');
+      } else {
+        print('🗺️ ConductorMaps: ❌ Skipping $name - invalid coordinates: ($latitude, $longitude)');
       }
     }
 
     print(
         '🗺️ ConductorMaps: Created ${markers.length} ${widget.route} route markers from Firestore');
     return markers;
+  }
+
+  void _showDebugDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Debug Route ID'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Current Route: ${widget.route}'),
+              SizedBox(height: 16),
+              Text('Route ID (Document ID): ${widget.route}'),
+              SizedBox(height: 16),
+              Text('Destinations Loaded: ${_routeDestinations.length}'),
+              if (_routeDestinations.isNotEmpty) ...[
+                SizedBox(height: 8),
+                Text('Sample destinations:'),
+              ],
+              if (_routeDestinations.isNotEmpty)
+                ..._routeDestinations.take(3).map((dest) => 
+                  Text('• ${dest['name']} at (${dest['latitude']}, ${dest['longitude']})')
+                ).toList(),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Refresh'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _loadRouteDestinations();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -385,6 +630,14 @@ class _ConductorMapsState extends State<ConductorMaps> {
         backgroundColor: Color(0xFF0091AD),
         foregroundColor: Colors.white,
         centerTitle: true,
+        actions: [
+          // Debug button to test route ID
+          IconButton(
+            icon: Icon(Icons.bug_report),
+            onPressed: () => _showDebugDialog(),
+            tooltip: 'Debug Route ID',
+          ),
+        ],
       ),
       body: _isLoading || _currentPosition == null
           ? Center(

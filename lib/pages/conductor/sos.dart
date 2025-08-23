@@ -73,10 +73,10 @@ class _SOSPageState extends State<SOSPage> {
         'Place': 'SM City Lipa - Mataas na Kahoy',
         'Place 2': 'Mataas na Kahoy - SM City Lipa',
       },
-      'Lipa Palengke Mataas na Kahoy': {
-        'Place': 'Lipa Palengke - Mataas na Kahoy',
-        'Place 2': 'Mataas na Kahoy - Lipa Palengke',
-      },
+          'Mataas Na Kahoy Palengke': {
+      'Place': 'Lipa Palengke - Mataas na Kahoy',
+      'Place 2': 'Mataas na Kahoy - Lipa Palengke',
+    },
     };
     final label = map[route]?[placeCollection];
     print("📍 Mapped Route Label = $label");

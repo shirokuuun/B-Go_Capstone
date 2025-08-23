@@ -118,7 +118,7 @@ import 'package:b_go/auth/auth_services.dart';
 
 
     String getRouteLabel(String placeCollection) {
-      final route = widget.route.trim();
+      final route = widget.route;
 
       if (route == 'Rosario') {
         switch (placeCollection) {
@@ -141,7 +141,7 @@ import 'package:b_go/auth/auth_services.dart';
           case 'Place 2':
             return 'Mataas na Kahoy - SM City Lipa';
         }
-      } else if (route == 'Lipa Palengke Mataas na Kahoy') {
+      } else if (route == 'Mataas Na Kahoy Palengke') {
           switch (placeCollection) {
             case 'Place':
               return 'Lipa Palengke - Mataas na Kahoy';

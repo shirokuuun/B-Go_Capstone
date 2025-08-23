@@ -26,7 +26,7 @@ class ConductorTicket extends StatefulWidget {
 
 class _ConductorTicketState extends State<ConductorTicket> {
   String getRouteLabel(String placeCollection) {
-    final route = widget.route.trim();
+    final route = widget.route;
 
     if (route == 'Rosario') {
       switch (placeCollection) {
@@ -49,7 +49,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
         case 'Place 2':
           return 'Mataas na Kahoy - SM City Lipa';
       }
-    } else if (route == 'Lipa Palengke Mataas na Kahoy') {
+    } else if (route == 'Mataas Na Kahoy Palengke') {
       switch (placeCollection) {
         case 'Place':
           return 'Lipa Palengke - Mataas na Kahoy';
@@ -512,7 +512,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
             _buildReceiptRow('To:', to),
             _buildReceiptRow('From KM:', startKm),
             _buildReceiptRow('To KM:', endKm),
-            _buildReceiptRow('Base Fare (Regular):', baseFare),
+            _buildReceiptRow('Base Fare', baseFare),
             _buildReceiptRow('Quantity:', quantity),
             _buildReceiptRow('Total Amount:', '$totalFare PHP', isTotal: true),
             SizedBox(height: 16),

@@ -49,7 +49,7 @@ class _HomePageState extends State<HomePage> {
     _busIcons = {
       'batangas': await _createCustomBusIcon(Colors.red),
       'Mataas na Kahoy': await _createCustomBusIcon(Colors.purple),
-      'Lipa Palengke Mataas na Kahoy':
+      'Mataas Na Kahoy Palengke':
           await _createCustomBusIcon(Colors.orange),
       'rosario':
           await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
@@ -763,7 +763,7 @@ class _HomePageState extends State<HomePage> {
         return Colors.yellow;
       case 'mataas na kahoy':
         return Colors.purple;
-      case 'lipa palengke mataas na kahoy':
+              case 'mataas na kahoy palengke':
         return Colors.orange;
       default:
         return Colors.cyan;

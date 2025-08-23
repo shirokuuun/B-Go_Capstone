@@ -38,7 +38,7 @@ class _ConductorFromState extends State<ConductorFrom> {
     'Batangas': 'Batangas',
     'Rosario': 'Rosario',
     'Mataas na Kahoy': 'Mataas na Kahoy',
-    'Lipa Palengke Mataas na Kahoy': 'Mataas Na Kahoy Palengke',
+    'Mataas Na Kahoy Palengke': 'Mataas Na Kahoy Palengke',
     'Tiaong': 'Tiaong',
     'San Juan': 'San Juan',
   };
@@ -61,12 +61,12 @@ class _ConductorFromState extends State<ConductorFrom> {
         {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
         {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
       ];
-    } else if ('${widget.route.trim()}' == 'Mataas na Kahoy') {
+    } else if ('${widget.route}' == 'Mataas na Kahoy') {
       routeDirections = [
         {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
         {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
       ];
-    } else if ('${widget.route.trim()}' == 'Lipa Palengke Mataas na Kahoy') {
+    } else if ('${widget.route.trim()}' == 'Mataas Na Kahoy Palengke') {
       routeDirections = [
         {'label': 'Lipa Palengke - Mataas na Kahoy', 'collection': 'Place'},
         {'label': 'Mataas na Kahoy - Lipa Palengke', 'collection': 'Place 2'},
@@ -475,7 +475,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
         case 'Place 2':
           return 'Mataas na Kahoy - SM City Lipa';
       }
-    } else if (r == 'Lipa Palengke Mataas na Kahoy') {
+    } else if (r == 'Mataas Na Kahoy Palengke') {
       switch (placeCollection) {
         case 'Place':
           return 'Lipa Palengke - Mataas na Kahoy';

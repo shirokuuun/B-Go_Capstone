@@ -49,12 +49,12 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         {'label': 'SM City Lipa - Batangas City', 'collection': 'Place'},
         {'label': 'Batangas City - SM City Lipa', 'collection': 'Place 2'},
       ];
-    } else if ('${widget.route.trim()}' == 'Mataas na Kahoy') {
+    } else if ('${widget.route}' == 'Mataas na Kahoy') {
       routeDirections = [
         {'label': 'SM City Lipa - Mataas na Kahoy', 'collection': 'Place'},
         {'label': 'Mataas na Kahoy - SM City Lipa', 'collection': 'Place 2'},
       ];
-    } else if ('${widget.route.trim()}' == 'Lipa Palengke Mataas na Kahoy') {
+    } else if ('${widget.route.trim()}' == 'Mataas Na Kahoy Palengke') {
       routeDirections = [
         {'label': 'Lipa Palengke - Mataas na Kahoy', 'collection': 'Place'},
         {'label': 'Mataas na Kahoy - Lipa Palengke', 'collection': 'Place 2'},

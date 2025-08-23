@@ -24,7 +24,7 @@ class RouteService {
         return 'SM City Lipa - ${route.trim()}';
       } else if (name ==  'Mataas na Kahoy Terminal') {
         return 'SM City Lipa - Mataas na Kahoy Terminal';
-      } else if (route.trim() == 'Lipa Palengke Mataas na Kahoy' && name == 'Mataas na Kahoy Terminal') {
+      } else if (route.trim() == 'Mataas Na Kahoy Palengke' && name == 'Mataas na Kahoy Terminal') {
         return 'SM City Lipa - Mataas na Kahoy Terminal';
       }
       // Default for other names
@@ -78,8 +78,8 @@ class RouteService {
           }
         }
         
-        // Special handling for Lipa Palengke Mataas na Kahoy route (both display name and Firestore name)
-        if (route == 'Lipa Palengke Mataas na Kahoy' || route == 'Mataas Na Kahoy Palengke') {
+            // Special handling for Mataas Na Kahoy Palengke route (both display name and Firestore name)
+    if (route == 'Mataas Na Kahoy Palengke') {
           print('🔍 RouteService: Applying special handling for route: "$route"');
           String placeName = data['Name']?.toString() ?? doc.id;
           print('🔍 RouteService: Processing place: "$placeName" in collection: "$collectionName"');

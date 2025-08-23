@@ -19,7 +19,7 @@ class _PreTicketState extends State<PreTicket> {
     'Batangas',
     'Rosario',
     'Mataas na Kahoy',
-    'Lipa Palengke Mataas na Kahoy',
+    'Mataas Na Kahoy Palengke',
     'Tiaong',
     'San Juan',
   ];
@@ -38,7 +38,7 @@ class _PreTicketState extends State<PreTicket> {
       'SM Lipa to Mataas na Kahoy',
       'Mataas na Kahoy to SM Lipa',
     ],
-    'Lipa Palengke Mataas na Kahoy': [
+    'Mataas Na Kahoy Palengke': [
       'Lipa Palengke to Mataas na Kahoy',
       'Mataas na Kahoy to Lipa Palengke',
     ],
@@ -63,7 +63,7 @@ class _PreTicketState extends State<PreTicket> {
     'Batangas': 'Batangas',
     'Rosario': 'Rosario',
     'Mataas na Kahoy': 'Mataas na Kahoy',
-    'Lipa Palengke Mataas na Kahoy': 'Mataas Na Kahoy Palengke',
+    'Mataas Na Kahoy Palengke': 'Mataas Na Kahoy Palengke',
     'Tiaong': 'Tiaong',
     'San Juan': 'San Juan',
   };

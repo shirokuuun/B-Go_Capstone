@@ -3,6 +3,7 @@ import 'package:b_go/pages/conductor/trip_list/trip_page.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/conductor_dashboard.dart';
 import 'package:b_go/pages/conductor/conductor_maps.dart';
+import 'package:b_go/pages/conductor/conductor_departure.dart';
 
 class ConductorHome extends StatefulWidget {
   String route;
@@ -48,7 +49,7 @@ class _ConductorHomeState extends State<ConductorHome> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ConductorFrom(
+        builder: (context) => ConductorDeparture(
           route: widget.route,
           role: widget.role,
         ),

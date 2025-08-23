@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:b_go/auth/auth_services.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -58,6 +59,28 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final nameFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final emailFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final logoutFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final avatarRadius = isMobile ? 54.0 : isTablet ? 64.0 : 74.0;
+    final editIconRadius = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final editIconSize = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final logoutAvatarRadius = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final logoutIconSize = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final topSpacing = isMobile ? 24.0 : isTablet ? 32.0 : 40.0;
+    final nameSpacing = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final buttonSpacing = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final bottomSpacing = isMobile ? 32.0 : isTablet ? 40.0 : 48.0;
+    final buttonPadding = isMobile ? 32.0 : isTablet ? 40.0 : 48.0;
+    
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       // Not logged in, redirect
@@ -80,7 +103,7 @@ class _ProfilePageState extends State<ProfilePage> {
           'Profile',
           style: GoogleFonts.outfit(
             color: Colors.white,
-            fontSize: 20,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -91,12 +114,12 @@ class _ProfilePageState extends State<ProfilePage> {
             ? Center(child: CircularProgressIndicator())
             : Column(
                 children: [
-                  SizedBox(height: 24),
+                  SizedBox(height: topSpacing),
                   Stack(
                     alignment: Alignment.bottomRight,
                     children: [
                       CircleAvatar(
-                        radius: 54,
+                        radius: avatarRadius,
                         backgroundImage: NetworkImage(
                           photoURL ??
                               'https://randomuser.me/api/portraits/men/1.jpg',
@@ -107,30 +130,30 @@ class _ProfilePageState extends State<ProfilePage> {
                         bottom: 4,
                         right: 4,
                         child: CircleAvatar(
-                          radius: 16,
+                          radius: editIconRadius,
                           backgroundColor: Color(0xFF0091AD),
                           child:
-                              Icon(Icons.edit, color: Colors.white, size: 16),
+                              Icon(Icons.edit, color: Colors.white, size: editIconSize),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  SizedBox(height: nameSpacing),
                   Text(
                     name ?? 'John Doe',
                     style: GoogleFonts.outfit(
-                      fontSize: 24,
+                      fontSize: nameFontSize,
                       color: Colors.black,
                     ),
                   ),
                   Text(
                     email ?? 'No email found',
                     style: GoogleFonts.outfit(
-                      fontSize: 16,
+                      fontSize: emailFontSize,
                       color: Colors.black54,
                     ),
                   ),
-                  SizedBox(height: 16),
+                  SizedBox(height: buttonSpacing),
                   ElevatedButton(
                     onPressed: () async {
                       await Navigator.pushNamed(context, '/edit_profile');
@@ -144,18 +167,18 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                       elevation: 4,
                       padding:
-                          EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                          EdgeInsets.symmetric(horizontal: buttonPadding, vertical: 12),
                     ),
                     child: Text(
                       'Edit Profile',
                       style: GoogleFonts.outfit(
-                        fontSize: 18,
+                        fontSize: buttonFontSize,
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                  SizedBox(height: 32),
+                  SizedBox(height: bottomSpacing),
                   _ProfileRow(
                     icon: Icons.settings,
                     label: 'Settings',
@@ -172,7 +195,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   Spacer(),
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 32.0),
+                    padding: EdgeInsets.only(bottom: bottomSpacing),
                     child: GestureDetector(
                       onTap: () async {
                         final authServices = AuthServices();
@@ -187,16 +210,16 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           CircleAvatar(
                             backgroundColor: Colors.black,
-                            radius: 20,
+                            radius: logoutAvatarRadius,
                             child:
-                                Icon(Icons.logout, color: Colors.red, size: 20),
+                                Icon(Icons.logout, color: Colors.red, size: logoutIconSize),
                           ),
-                          SizedBox(width: 8),
+                          SizedBox(width: isMobile ? 8 : 12),
                           Text(
                             'Log Out',
                             style: GoogleFonts.outfit(
                               color: Colors.red,
-                              fontSize: 20,
+                              fontSize: logoutFontSize,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -224,6 +247,14 @@ class _ProfileRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final labelFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: Color.fromARGB(255, 1, 123, 148),
@@ -231,7 +262,7 @@ class _ProfileRow extends StatelessWidget {
       ),
       title: Text(
         label,
-        style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 16),
+        style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: labelFontSize),
       ),
       trailing: Icon(Icons.chevron_right, color: Colors.black),
       onTap: onTap,

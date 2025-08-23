@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart'; // Added for location tracking
 import 'package:b_go/pages/passenger/services/passenger_location_service.dart';
 import 'package:qr_flutter/qr_flutter.dart'; // Added for QR code generation
 import 'dart:convert'; // Added for JSON encoding
+import 'package:responsive_framework/responsive_framework.dart';
 
 class PreBook extends StatefulWidget {
   const PreBook({super.key});
@@ -22,9 +23,20 @@ class _PreBookState extends State<PreBook> {
     'Batangas',
     'Rosario',
     'Mataas na Kahoy',
+    'Mataas Na Kahoy Palengke',
     'Tiaong',
     'San Juan',
   ];
+
+  // Map display names to Firestore document names
+  final Map<String, String> _routeFirestoreNames = {
+    'Batangas': 'Batangas',
+    'Rosario': 'Rosario',
+    'Mataas na Kahoy': 'Mataas na Kahoy',
+    'Mataas Na Kahoy Palengke': 'Mataas Na Kahoy Palengke',
+    'Tiaong': 'Tiaong',
+    'San Juan': 'San Juan',
+  };
 
   final Map<String, List<String>> routeLabels = {
     'Batangas': [
@@ -38,6 +50,10 @@ class _PreBookState extends State<PreBook> {
     'Mataas na Kahoy': [
       'SM Lipa to Mataas na Kahoy',
       'Mataas na Kahoy to SM Lipa',
+    ],
+    'Mataas Na Kahoy Palengke': [
+      'Lipa Palengke to Mataas na Kahoy',
+      'Mataas na Kahoy to Lipa Palengke',
     ],
     'Tiaong': [
       'SM Lipa to Tiaong',
@@ -55,11 +71,15 @@ class _PreBookState extends State<PreBook> {
   String? verifiedIDType;
   Position? _currentLocation; // Added for passenger location tracking
   final PassengerLocationService _locationService = PassengerLocationService();
+  String selectedPlaceCollection = 'Place'; // Added for direction selection
 
   @override
   void initState() {
     super.initState();
-    placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+    placesFuture = RouteService.fetchPlaces(
+      _routeFirestoreNames[selectedRoute] ?? selectedRoute,
+      placeCollection: 'Place'
+    );
     _fetchVerifiedIDType();
     // Delay location request slightly to ensure UI is loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -149,7 +169,13 @@ class _PreBookState extends State<PreBook> {
       setState(() {
         selectedRoute = newRoute;
         directionIndex = 0;
-        placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: 'Place');
+        selectedPlaceCollection = 'Place';
+        // Use the Firestore route name instead of the display name
+        String firestoreRouteName = _routeFirestoreNames[newRoute] ?? newRoute;
+        placesFuture = RouteService.fetchPlaces(
+          firestoreRouteName,
+          placeCollection: selectedPlaceCollection
+        );
       });
     }
   }
@@ -157,7 +183,13 @@ class _PreBookState extends State<PreBook> {
   void _toggleDirection() {
     setState(() {
       directionIndex = directionIndex == 0 ? 1 : 0;
-      placesFuture = RouteService.fetchPlaces(selectedRoute, placeCollection: directionIndex == 0 ? 'Place' : 'Place 2');
+      selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
+      // Use the Firestore route name instead of the display name
+      String firestoreRouteName = _routeFirestoreNames[selectedRoute] ?? selectedRoute;
+      placesFuture = RouteService.fetchPlaces(
+        firestoreRouteName,
+        placeCollection: selectedPlaceCollection
+      );
     });
   }
 
@@ -272,6 +304,45 @@ class _PreBookState extends State<PreBook> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Get screen dimensions for better responsive calculations
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Responsive sizing with better screen size adaptation
+    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final dropdownFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final locationStatusFontSize = isMobile ? 11.0 : isTablet ? 13.0 : 15.0;
+    final locationCoordFontSize = isMobile ? 9.0 : isTablet ? 11.0 : 13.0;
+    final buttonFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    
+    // Responsive heights based on screen size
+    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
+    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
+    
+    // Responsive padding that scales with screen size
+    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final locationPadding = isMobile ? (screenWidth * 0.03) : isTablet ? (screenWidth * 0.035) : (screenWidth * 0.04);
+    
+    // Responsive button sizing
+    final buttonHeight = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+    final iconSize = isMobile ? 18.0 : isTablet ? 22.0 : 26.0;
+    final smallIconSize = isMobile ? 14.0 : isTablet ? 18.0 : 22.0;
+    
+    // Responsive grid configuration
+    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
+    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
+    
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -279,16 +350,16 @@ class _PreBookState extends State<PreBook> {
             floating: true,
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF007A8F),
-            expandedHeight: 140,
+            expandedHeight: expandedHeight,
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 50.0),
+                    padding: EdgeInsets.only(top: topPadding),
                     child: Row(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
+                          padding: EdgeInsets.only(left: 8.0),
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back, color: Colors.white),
                             onPressed: () => Navigator.of(context).pop(),
@@ -297,15 +368,15 @@ class _PreBookState extends State<PreBook> {
                         Expanded(
                           child: Text(
                             'Pre-Booking',
-                            style: GoogleFonts.outfit(fontSize: 18, color: Colors.white),
+                            style: GoogleFonts.outfit(fontSize: titleFontSize, color: Colors.white),
                           ),
                         ),
                         Padding(
-                          padding: const EdgeInsets.only(right: 10.0),
+                          padding: EdgeInsets.only(right: 10.0),
                           child: DropdownButton<String>(
                             value: selectedRoute,
                             dropdownColor: const Color(0xFF007A8F),
-                            style: GoogleFonts.outfit(fontSize: 13, color: Colors.white),
+                            style: GoogleFonts.outfit(fontSize: dropdownFontSize, color: Colors.white),
                             iconEnabledColor: Colors.white,
                             underline: Container(),
                             items: routeChoices
@@ -321,11 +392,11 @@ class _PreBookState extends State<PreBook> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
                     child: GestureDetector(
                       onTap: _toggleDirection,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: EdgeInsets.symmetric(horizontal: containerPadding, vertical: verticalPadding),
                         decoration: BoxDecoration(
                           color: const Color(0xFF007A8F),
                           borderRadius: BorderRadius.circular(16),
@@ -340,11 +411,13 @@ class _PreBookState extends State<PreBook> {
                         child: Row(
                           children: [
                             const Icon(Icons.swap_horiz, color: Colors.white),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isMobile ? 12 : 16),
                             Expanded(
                               child: Text(
                                 routeLabels[selectedRoute]![directionIndex],
-                                style: GoogleFonts.outfit(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
+                                style: GoogleFonts.outfit(fontSize: routeFontSize, color: Colors.white, fontWeight: FontWeight.w600),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -357,13 +430,13 @@ class _PreBookState extends State<PreBook> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.only(top: 20.0),
+            padding: EdgeInsets.only(top: isMobile ? (screenHeight * 0.02) : (screenHeight * 0.025)),
           ),
           SliverToBoxAdapter(
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                margin: EdgeInsets.only(top: MediaQuery.of(context).size.height * 0.02),
+                margin: EdgeInsets.only(top: screenHeight * 0.02),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -376,22 +449,25 @@ class _PreBookState extends State<PreBook> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: EdgeInsets.symmetric(horizontal: cardPadding, vertical: cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 10),
+                      padding: EdgeInsets.only(left: isMobile ? 10 : 12),
                       child: Text(
                         "Select Location:",
-                        style: GoogleFonts.outfit(fontSize: 18, color: Colors.black87),
+                        style: GoogleFonts.outfit(fontSize: locationTitleFontSize, color: Colors.black87),
                       ),
                     ),
-                    // Location status indicator
+                    // Location status indicator with responsive sizing
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 10 : 12, 
+                        vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)
+                      ),
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(locationPadding),
                         decoration: BoxDecoration(
                           color: _currentLocation != null ? Colors.green.shade50 : Colors.orange.shade50,
                           borderRadius: BorderRadius.circular(8),
@@ -408,9 +484,9 @@ class _PreBookState extends State<PreBook> {
                                 Icon(
                                   _currentLocation != null ? Icons.location_on : Icons.location_off,
                                   color: _currentLocation != null ? Colors.green : Colors.orange,
-                                  size: 20,
+                                  size: iconSize,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: isMobile ? 8 : 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,24 +496,26 @@ class _PreBookState extends State<PreBook> {
                                           ? 'Location captured successfully!'
                                           : 'Location access needed for conductor to find you',
                                         style: GoogleFonts.outfit(
-                                          fontSize: 12,
+                                          fontSize: locationStatusFontSize,
                                           fontWeight: FontWeight.w600,
                                           color: _currentLocation != null ? Colors.green.shade700 : Colors.orange.shade700,
                                         ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       if (_currentLocation != null) ...[
-                                        SizedBox(height: 2),
+                                        SizedBox(height: isMobile ? 2 : 4),
                                         Text(
                                           'Lat: ${_currentLocation!.latitude.toStringAsFixed(6)}',
                                           style: GoogleFonts.outfit(
-                                            fontSize: 10,
+                                            fontSize: locationCoordFontSize,
                                             color: Colors.green.shade600,
                                           ),
                                         ),
                                         Text(
                                           'Lng: ${_currentLocation!.longitude.toStringAsFixed(6)}',
                                           style: GoogleFonts.outfit(
-                                            fontSize: 10,
+                                            fontSize: locationCoordFontSize,
                                             color: Colors.green.shade600,
                                           ),
                                         ),
@@ -447,7 +525,7 @@ class _PreBookState extends State<PreBook> {
                                 ),
                                 if (_currentLocation == null)
                                   IconButton(
-                                    icon: const Icon(Icons.refresh, size: 16),
+                                    icon: Icon(Icons.refresh, size: smallIconSize),
                                     onPressed: () {
                                       _getCurrentLocation();
                                       ScaffoldMessenger.of(context).showSnackBar(
@@ -462,7 +540,7 @@ class _PreBookState extends State<PreBook> {
                               ],
                             ),
                             if (_currentLocation == null) ...[
-                              const SizedBox(height: 8),
+                              SizedBox(height: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)),
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
@@ -475,19 +553,19 @@ class _PreBookState extends State<PreBook> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.location_on, size: 16),
-                                  label: const Text('Enable Location Access'),
+                                  icon: Icon(Icons.location_on, size: smallIconSize),
+                                  label: Text('Enable Location Access', style: TextStyle(fontSize: buttonFontSize)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.orange,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: EdgeInsets.symmetric(vertical: buttonHeight),
                                   ),
                                 ),
                               ),
                             ],
                             // Debug button to show current location
                             if (_currentLocation != null) ...[
-                              const SizedBox(height: 8),
+                              SizedBox(height: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)),
                               SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
@@ -499,18 +577,18 @@ class _PreBookState extends State<PreBook> {
                                       ),
                                     );
                                   },
-                                  icon: const Icon(Icons.info, size: 16),
-                                  label: const Text('Show Location Details'),
+                                  icon: Icon(Icons.info, size: smallIconSize),
+                                  label: Text('Show Location Details', style: TextStyle(fontSize: buttonFontSize)),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.blue,
                                     foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 8),
+                                    padding: EdgeInsets.symmetric(vertical: buttonHeight),
                                   ),
                                 ),
                               ),
                             ],
                             // Debug button to test location capture
-                            const SizedBox(height: 8),
+                            SizedBox(height: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)),
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton.icon(
@@ -526,12 +604,12 @@ class _PreBookState extends State<PreBook> {
                                     );
                                   }
                                 },
-                                icon: const Icon(Icons.refresh, size: 16),
-                                label: const Text('Test Location Capture'),
+                                icon: Icon(Icons.refresh, size: smallIconSize),
+                                label: Text('Test Location Capture', style: TextStyle(fontSize: buttonFontSize)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.orange,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: EdgeInsets.symmetric(vertical: buttonHeight),
                                 ),
                               ),
                             ),
@@ -545,7 +623,7 @@ class _PreBookState extends State<PreBook> {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Center(child: Text('Error:   snapshot.error}'));
+                          return Center(child: Text('Error: ${snapshot.error}'));
                         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                           return const Center(child: Text('No places found.'));
                         }
@@ -554,10 +632,10 @@ class _PreBookState extends State<PreBook> {
                           shrinkWrap: true,
                           physics: NeverScrollableScrollPhysics(),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 2.2,
+                            crossAxisCount: gridCrossAxisCount,
+                            mainAxisSpacing: gridSpacing,
+                            crossAxisSpacing: gridSpacing,
+                            childAspectRatio: gridAspectRatio,
                           ),
                           itemCount: myList.length,
                           itemBuilder: (context, index) {
@@ -568,7 +646,10 @@ class _PreBookState extends State<PreBook> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
+                                  horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)
+                                ),
                               ),
                               onPressed: () => _showToSelectionPage(item, myList),
                               child: Column(
@@ -576,14 +657,24 @@ class _PreBookState extends State<PreBook> {
                                 children: [
                                   Text(
                                     item['name'] ?? '',
-                                    style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  if (item['km'] != null)
-                                    Text(
-                                      '${item['km']} km',
-                                      style: TextStyle(fontSize: 12, color: Colors.white70),
+                                    style: GoogleFonts.outfit(
+                                      fontSize: isMobile ? 12 : 14, 
+                                      color: Colors.white
                                     ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (item['km'] != null) ...[
+                                    SizedBox(height: isMobile ? 2 : 4),
+                                    Text(
+                                      '${(item['km'] as num).toInt()} km',
+                                      style: TextStyle(
+                                        fontSize: isMobile ? 10 : 12, 
+                                        color: Colors.white70
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             );
@@ -609,6 +700,35 @@ class _ToSelectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Get screen dimensions for better responsive calculations
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+    
+    // Responsive sizing with better screen size adaptation
+    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
+    // Responsive heights based on screen size
+    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
+    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
+    
+    // Responsive padding that scales with screen size
+    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
+    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
+    
+    // Responsive grid configuration
+    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
+    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
+    
     final size = MediaQuery.of(context).size;
     return Scaffold(
       body: CustomScrollView(
@@ -617,16 +737,16 @@ class _ToSelectionPage extends StatelessWidget {
             floating: true,
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF007A8F),
-            expandedHeight: 140,
+            expandedHeight: expandedHeight,
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(top: 50.0),
+                    padding: EdgeInsets.only(top: topPadding),
                     child: Row(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 8.0),
+                          padding: EdgeInsets.only(left: 8.0),
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back, color: Colors.white),
                             onPressed: () => Navigator.of(context).pop(),
@@ -635,16 +755,21 @@ class _ToSelectionPage extends StatelessWidget {
                         Expanded(
                           child: Text(
                             'Drop-off',
-                            style: GoogleFonts.outfit(fontSize: 18, color: Colors.white),
+                            style: GoogleFonts.outfit(
+                              fontSize: titleFontSize,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
+                        // No dropdown here
                       ],
                     ),
                   ),
+                  // Non-clickable direction label
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: EdgeInsets.symmetric(horizontal: containerPadding, vertical: verticalPadding),
                       decoration: BoxDecoration(
                         color: const Color(0xFF007A8F),
                         borderRadius: BorderRadius.circular(16),
@@ -658,11 +783,17 @@ class _ToSelectionPage extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const SizedBox(width: 12),
+                          SizedBox(width: isMobile ? 12 : 16),
                           Expanded(
                             child: Text(
                               directionLabel,
-                              style: GoogleFonts.outfit(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w600),
+                              style: GoogleFonts.outfit(
+                                fontSize: routeFontSize,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -677,7 +808,10 @@ class _ToSelectionPage extends StatelessWidget {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                margin: EdgeInsets.only(top: size.height * 0.02, bottom: size.height * 0.08),
+                margin: EdgeInsets.only(
+                  top: size.height * 0.02, 
+                  bottom: size.height * 0.08
+                ),
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Colors.white,
@@ -690,25 +824,28 @@ class _ToSelectionPage extends StatelessWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                padding: EdgeInsets.symmetric(horizontal: cardPadding, vertical: cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(left: 10),
+                      padding: EdgeInsets.only(left: isMobile ? 10 : 12),
                       child: Text(
                         "Select Your Drop-off:",
-                        style: GoogleFonts.outfit(fontSize: 18, color: Colors.black87),
+                        style: GoogleFonts.outfit(
+                          fontSize: locationTitleFontSize,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     GridView.builder(
                       shrinkWrap: true,
                       physics: NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 2.2,
+                        crossAxisCount: gridCrossAxisCount,
+                        mainAxisSpacing: gridSpacing,
+                        crossAxisSpacing: gridSpacing,
+                        childAspectRatio: gridAspectRatio,
                       ),
                       itemCount: toPlaces.length,
                       itemBuilder: (context, index) {
@@ -719,7 +856,10 @@ class _ToSelectionPage extends StatelessWidget {
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            padding: EdgeInsets.symmetric(
+                              vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
+                              horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)
+                            ),
                           ),
                           onPressed: () => Navigator.of(context).pop(place),
                           child: Column(
@@ -727,14 +867,24 @@ class _ToSelectionPage extends StatelessWidget {
                             children: [
                               Text(
                                 place['name'] ?? '',
-                                style: GoogleFonts.outfit(fontSize: 14, color: Colors.white),
-                                textAlign: TextAlign.center,
-                              ),
-                              if (place['km'] != null)
-                                Text(
-                                  '${place['km']} km',
-                                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                                style: GoogleFonts.outfit(
+                                  fontSize: isMobile ? 12 : 14, 
+                                  color: Colors.white
                                 ),
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (place['km'] != null) ...[
+                                SizedBox(height: isMobile ? 2 : 4),
+                                Text(
+                                  '${(place['km'] as num).toInt()} km',
+                                  style: TextStyle(
+                                    fontSize: isMobile ? 10 : 12, 
+                                    color: Colors.white70
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         );
@@ -929,6 +1079,7 @@ class _ReceiptModal extends StatelessWidget {
       'Batangas': 28.0, // SM Lipa to Batangas City (0-14km)
       'Rosario': 14.0,  // SM Lipa to Rosario (0-14km)
       'Mataas na Kahoy': 8.0, // SM Lipa to Mataas na Kahoy (0-14km)
+      'Mataas na Kahoy Lipa Palengke': 8.0, // SM Lipa to Lipa Palengke (0-14km)
       'Tiaong': 30.0,   // SM Lipa to Tiaong (0-14km)
       'San Juan': 37.0, // SM Lipa to San Juan (0-14km)
     };
@@ -975,8 +1126,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fromLatitude': fromPlace['latitude'] ?? 0.0,
       'fromLongitude': fromPlace['longitude'] ?? 0.0,
       'toLatitude': toPlace['latitude'] ?? 0.0,
@@ -999,8 +1150,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fromLatitude': fromPlace['latitude'] ?? 0.0,
       'fromLongitude': fromPlace['longitude'] ?? 0.0,
       'toLatitude': toPlace['latitude'] ?? 0.0,
@@ -1074,8 +1225,8 @@ class _ReceiptModal extends StatelessWidget {
       'direction': directionLabel,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-      'fromKm': fromPlace['km'],
-      'toKm': toPlace['km'],
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fare': baseFare,
       'quantity': quantity,
       'amount': totalAmount,
@@ -1103,8 +1254,8 @@ class _ReceiptModal extends StatelessWidget {
             Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
             Text('From: ${fromPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
             Text('To: ${toPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('From KM: ${fromPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
-            Text('To KM: ${toPlace['km']}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('From KM: ${(fromPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
+            Text('To KM: ${(toPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
             Text('Selected Distance: ${(endKm - startKm).toStringAsFixed(1)} km', style: GoogleFonts.outfit(fontSize: 14)),
             Text('Full Trip Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
             Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
@@ -1463,8 +1614,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
                       _buildDetailRow('Time:', formattedTime),
                       _buildDetailRow('From:', widget.fromPlace['name']),
                       _buildDetailRow('To:', widget.toPlace['name']),
-                      _buildDetailRow('From KM:', '${widget.fromPlace['km']}'),
-                      _buildDetailRow('To KM:', '${widget.toPlace['km']}'),
+                      _buildDetailRow('From KM:', '${(widget.fromPlace['km'] as num).toInt()}'),
+                      _buildDetailRow('To KM:', '${(widget.toPlace['km'] as num).toInt()}'),
                       _buildDetailRow('Selected Distance:', '${distance.toStringAsFixed(1)} km'),
                       _buildDetailRow('Full Trip Fare (Regular):', '${widget.baseFare.toStringAsFixed(2)} PHP'),
                       _buildDetailRow('Quantity:', '${widget.quantity}'),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:b_go/auth/main_page.dart';
 import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class GetStartedPage extends StatefulWidget {
   const GetStartedPage({Key? key}) : super(key: key);
@@ -87,12 +88,25 @@ class _GetStartedPageState extends State<GetStartedPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 60.0 : isTablet ? 72.0 : 84.0;
+    final subtitleFontSize = isMobile ? 22.0 : isTablet ? 26.0 : 30.0;
+    final buttonFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final buttonHeight = isMobile ? 55.0 : isTablet ? 60.0 : 65.0;
+    final iconSize = isMobile ? 80.0 : isTablet ? 100.0 : 120.0;
+    final centerImageSize = isMobile ? 200.0 : isTablet ? 250.0 : 300.0;
+    
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 30),
+            SizedBox(height: isMobile ? 30 : 40),
             // Slideshow with corner icons
             Expanded(
               flex: 7,
@@ -103,48 +117,48 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      top: _spread ? 10 : 200,
-                      left: _spread ? 5 : 150,
+                      top: _spread ? (isMobile ? 10 : 20) : (isMobile ? 200 : 250),
+                      left: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][0],
                         key: ValueKey('${_currentIndex}_topLeft'),
-                        height: 80,
+                        height: iconSize,
                       ),
                     ),
 
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      top: _spread ? 10 : 200,
-                      right: _spread ? 5 : 150,
+                      top: _spread ? (isMobile ? 10 : 20) : (isMobile ? 200 : 250),
+                      right: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][1],
                         key: ValueKey('${_currentIndex}_topRight'),
-                        height: 80,
+                        height: iconSize,
                       ),
                     ),
 
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      bottom: _spread ? 40 : 200,
-                      left: _spread ? 5 : 150,
+                      bottom: _spread ? (isMobile ? 40 : 60) : (isMobile ? 200 : 250),
+                      left: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][2],
                         key: ValueKey('${_currentIndex}_bottomLeft'),
-                        height: 80,
+                        height: iconSize,
                       ),
                     ),
 
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      bottom: _spread ? 40 : 200,
-                      right: _spread ? 5 : 150,
+                      bottom: _spread ? (isMobile ? 40 : 60) : (isMobile ? 200 : 250),
+                      right: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][3],
                         key: ValueKey('${_currentIndex}_bottomRight'),
-                        height: 80,
+                        height: iconSize,
                       ),
                     ),
 
@@ -158,8 +172,8 @@ class _GetStartedPageState extends State<GetStartedPage> {
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 600),
                             curve: Curves.easeInOut,
-                            height: 200,
-                            width: 200,
+                            height: centerImageSize,
+                            width: centerImageSize,
                             child: Image.asset(
                               _images[index],
                               fit: BoxFit.contain,
@@ -175,25 +189,24 @@ class _GetStartedPageState extends State<GetStartedPage> {
 
             // Title and subtitle to match the screenshot
             Container(
-              margin:
-                  const EdgeInsets.only(top: 10), // Adjust this value as needed
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              margin: EdgeInsets.only(top: isMobile ? 10 : 20),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 20),
               child: Column(
                 children: [
                   Text(
                     'B-Go',
                     style: GoogleFonts.outfit(
-                      fontSize: 60,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w500,
                       height: 1.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 5),
+                  SizedBox(height: isMobile ? 5 : 10),
                   Text(
                     'Travel with Confidence',
                     style: GoogleFonts.outfit(
-                      fontSize: 22,
+                      fontSize: subtitleFontSize,
                       color: Colors.grey,
                       fontWeight: FontWeight.w500,
                     ),
@@ -203,11 +216,11 @@ class _GetStartedPageState extends State<GetStartedPage> {
               ),
             ),
 
-            const SizedBox(height: 25),
+            SizedBox(height: isMobile ? 25 : 35),
 
             // Get Started button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
+              padding: EdgeInsets.symmetric(horizontal: isMobile ? 30 : 40),
               child: ElevatedButton(
                 onPressed: () {
                   Navigator.pushReplacement(
@@ -216,7 +229,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(55),
+                  minimumSize: Size.fromHeight(buttonHeight),
                   backgroundColor: const Color(0xFF007A8F),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
@@ -225,14 +238,14 @@ class _GetStartedPageState extends State<GetStartedPage> {
                 child: Text(
                   'Get Started',
                   style: GoogleFonts.outfit(
-                    fontSize: 20,
+                    fontSize: buttonFontSize,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 50),
+            SizedBox(height: isMobile ? 50 : 60),
           ],
         ),
       ),

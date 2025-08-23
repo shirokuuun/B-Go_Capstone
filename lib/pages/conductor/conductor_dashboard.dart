@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/location_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class ConductorDashboard extends StatefulWidget {
   final String route;
@@ -433,13 +434,35 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final welcomeFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final routeFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final cardTitleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final bodyFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final smallFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final buttonFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final resetButtonFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final instructionsFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final iconSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final bodyPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final cardPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final spacing = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final smallSpacing = isMobile ? 8.0 : isTablet ? 10.0 : 12.0;
+    final mediumSpacing = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
           "Dashboard",
           style: GoogleFonts.outfit(
-            fontSize: 20,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -448,7 +471,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: EdgeInsets.all(bodyPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -456,22 +479,22 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Welcome, ${_conductorName.isNotEmpty ? _conductorName : "Conductor"}!',
                       style: GoogleFonts.outfit(
-                        fontSize: 24,
+                        fontSize: welcomeFontSize,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    SizedBox(height: smallSpacing),
                     Text(
                       'Route: ${widget.route}',
                       style: GoogleFonts.outfit(
-                        fontSize: 18,
+                        fontSize: routeFontSize,
                         color: Colors.grey[600],
                       ),
                     ),
@@ -479,30 +502,30 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: spacing),
 
             // Passenger Count Section
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.people, color: Color(0xFF0091AD)),
-                        SizedBox(width: 8),
+                        Icon(Icons.people, color: Color(0xFF0091AD), size: iconSize),
+                        SizedBox(width: smallSpacing),
                         Text(
                           'Passenger Count',
                           style: GoogleFonts.outfit(
-                            fontSize: 20,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    SizedBox(height: mediumSpacing),
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('conductors')
@@ -517,7 +540,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         if (snapshot.hasError) {
                           return Text(
                             'Error loading passenger count: ${snapshot.error}',
-                            style: GoogleFonts.outfit(color: Colors.red),
+                            style: GoogleFonts.outfit(color: Colors.red, fontSize: bodyFontSize),
                           );
                         }
 
@@ -525,7 +548,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         if (docs.isEmpty) {
                           return Text(
                             'No conductor data found',
-                            style: GoogleFonts.outfit(color: Colors.grey),
+                            style: GoogleFonts.outfit(color: Colors.grey, fontSize: bodyFontSize),
                           );
                         }
 
@@ -567,41 +590,41 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                     Text(
                                       'Current Passengers:',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 16,
+                                        fontSize: bodyFontSize,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                     Text(
                                       '$totalPassengers/$maxCapacity',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 18,
+                                        fontSize: bodyFontSize,
                                         fontWeight: FontWeight.bold,
                                         color: totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: smallSpacing),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       'Boarded: $boardedPassengers',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 12,
+                                        fontSize: smallFontSize,
                                         color: Colors.grey[600],
                                       ),
                                     ),
                                     Text(
                                       'Pre-booked: $preBookedPassengers',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 12,
+                                        fontSize: smallFontSize,
                                         color: Colors.grey[600],
                                       ),
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: smallSpacing),
                                 LinearProgressIndicator(
                                   value: percentage / 100,
                                   backgroundColor: Colors.grey[300],
@@ -609,18 +632,18 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                     totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: smallSpacing),
                                 Text(
                                   '${percentage.toStringAsFixed(1)}% capacity used',
                                   style: GoogleFonts.outfit(
-                                    fontSize: 12,
+                                    fontSize: smallFontSize,
                                     color: Colors.grey[600],
                                   ),
                                 ),
                                 if (totalPassengers >= maxCapacity) ...[
-                                  SizedBox(height: 8),
+                                  SizedBox(height: smallSpacing),
                                   Container(
-                                    padding: EdgeInsets.all(8),
+                                    padding: EdgeInsets.all(smallSpacing),
                                     decoration: BoxDecoration(
                                       color: Colors.red[50],
                                       borderRadius: BorderRadius.circular(8),
@@ -629,14 +652,14 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                     child: Text(
                                       'Bus is at full capacity!',
                                       style: GoogleFonts.outfit(
-                                        fontSize: 12,
+                                        fontSize: smallFontSize,
                                         color: Colors.red[700],
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
                                   ),
                                 ],
-                                SizedBox(height: 12),
+                                SizedBox(height: mediumSpacing),
                                 Row(
                                   children: [
                                     Expanded(
@@ -687,7 +710,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                         child: Text(
                                           'Reset Count',
                                           style: GoogleFonts.outfit(
-                                            fontSize: 14,
+                                            fontSize: resetButtonFontSize,
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -705,13 +728,13 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: spacing),
 
             // Location Tracking Section
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -720,27 +743,27 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         Icon(
                           Icons.location_on,
                           color: _isTracking ? Colors.green : Colors.grey,
-                          size: 24,
+                          size: iconSize,
                         ),
-                        SizedBox(width: 8),
+                        SizedBox(width: smallSpacing),
                         Text(
                           'Location Tracking',
                           style: GoogleFonts.outfit(
-                            fontSize: 20,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    SizedBox(height: mediumSpacing),
                     Text(
                       _statusMessage,
                       style: GoogleFonts.outfit(
-                        fontSize: 16,
+                        fontSize: bodyFontSize,
                         color: _isTracking ? Colors.green : Colors.grey[600],
                       ),
                     ),
-                    SizedBox(height: 16),
+                    SizedBox(height: mediumSpacing),
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -757,11 +780,11 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(_isTracking ? Icons.stop : Icons.play_arrow),
-                            SizedBox(width: 8),
+                            SizedBox(width: smallSpacing),
                             Text(
                               _isTracking ? 'Stop Tracking' : 'Start Tracking',
                               style: GoogleFonts.outfit(
-                                fontSize: 16,
+                                fontSize: buttonFontSize,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -773,88 +796,88 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: spacing),
 
             // Pre-booked Passengers Card
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.people, color: Color(0xFF0091AD)),
-                        SizedBox(width: 8),
+                        Icon(Icons.people, color: Color(0xFF0091AD), size: iconSize),
+                        SizedBox(width: smallSpacing),
                         Text(
                           'Pre-booked Passengers',
                           style: GoogleFonts.outfit(
-                            fontSize: 20,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    SizedBox(height: mediumSpacing),
                     _buildPreBookedPassengersList(),
                   ],
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: spacing),
 
             // Scanned QR Data Card
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.qr_code_scanner, color: Color(0xFF0091AD)),
-                        SizedBox(width: 8),
+                        Icon(Icons.qr_code_scanner, color: Color(0xFF0091AD), size: iconSize),
+                        SizedBox(width: smallSpacing),
                         Text(
                           'Scanned QR Codes',
                           style: GoogleFonts.outfit(
-                            fontSize: 20,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    SizedBox(height: mediumSpacing),
                     _buildScannedQRDataList(),
                   ],
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            SizedBox(height: spacing),
 
             // Instructions Card
             Card(
               elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(cardPadding),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: Color(0xFF0091AD)),
-                        SizedBox(width: 8),
+                        Icon(Icons.info_outline, color: Color(0xFF0091AD), size: iconSize),
+                        SizedBox(width: smallSpacing),
                         Text(
                           'Instructions',
                           style: GoogleFonts.outfit(
-                            fontSize: 20,
+                            fontSize: cardTitleFontSize,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    SizedBox(height: mediumSpacing),
                     Text(
                       '• Start location tracking when you begin your route\n'
                       '• Stop tracking when you end your shift\n'
@@ -863,7 +886,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       '• Check pre-booked passengers below for guaranteed seats\n'
                       '• Use the Maps tab to see passenger locations',
                       style: GoogleFonts.outfit(
-                        fontSize: 14,
+                        fontSize: instructionsFontSize,
                         color: Colors.grey[600],
                       ),
                     ),

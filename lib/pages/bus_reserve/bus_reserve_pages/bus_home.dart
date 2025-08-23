@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/bus_reserve/reservation_service.dart';
 import 'package:intl/intl.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class BusHome extends StatefulWidget {
   const BusHome({super.key});
@@ -58,6 +59,27 @@ class _BusHomeState extends State<BusHome> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
+    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final titleFontSize = isMobile ? 25.0 : isTablet ? 28.0 : 32.0;
+    final busListingsFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final busNameFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final iconSize = isMobile ? 40.0 : isTablet ? 48.0 : 56.0;
+    final expandedHeight = isMobile ? 70.0 : isTablet ? 80.0 : 90.0;
+    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final verticalPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    final containerPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    final marginSpacing = isMobile ? 6.0 : isTablet ? 8.0 : 10.0;
+    final horizontalMargin = isMobile ? 10.0 : isTablet ? 12.0 : 16.0;
+    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
+    
     return Scaffold(
       key: _scaffoldKey,
       drawer: Drawer(
@@ -72,7 +94,7 @@ class _BusHomeState extends State<BusHome> {
                 'Menu',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: 30,
+                  fontSize: drawerHeaderFontSize,
                 ),
               ),
             ),
@@ -81,7 +103,7 @@ class _BusHomeState extends State<BusHome> {
               title: Text(
                 'Home',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -95,7 +117,7 @@ class _BusHomeState extends State<BusHome> {
               title: Text(
                 'Role Selection',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -116,7 +138,7 @@ class _BusHomeState extends State<BusHome> {
             floating: true,
             backgroundColor: const Color(0xFF0091AD),
             leading: Padding(
-              padding: const EdgeInsets.only(top: 18.0, left: 8.0),
+              padding: EdgeInsets.only(top: 18.0, left: 8.0),
               child: IconButton(
                 icon: const Icon(Icons.menu, color: Colors.white),
                 onPressed: () {
@@ -125,11 +147,11 @@ class _BusHomeState extends State<BusHome> {
               ),
             ),
             title: Padding(
-              padding: const EdgeInsets.only(top: 22.0),
+              padding: EdgeInsets.only(top: 22.0),
               child: Text(
                 'Bus Reservation',
                 style: GoogleFonts.outfit(
-                  fontSize: 25,
+                  fontSize: titleFontSize,
                   color: Colors.white,
                 ),
               ),
@@ -137,7 +159,7 @@ class _BusHomeState extends State<BusHome> {
             centerTitle: true,
             actions: [
               Padding(
-                padding: const EdgeInsets.only(top: 18),
+                padding: EdgeInsets.only(top: 18),
                 child: IconButton(
                   icon: const Icon(Icons.calendar_today, color: Colors.white),
                   onPressed: _selectDate,
@@ -149,15 +171,15 @@ class _BusHomeState extends State<BusHome> {
             automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF0091AD),
             pinned: true,
-            expandedHeight: 70,
+            expandedHeight: expandedHeight,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: EdgeInsets.all(16.0),
                 child: Align(
                   alignment: Alignment.bottomCenter,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding, vertical: verticalPadding),
                     decoration: BoxDecoration(
                       color: const Color(0xFF007A8F),
                       borderRadius: BorderRadius.circular(16),
@@ -173,7 +195,7 @@ class _BusHomeState extends State<BusHome> {
                       child: Text(
                         'Bus Listings',
                         style: GoogleFonts.outfit(
-                          fontSize: 24,
+                          fontSize: busListingsFontSize,
                           color: Colors.white,
                           fontWeight: FontWeight.w600,
                         ),
@@ -186,7 +208,7 @@ class _BusHomeState extends State<BusHome> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(containerPadding),
               child: Column(
                 children: [
                   if (_selectedDate != null)
@@ -194,7 +216,7 @@ class _BusHomeState extends State<BusHome> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
+                          padding: EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.grey.shade200,
@@ -230,9 +252,9 @@ class _BusHomeState extends State<BusHome> {
                     (context, index) {
                       final bus = _availableBuses[index];
                       return Container(
-                        margin: const EdgeInsets.symmetric(
-                            vertical: 6, horizontal: 10),
-                        padding: const EdgeInsets.all(12),
+                        margin: EdgeInsets.symmetric(
+                            vertical: marginSpacing, horizontal: horizontalMargin),
+                        padding: EdgeInsets.all(containerPadding),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(14),
@@ -253,28 +275,28 @@ class _BusHomeState extends State<BusHome> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Padding(
+                            Padding(
                               padding: EdgeInsets.only(top: 8.0),
                               child: Icon(
                                 Icons.directions_bus,
-                                size: 40,
+                                size: iconSize,
                                 color: Color(0xFF0091AD),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isMobile ? 12 : 16),
                             SizedBox(
-                              width: 100,
+                              width: isMobile ? 100 : 120,
                               child: Text(
                                 bus['name'] ?? '',
                                 style: GoogleFonts.outfit(
-                                  fontSize: 16,
+                                  fontSize: busNameFontSize,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF0091AD),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: isMobile ? 12 : 16),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,13 +399,13 @@ class _BusHomeState extends State<BusHome> {
         left: false,
         right: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: _selectedBusIds.isNotEmpty
                   ? const Color(0xFF0091AD)
                   : Colors.grey.shade400,
-              minimumSize: const Size(double.infinity, 50),
+              minimumSize: Size(double.infinity, buttonHeight),
             ),
             onPressed: _selectedBusIds.isNotEmpty
                 ? () {
@@ -397,11 +419,11 @@ class _BusHomeState extends State<BusHome> {
                     );
                   }
                 : null,
-            child: const Text(
+            child: Text(
               'Continue with Selected Bus',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: buttonFontSize,
                 fontWeight: FontWeight.bold,
               ),
             ),

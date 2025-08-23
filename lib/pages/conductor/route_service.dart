@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
+import 'remittance_service.dart';
 
 class RouteService {
   static Future<String> fetchRoutePlaceName(String route) async {
@@ -23,6 +24,8 @@ class RouteService {
         return 'SM City Lipa - ${route.trim()}';
       } else if (name ==  'Mataas na Kahoy Terminal') {
         return 'SM City Lipa - Mataas na Kahoy Terminal';
+      } else if (route.trim() == 'Mataas Na Kahoy Palengke' && name == 'Mataas na Kahoy Terminal') {
+        return 'SM City Lipa - Mataas na Kahoy Terminal';
       }
       // Default for other names
       return '${route.trim()} - $name';
@@ -32,30 +35,97 @@ class RouteService {
   }
 
   // Get PLACES from route
-  static Future<List<Map<String, dynamic>>> fetchPlaces(String route, {String placeCollection = 'Place'}) async {
-    var snapshot = await FirebaseFirestore.instance
-        .collection('Destinations')
-        .doc(route.trim())
-        .collection(placeCollection)
-        .get();
+  static Future<List<Map<String, dynamic>>> fetchPlaces(
+      String route, {String? placeCollection}) async {
+    try {
+      print('🔍 RouteService: Fetching places for route: "$route" with collection: "$placeCollection"');
+      
+      // Get the Firestore instance
+      FirebaseFirestore firestore = FirebaseFirestore.instance;
+      
+      // Reference to the Destinations collection
+      CollectionReference destinationsRef = firestore.collection('Destinations');
+      
+      // Get the specific route document
+      DocumentReference routeDocRef = destinationsRef.doc(route);
+      
+      // Get the places subcollection based on the placeCollection parameter
+      String collectionName = placeCollection ?? 'Place';
+      CollectionReference placesRef = routeDocRef.collection(collectionName);
+      
+      // Fetch all documents in the places subcollection
+      QuerySnapshot querySnapshot = await placesRef.get();
+      
+            print('🔍 RouteService: Found ${querySnapshot.docs.length} documents for route "$route"');
+      
+      // Debug: Print all document IDs and data
+      for (var doc in querySnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        print('🔍 RouteService: Document ${doc.id}: ${data}');
+      }
+      
+      // Convert the documents to a list of maps, properly handling the data
+      List<Map<String, dynamic>> places = querySnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        
+        // Extract and convert distance properly
+        double distance = 0;
+        if (data['km'] != null) {
+          if (data['km'] is String) {
+            distance = double.tryParse(data['km'].toString()) ?? 0;
+          } else if (data['km'] is num) {
+            distance = data['km'].toDouble();
+          }
+        }
+        
+            // Special handling for Mataas Na Kahoy Palengke route (both display name and Firestore name)
+    if (route == 'Mataas Na Kahoy Palengke') {
+          print('🔍 RouteService: Applying special handling for route: "$route"');
+          String placeName = data['Name']?.toString() ?? doc.id;
+          print('🔍 RouteService: Processing place: "$placeName" in collection: "$collectionName"');
+          
+          if (collectionName == 'Place') {
+            // Forward direction: Lipa Palengke to Mataas na Kahoy
+            if (placeName == 'Lipa Palengke') {
+              distance = 0.0; // Starting point
+            } else if (placeName == 'Mataas na Kahoy Terminal') {
+              distance = 8.0; // End point
+            }
+            // For other places, keep original distance calculation from database
+          } else if (collectionName == 'Place 2') {
+            // Reverse direction: Mataas na Kahoy to Lipa Palengke
+            if (placeName == 'Mataas na Kahoy Terminal') {
+              distance = 0.0; // Starting point
+            } else if (placeName == 'Lipa Palengke') {
+              distance = 8.0; // End point
+            }
+            // For intermediate stops, the distance should already be correct in the database
+            // as they are stored relative to the route direction
+          }
+        }
+        
+        return {
+          'name': data['Name']?.toString() ?? doc.id, // Use 'Name' field or doc.id as fallback
+          'km': distance,
+          'latitude': data['latitude'] ?? 0,
+          'longitude': data['longitude'] ?? 0,
+        };
+      }).toList();
 
-    List<Map<String, dynamic>> places = snapshot.docs.map((doc) {
-      final data = doc.data();
-      return {
-        'name': data['Name']?.toString() ?? doc.id,
-        'km': data['km'],
-        'latitude': data['latitude'] ?? 0.0,
-        'longitude': data['longitude'] ?? 0.0,
-      };
-    }).toList();
-
-    places.sort((a, b) {
-      num akm = a['km'] ?? double.infinity;
-      num bkm = b['km'] ?? double.infinity;
-      return akm.compareTo(bkm);
-    });
-
-    return places;
+      // Sort places by distance (0km to highest)
+      places.sort((a, b) {
+        double distanceA = a['km'] ?? 0;
+        double distanceB = b['km'] ?? 0;
+        return distanceA.compareTo(distanceB);
+      });
+      
+      print('🔍 RouteService: Returning ${places.length} sorted places: ${places.map((p) => '${p['name']} (${p['km']}km)').toList()}');
+      
+      return places;
+    } catch (e) {
+      print('❌ RouteService: Error fetching places for route "$route": $e');
+      return [];
+    }
   }
 
   // Calculate distance between two coordinates in kilometers
@@ -155,23 +225,23 @@ class RouteService {
       throw Exception('Conductor not found for email ${user?.email}');
     }
 
-  try {
-    await FirebaseFirestore.instance
-    .collection('conductors')
-    .doc(conductorId)
-    .collection('trips')
-    .doc(formattedDate)
-    .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
-  } catch (e) {
-    print('Failed to ensure date document exists: $e');
-  }
+     try {
+     await FirebaseFirestore.instance
+     .collection('conductors')
+     .doc(conductorId)
+     .collection('remittance')
+     .doc(formattedDate)
+     .set({'createdAt': FieldValue.serverTimestamp()}, SetOptions(merge: true));
+   } catch (e) {
+     print('Failed to ensure date document exists: $e');
+   }
 
-    final tripsCollection = FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorId)
-        .collection('trips')
-        .doc(formattedDate)
-        .collection('tickets');
+         final tripsCollection = FirebaseFirestore.instance
+         .collection('conductors')
+         .doc(conductorId)
+         .collection('remittance')
+         .doc(formattedDate)
+         .collection('tickets');
 
 
     final snapshot = await tripsCollection.get();
@@ -203,6 +273,50 @@ class RouteService {
       'discountBreakdown': discountBreakdown,
     });
 
+         // Also save to daily trip structure (trip1 or trip2)
+     try {
+       final dailyTripDoc = await FirebaseFirestore.instance
+           .collection('conductors')
+           .doc(conductorId)
+           .collection('dailyTrips')
+           .doc(formattedDate)
+           .get();
+       
+       if (dailyTripDoc.exists) {
+         final dailyTripData = dailyTripDoc.data();
+         final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+         final tripCollection = 'trip$currentTrip';
+         
+         await FirebaseFirestore.instance
+             .collection('conductors')
+             .doc(conductorId)
+             .collection('dailyTrips')
+             .doc(formattedDate)
+             .collection(tripCollection)
+             .doc('tickets')
+             .collection('tickets')
+             .doc(tripDocName)
+             .set({
+               'from': from,
+               'to': to,
+               'startKm': startKm,
+               'endKm': endKm,
+               'totalKm': totalKm,
+               'timestamp': FieldValue.serverTimestamp(),
+               'active': true,
+               'quantity': quantity,
+               'farePerPassenger': formattedFares,
+               'totalFare': totalFareStr,
+               'discountAmount': totalDiscountStr,
+               'discountList': discountList,
+               'discountBreakdown': discountBreakdown,
+             });
+       }
+     } catch (e) {
+       print('Failed to save to daily trip structure: $e');
+       // Continue with normal operation even if daily trip structure fails
+     }
+
     // Increment passenger count
     await FirebaseFirestore.instance
         .collection('conductors')
@@ -210,6 +324,37 @@ class RouteService {
         .update({
           'passengerCount': FieldValue.increment(quantity)
         });
+
+    // Calculate and save remittance summary
+    Map<String, dynamic>? remittanceSummary;
+    try {
+      remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, formattedDate);
+      await RemittanceService.saveRemittanceSummary(conductorId, formattedDate, remittanceSummary);
+      print('✅ Remittance summary updated for $formattedDate');
+    } catch (e) {
+      print('Error updating remittance summary: $e');
+    }
+
+    // Also update the remittance summary in the daily trip document
+    if (remittanceSummary != null) {
+      try {
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(formattedDate)
+            .update({
+              'ticketCount': remittanceSummary['ticketCount'],
+              'totalPassengers': remittanceSummary['totalPassengers'],
+              'totalFare': remittanceSummary['totalFare'],
+              'totalFareFormatted': remittanceSummary['totalFareFormatted'],
+              'lastRemittanceUpdate': FieldValue.serverTimestamp(),
+            });
+        print('✅ Daily trip remittance summary updated');
+      } catch (e) {
+        print('Error updating daily trip remittance summary: $e');
+      }
+    }
 
     return tripDocName;
   }
@@ -272,7 +417,7 @@ static Future<List<String>> fetchAvailableDates(String conductorId) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorId)
-        .collection('trips')
+        .collection('dailyTrips')  // Changed from 'trips' to 'dailyTrips'
         .get();
 
     print("Fetched ${snapshot.docs.length} date documents for $conductorId");
@@ -290,35 +435,76 @@ static Future<List<String>> fetchAvailableDates(String conductorId) async {
   }
 }
 
+
 // Fetch all tickets for a specific conductor and date
 static Future<List<Map<String, dynamic>>> fetchTickets({
   required String conductorId,
   required String date,
 }) async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorId)
-      .collection('trips')
-      .doc(date)
-      .collection('tickets')
-      .get();
+  try {
+    print('🔍 Fetching tickets for conductor: $conductorId, date: $date');
+    
+    // First, get the dailyTrips document for the date
+    final dailyTripsDoc = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('dailyTrips')
+        .doc(date)
+        .get();
 
-  return snapshot.docs.map((doc) {
-    final data = doc.data();
-    return {
-      'id': doc.id,
-      'from': data['from'],
-      'to': data['to'],
-      'totalFare': data['totalFare'],
-      'quantity': data['quantity'],
-      'discountAmount': data['discountAmount'],
-      'discountBreakdown': data['discountBreakdown'],
-      'farePerPassenger': data['farePerPassenger'],
-      'startKm': data['startKm'],
-      'endKm': data['endKm'],
-      'timestamp': data['timestamp'],
-    };
-  }).toList();
+    if (!dailyTripsDoc.exists) {
+      print('⚠️ No dailyTrips document found for date: $date');
+      return [];
+    }
+
+    // Since listCollections() is not available, we'll use a different approach
+    // We'll check for common trip collection names and get tickets from them
+    List<Map<String, dynamic>> allTickets = [];
+    
+    // Check for trip1, trip2, trip3 collections
+    for (int i = 1; i <= 10; i++) { // Check up to 5 trips
+      try {
+        final tripCollection = dailyTripsDoc.reference.collection('trip$i');
+        final ticketsDoc = tripCollection.doc('tickets');
+        final ticketsCollection = ticketsDoc.collection('tickets');
+        
+        final ticketsSnapshot = await ticketsCollection.get();
+        
+        if (ticketsSnapshot.docs.isNotEmpty) {
+          print('🔍 Found tickets in trip$i: ${ticketsSnapshot.docs.length}');
+          
+          for (var ticketDoc in ticketsSnapshot.docs) {
+            final data = ticketDoc.data();
+            print('🔍 Found ticket: ${ticketDoc.id} with data: $data');
+            
+            allTickets.add({
+              'id': ticketDoc.id,
+              'from': data['from'],
+              'to': data['to'],
+              'totalFare': data['totalFare'],
+              'quantity': data['quantity'],
+              'discountAmount': data['discountAmount'],
+              'discountBreakdown': data['discountBreakdown'],
+              'farePerPassenger': data['farePerPassenger'],
+              'startKm': data['startKm'],
+              'endKm': data['endKm'],
+              'timestamp': data['timestamp'],
+            });
+          }
+        }
+      } catch (e) {
+        // If trip collection doesn't exist, continue to next
+        print('🔍 Trip $i not found or error: $e');
+        continue;
+      }
+    }
+
+    print('✅ Total tickets found: ${allTickets.length}');
+    return allTickets;
+  } catch (e) {
+    print('❌ Error fetching tickets: $e');
+    return [];
+  }
 }
 
 
@@ -355,41 +541,61 @@ static Future<void> deleteTicket(
   String date,
   String ticketId,
 ) async {
-  // First, get the ticket data to know how many passengers to decrement
-  final ticketDoc = await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorId)
-      .collection('trips')
-      .doc(date)
-      .collection('tickets')
-      .doc(ticketId)
-      .get();
-
-  if (!ticketDoc.exists) {
-    throw Exception('Ticket not found');
-  }
-
-  final ticketData = ticketDoc.data()!;
-  final quantity = ticketData['quantity'] ?? 0;
-
-  // Delete the ticket
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorId)
-      .collection('trips')
-      .doc(date)
-      .collection('tickets')
-      .doc(ticketId)
-      .delete();
-
-  // Decrement the passenger count
-  if (quantity > 0) {
-    await FirebaseFirestore.instance
+  try {
+    // First, find the ticket in the dailyTrips structure
+    final dailyTripsDoc = await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorId)
-        .update({
-          'passengerCount': FieldValue.increment(-quantity)
-        });
+        .collection('dailyTrips')
+        .doc(date)
+        .get();
+
+    if (!dailyTripsDoc.exists) {
+      throw Exception('Daily trips document not found for date: $date');
+    }
+
+    // Since listCollections() is not available, we'll use a different approach
+    // We'll check for common trip collection names and find the ticket
+    for (int i = 1; i <= 5; i++) { // Check up to 5 trips
+      try {
+        final tripCollection = dailyTripsDoc.reference.collection('trip$i');
+        final ticketsDoc = tripCollection.doc('tickets');
+        final ticketsCollection = ticketsDoc.collection('tickets');
+        
+        final ticketDoc = ticketsCollection.doc(ticketId);
+        final ticketSnapshot = await ticketDoc.get();
+        
+        if (ticketSnapshot.exists) {
+          final ticketData = ticketSnapshot.data()!;
+          final quantity = ticketData['quantity'] ?? 0;
+
+          // Delete the ticket
+          await ticketDoc.delete();
+
+          // Decrement the passenger count
+          if (quantity > 0) {
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorId)
+                .update({
+                  'passengerCount': FieldValue.increment(-quantity)
+                });
+          }
+          
+          print('✅ Ticket deleted successfully');
+          return;
+        }
+      } catch (e) {
+        // If trip collection doesn't exist, continue to next
+        print('🔍 Trip $i not found or error: $e');
+        continue;
+      }
+    }
+    
+    throw Exception('Ticket not found');
+  } catch (e) {
+    print('❌ Error deleting ticket: $e');
+    throw e;
   }
 }
 

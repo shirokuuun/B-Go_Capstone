@@ -1,6 +1,7 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class UserSelection extends StatefulWidget {
   const UserSelection({super.key});
@@ -15,6 +16,17 @@ class _UserSelectionState extends State<UserSelection> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final arrowSize = isMobile ? 48.0 : isTablet ? 56.0 : 64.0;
+    final fontSize = isMobile ? 28.0 : isTablet ? 32.0 : 36.0;
+    final containerWidth = isMobile ? 0.7 : isTablet ? 0.6 : 0.5;
+    final containerHeight = isMobile ? 0.8 : isTablet ? 0.75 : 0.7;
+    
     return PopScope(
       canPop: false, // This disables the back button
       child: Scaffold(
@@ -25,7 +37,7 @@ class _UserSelectionState extends State<UserSelection> {
               // Left arrow (only show if not first)
               if (currentIndex > 0)
                 IconButton(
-                  icon: const Icon(Icons.arrow_left, size: 48),
+                  icon: Icon(Icons.arrow_left, size: arrowSize),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(),
                   onPressed: () {
@@ -35,7 +47,7 @@ class _UserSelectionState extends State<UserSelection> {
                   },
                 )
               else
-                const SizedBox(width: 48), // Placeholder for alignment
+                SizedBox(width: arrowSize), // Placeholder for alignment
 
               // Role selection modal
               GestureDetector(
@@ -55,8 +67,8 @@ class _UserSelectionState extends State<UserSelection> {
                   } 
                 },
                 child: Container(
-                  width: MediaQuery.of(context).size.width * 0.7,
-                  height: MediaQuery.of(context).size.height * 0.80,
+                  width: MediaQuery.of(context).size.width * containerWidth,
+                  height: MediaQuery.of(context).size.height * containerHeight,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
@@ -71,8 +83,8 @@ class _UserSelectionState extends State<UserSelection> {
                   alignment: Alignment.center,
                   child: Text(
                     roles[currentIndex],
-                    style: const TextStyle(
-                      fontSize: 28,
+                    style: TextStyle(
+                      fontSize: fontSize,
                       fontWeight: FontWeight.bold,
                     ),
                     textAlign: TextAlign.center,
@@ -83,7 +95,7 @@ class _UserSelectionState extends State<UserSelection> {
               // Right arrow (only show if not last)
               if (currentIndex < roles.length - 1)
                 IconButton(
-                  icon: const Icon(Icons.arrow_right, size: 48),
+                  icon: Icon(Icons.arrow_right, size: arrowSize),
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(),
                   onPressed: () {
@@ -93,7 +105,7 @@ class _UserSelectionState extends State<UserSelection> {
                   },
                 )
               else
-                const SizedBox(width: 48), // Placeholder for alignment
+                SizedBox(width: arrowSize), // Placeholder for alignment
             ],
           ),
         ),

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class HomePage extends StatefulWidget {
   final String role;
@@ -23,14 +24,14 @@ class _HomePageState extends State<HomePage> {
   final LatLng _center =
       const LatLng(13.9407, 121.1529); // Example: Rosario, Batangas
   int _selectedIndex = 0;
-  
+
   // Bus location tracking
   final BusLocationService _busLocationService = BusLocationService();
   List<BusLocation> _buses = [];
   Set<Marker> _markers = {};
   String? _selectedRoute;
   List<String> _availableRoutes = [];
-  
+
   // Custom bus icons
   Map<String, BitmapDescriptor> _busIcons = {};
 
@@ -47,8 +48,11 @@ class _HomePageState extends State<HomePage> {
     // Use the same colors as defined in _getColorForRoute method
     _busIcons = {
       'batangas': await _createCustomBusIcon(Colors.red),
-      'mataas na kahoy': await _createCustomBusIcon(Colors.purple),
-      'rosario': await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
+      'Mataas na Kahoy': await _createCustomBusIcon(Colors.purple),
+      'Mataas Na Kahoy Palengke':
+          await _createCustomBusIcon(Colors.orange),
+      'rosario':
+          await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
       'tiaong': await _createCustomBusIcon(Colors.green),
       'san juan': await _createCustomBusIcon(Colors.yellow),
       'default': await _createCustomBusIcon(Colors.cyan),
@@ -77,7 +81,7 @@ class _HomePageState extends State<HomePage> {
             .where((route) => route.isNotEmpty)
             .toSet()
             .toList()
-            ..sort(); // Sort alphabetically
+          ..sort(); // Sort alphabetically
       });
     } catch (e) {
       print('Error loading routes: $e');
@@ -96,10 +100,11 @@ class _HomePageState extends State<HomePage> {
 
   void _updateMarkers() {
     _markers.clear();
-    
+
     for (final bus in _buses) {
       // Skip if route filter is applied and bus doesn't match
-      if (_selectedRoute != null && !_matchesRoute(bus.route, _selectedRoute!)) {
+      if (_selectedRoute != null &&
+          !_matchesRoute(bus.route, _selectedRoute!)) {
         continue;
       }
 
@@ -113,7 +118,7 @@ class _HomePageState extends State<HomePage> {
         anchor: Offset(0.5, 0.5), // Centers the marker
         zIndex: 1000, // Ensures bus markers appear above other markers
       );
-      
+
       _markers.add(marker);
     }
   }
@@ -121,7 +126,7 @@ class _HomePageState extends State<HomePage> {
   void _showBusInfoPopup(BusLocation bus) {
     // Format speed for display
     final speedKmh = (bus.speed * 3.6).round(); // Convert m/s to km/h
-    
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -201,23 +206,24 @@ class _HomePageState extends State<HomePage> {
                     builder: (context, snapshot) {
                       int passengerCount = 0;
                       if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>?;
+                        final data = snapshot.data!.docs.first.data()
+                            as Map<String, dynamic>?;
                         passengerCount = data?['passengerCount'] ?? 0;
                       }
-                      
+
                       final isFull = passengerCount >= 27;
-                      
+
                       return Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isFull 
+                          color: isFull
                               ? Colors.red.withOpacity(0.1)
                               : Colors.green.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isFull ? Colors.red : Colors.green, 
-                            width: 1
-                          ),
+                              color: isFull ? Colors.red : Colors.green,
+                              width: 1),
                         ),
                         child: Text(
                           '$passengerCount/27 Passengers',
@@ -271,13 +277,15 @@ class _HomePageState extends State<HomePage> {
 
   BitmapDescriptor _getBusIcon(String route) {
     final routeKey = route.trim().toLowerCase();
-    
+
     // Return default marker if icons are not ready yet
     if (_busIcons.isEmpty) {
       return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
     }
-    
-    final icon = _busIcons[routeKey] ?? _busIcons['default'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+
+    final icon = _busIcons[routeKey] ??
+        _busIcons['default'] ??
+        BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
     return icon;
   }
 
@@ -295,8 +303,8 @@ class _HomePageState extends State<HomePage> {
           context,
           MaterialPageRoute(builder: (context) => PassengerService()),
         );
-        break; 
-        
+        break;
+
       case 2:
         Navigator.pushNamed(context, '/profile');
         break;
@@ -326,19 +334,19 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             ..._availableRoutes.map((route) => ListTile(
-              title: Text(route, style: GoogleFonts.outfit()),
-              leading: Radio<String?>(
-                value: route,
-                groupValue: _selectedRoute,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedRoute = value;
-                    _updateMarkers();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            )),
+                  title: Text(route, style: GoogleFonts.outfit()),
+                  leading: Radio<String?>(
+                    value: route,
+                    groupValue: _selectedRoute,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedRoute = value;
+                        _updateMarkers();
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                )),
           ],
         ),
       ),
@@ -382,18 +390,33 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Responsive sizing
+    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
+    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
+    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final busCountFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final busCountSubFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final routeFilterFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final legendTitleFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
+    final legendRouteFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.white),
-                onPressed: () {
-                  _scaffoldKey.currentState?.openDrawer();
-                },
-              ),
+          icon: const Icon(Icons.menu, color: Colors.white),
+          onPressed: () {
+            _scaffoldKey.currentState?.openDrawer();
+          },
+        ),
         title: Text(
           "B-Go Map",
           style: GoogleFonts.outfit(
-            fontSize: 20,
+            fontSize: titleFontSize,
             fontWeight: FontWeight.w500,
             color: Colors.white,
           ),
@@ -426,7 +449,7 @@ class _HomePageState extends State<HomePage> {
                 'Menu',
                 style: GoogleFonts.outfit(
                   color: Colors.white,
-                  fontSize: 30,
+                  fontSize: drawerHeaderFontSize,
                 ),
               ),
             ),
@@ -435,7 +458,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Home',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -449,7 +472,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Role Selection',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -466,7 +489,7 @@ class _HomePageState extends State<HomePage> {
               title: Text(
                 'Trip Schedules',
                 style: GoogleFonts.outfit(
-                  fontSize: 18,
+                  fontSize: drawerItemFontSize,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -495,14 +518,17 @@ class _HomePageState extends State<HomePage> {
           ),
           // Bus count indicator with enhanced styling
           Positioned(
-            top: 16,
-            left: 16,
+            top: isMobile ? 16 : 20,
+            left: isMobile ? 16 : 20,
             child: Container(
               constraints: BoxConstraints(
-                minWidth: 100,
-                maxWidth: 200,
+                minWidth: isMobile ? 100 : 120,
+                maxWidth: isMobile ? 200 : 250,
               ),
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 16 : 20, 
+                vertical: isMobile ? 12 : 16
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -518,8 +544,9 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.directions_bus, color: Color(0xFF0091AD), size: 24),
-                  SizedBox(width: 8),
+                  Icon(Icons.directions_bus,
+                      color: Color(0xFF0091AD), size: isMobile ? 24 : 28),
+                  SizedBox(width: isMobile ? 8 : 12),
                   Flexible(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,7 +555,7 @@ class _HomePageState extends State<HomePage> {
                         Text(
                           '${_markers.length}',
                           style: GoogleFonts.outfit(
-                            fontSize: 18,
+                            fontSize: busCountFontSize,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF0091AD),
                           ),
@@ -536,7 +563,7 @@ class _HomePageState extends State<HomePage> {
                         Text(
                           'buses online',
                           style: GoogleFonts.outfit(
-                            fontSize: 12,
+                            fontSize: busCountSubFontSize,
                             fontWeight: FontWeight.w500,
                             color: Colors.grey[600],
                           ),
@@ -551,14 +578,17 @@ class _HomePageState extends State<HomePage> {
           // Route filter indicator with enhanced styling
           if (_selectedRoute != null)
             Positioned(
-              top: 16,
-              right: 16,
+              top: isMobile ? 16 : 20,
+              right: isMobile ? 16 : 20,
               child: Container(
                 constraints: BoxConstraints(
-                  minWidth: 100,
-                  maxWidth: 250,
+                  minWidth: isMobile ? 100 : 120,
+                  maxWidth: isMobile ? 250 : 300,
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 16 : 20, 
+                  vertical: isMobile ? 12 : 16
+                ),
                 decoration: BoxDecoration(
                   color: Color(0xFF0091AD),
                   borderRadius: BorderRadius.circular(25),
@@ -573,20 +603,20 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.filter_list, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
+                    Icon(Icons.filter_list, color: Colors.white, size: isMobile ? 20 : 24),
+                    SizedBox(width: isMobile ? 8 : 12),
                     Flexible(
                       child: Text(
                         _selectedRoute!,
                         style: GoogleFonts.outfit(
-                          fontSize: 14,
+                          fontSize: routeFilterFontSize,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 8),
+                    SizedBox(width: isMobile ? 8 : 12),
                     GestureDetector(
                       onTap: () {
                         setState(() {
@@ -595,12 +625,12 @@ class _HomePageState extends State<HomePage> {
                         });
                       },
                       child: Container(
-                        padding: EdgeInsets.all(4),
+                        padding: EdgeInsets.all(isMobile ? 4 : 6),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.close, color: Colors.white, size: 16),
+                        child: Icon(Icons.close, color: Colors.white, size: isMobile ? 16 : 20),
                       ),
                     ),
                   ],
@@ -610,14 +640,14 @@ class _HomePageState extends State<HomePage> {
           // Legend for bus colors - show all routes
           if (_busIcons.isNotEmpty)
             Positioned(
-              bottom: 100,
-              left: 16,
+              bottom: isMobile ? 100 : 120,
+              left: isMobile ? 16 : 20,
               child: Container(
                 constraints: BoxConstraints(
-                  maxWidth: 200,
-                  maxHeight: 200,
+                  maxWidth: isMobile ? 200 : 250,
+                  maxHeight: isMobile ? 200 : 250,
                 ),
-                padding: EdgeInsets.all(12),
+                padding: EdgeInsets.all(isMobile ? 12 : 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
@@ -636,40 +666,43 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       'Route Colors',
                       style: GoogleFonts.outfit(
-                        fontSize: 14,
+                        fontSize: legendTitleFontSize,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    SizedBox(height: isMobile ? 8 : 12),
                     Flexible(
                       child: SingleChildScrollView(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
-                          children: _getUniqueRoutes().map((route) => Padding(
-                            padding: EdgeInsets.symmetric(vertical: 2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: BoxDecoration(
-                                    color: _getColorForRoute(route),
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                                SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    route.toUpperCase(),
-                                    style: GoogleFonts.outfit(fontSize: 12),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )).toList(),
+                          children: _getUniqueRoutes()
+                              .map((route) => Padding(
+                                    padding: EdgeInsets.symmetric(vertical: isMobile ? 2 : 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: isMobile ? 12 : 16,
+                                          height: isMobile ? 12 : 16,
+                                          decoration: BoxDecoration(
+                                            color: _getColorForRoute(route),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        SizedBox(width: isMobile ? 8 : 12),
+                                        Flexible(
+                                          child: Text(
+                                            route.toUpperCase(),
+                                            style: GoogleFonts.outfit(
+                                                fontSize: legendRouteFontSize),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
+                              .toList(),
                         ),
                       ),
                     ),
@@ -703,17 +736,17 @@ class _HomePageState extends State<HomePage> {
 
   List<String> _getUniqueRoutes() {
     Set<String> uniqueRoutes = {};
-    
+
     // Add routes from available routes
     uniqueRoutes.addAll(_availableRoutes);
-    
+
     // Add routes from online buses
     for (final bus in _buses) {
       if (bus.isOnline && bus.route.trim().isNotEmpty) {
         uniqueRoutes.add(bus.route.trim());
       }
     }
-    
+
     // Convert to list and sort
     return uniqueRoutes.toList()..sort();
   }
@@ -730,6 +763,8 @@ class _HomePageState extends State<HomePage> {
         return Colors.yellow;
       case 'mataas na kahoy':
         return Colors.purple;
+              case 'mataas na kahoy palengke':
+        return Colors.orange;
       default:
         return Colors.cyan;
     }

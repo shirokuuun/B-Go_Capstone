@@ -28,6 +28,10 @@ class _ConductorMapsState extends State<ConductorMaps> {
   Timer? _locationTimer;
   bool _isLoading = true;
   StreamSubscription<QuerySnapshot>? _conductorSubscription;
+  
+  // Add field to track active trip direction
+  String? _activeTripDirection;
+  String? _activePlaceCollection;
 
   // Helper method to convert any numeric value to double
   double? _convertToDouble(dynamic value) {
@@ -124,6 +128,45 @@ class _ConductorMapsState extends State<ConductorMaps> {
         if (snapshot.docs.isNotEmpty) {
           final conductorData = snapshot.docs.first.data();
           // Don't override passenger count here - it will be calculated from active bookings
+          
+          // Load active trip information for marker filtering
+          final activeTrip = conductorData['activeTrip'];
+          if (activeTrip != null && activeTrip['isActive'] == true) {
+            final newDirection = activeTrip['direction'];
+            final newPlaceCollection = activeTrip['placeCollection'];
+            
+            // Check if trip direction changed
+            if (_activeTripDirection != newDirection || _activePlaceCollection != newPlaceCollection) {
+              setState(() {
+                _activeTripDirection = newDirection;
+                _activePlaceCollection = newPlaceCollection;
+              });
+              print('🗺️ ConductorMaps: Active trip changed - Direction: $_activeTripDirection, Collection: $_activePlaceCollection');
+              
+              // Refresh markers when trip direction changes
+              if (mounted) {
+                setState(() {
+                  // This will trigger a rebuild and refresh markers
+                });
+              }
+            }
+          } else {
+            if (_activeTripDirection != null || _activePlaceCollection != null) {
+              setState(() {
+                _activeTripDirection = null;
+                _activePlaceCollection = null;
+              });
+              print('🗺️ ConductorMaps: Active trip ended');
+              
+              // Refresh markers when trip ends
+              if (mounted) {
+                setState(() {
+                  // This will trigger a rebuild and refresh markers
+                });
+              }
+            }
+          }
+          
           print('🗺️ ConductorMaps: Conductor data loaded');
         }
       });
@@ -534,9 +577,41 @@ class _ConductorMapsState extends State<ConductorMaps> {
     final Set<Marker> markers = {};
     
     print('🗺️ ConductorMaps: Creating route markers from ${_routeDestinations.length} destinations');
+    print('🗺️ ConductorMaps: Active trip direction: $_activeTripDirection, Place collection: $_activePlaceCollection');
 
-    // Use the route destinations loaded from Firestore
-    for (final destination in _routeDestinations) {
+    // Filter destinations based on active trip direction
+    List<Map<String, dynamic>> filteredDestinations = [];
+    
+    if (_activePlaceCollection != null) {
+      // Only show markers for the current trip direction
+      filteredDestinations = _routeDestinations.where((destination) {
+        final direction = destination['direction'] ?? 'unknown';
+        
+        // If conductor is on "Place" (forward route), only show forward markers
+        if (_activePlaceCollection == 'Place') {
+          final shouldInclude = direction == 'forward' || direction == 'Place';
+          print('🗺️ ConductorMaps: Destination ${destination['name']} - direction: $direction, include: $shouldInclude (Place route)');
+          return shouldInclude;
+        }
+        // If conductor is on "Place 2" (reverse route), only show reverse markers
+        else if (_activePlaceCollection == 'Place 2') {
+          final shouldInclude = direction == 'reverse' || direction == 'Place 2';
+          print('🗺️ ConductorMaps: Destination ${destination['name']} - direction: $direction, include: $shouldInclude (Place 2 route)');
+          return shouldInclude;
+        }
+        // If no active trip, show all markers (fallback)
+        return true;
+      }).toList();
+      
+      print('🗺️ ConductorMaps: Filtered to ${filteredDestinations.length} destinations for current trip direction');
+    } else {
+      // No active trip, show all destinations
+      filteredDestinations = _routeDestinations;
+      print('🗺️ ConductorMaps: No active trip - showing all ${filteredDestinations.length} destinations');
+    }
+
+    // Use the filtered destinations to create markers
+    for (final destination in filteredDestinations) {
       final name = destination['name'] ?? 'Unknown';
       final km = destination['km'] ?? 0.0;
       final latitude = destination['latitude'] ?? 0.0;
@@ -566,8 +641,52 @@ class _ConductorMapsState extends State<ConductorMaps> {
     }
 
     print(
-        '🗺️ ConductorMaps: Created ${markers.length} ${widget.route} route markers from Firestore');
+        '🗺️ ConductorMaps: Created ${markers.length} ${widget.route} route markers for current trip direction');
     return markers;
+  }
+
+  // Add method to refresh markers
+  void _refreshMarkers() {
+    if (mounted) {
+      setState(() {
+        // This will trigger a rebuild and refresh markers
+      });
+    }
+  }
+
+  // Add method to force refresh conductor data
+  void _forceRefreshConductorData() {
+    _loadConductorData();
+    _refreshMarkers();
+  }
+
+  // Add method to check if there are markers for current direction
+  bool _hasMarkersForCurrentDirection() {
+    if (_activePlaceCollection == null) return true; // Show all if no active trip
+    
+    final filteredCount = _routeDestinations.where((dest) {
+      final direction = dest['direction'] ?? 'unknown';
+      if (_activePlaceCollection == 'Place') {
+        return direction == 'forward' || direction == 'Place';
+      } else if (_activePlaceCollection == 'Place 2') {
+        return direction == 'reverse' || direction == 'Place 2';
+      }
+      return true;
+    }).length;
+    
+    return filteredCount > 0;
+  }
+
+  // Add method to get marker summary
+  String _getMarkerSummary() {
+    final routeMarkers = _createRouteMarkers();
+    final passengerMarkers = _activeBookings.where((booking) {
+      final passengerLat = booking['passengerLatitude'] ?? 0.0;
+      final passengerLng = booking['passengerLongitude'] ?? 0.0;
+      return passengerLat != 0.0 && passengerLng != 0.0;
+    }).length;
+    
+    return 'Route: ${routeMarkers.length}, Passengers: $passengerMarkers, Total: ${routeMarkers.length + passengerMarkers + (_currentPosition != null ? 1 : 0)}';
   }
 
   void _showDebugDialog() {
@@ -584,14 +703,31 @@ class _ConductorMapsState extends State<ConductorMaps> {
               SizedBox(height: 16),
               Text('Route ID (Document ID): ${widget.route}'),
               SizedBox(height: 16),
+              Text('Active Trip Direction: ${_activeTripDirection ?? 'None'}'),
+              Text('Active Place Collection: ${_activePlaceCollection ?? 'None'}'),
+              SizedBox(height: 16),
               Text('Destinations Loaded: ${_routeDestinations.length}'),
+              if (_activePlaceCollection != null) ...[
+                Text('Filtered Destinations: ${_routeDestinations.where((dest) {
+                  final direction = dest['direction'] ?? 'unknown';
+                  if (_activePlaceCollection == 'Place') {
+                    return direction == 'forward' || direction == 'Place';
+                  } else if (_activePlaceCollection == 'Place 2') {
+                    return direction == 'reverse' || direction == 'Place 2';
+                  }
+                  return true;
+                }).length}'),
+              ],
+              SizedBox(height: 16),
+              Text('Current Markers: ${_getMarkerSummary()}'),
+              SizedBox(height: 16),
               if (_routeDestinations.isNotEmpty) ...[
                 SizedBox(height: 8),
                 Text('Sample destinations:'),
               ],
               if (_routeDestinations.isNotEmpty)
                 ..._routeDestinations.take(3).map((dest) => 
-                  Text('• ${dest['name']} at (${dest['latitude']}, ${dest['longitude']})')
+                  Text('• ${dest['name']} at (${dest['latitude']}, ${dest['longitude']}) - ${dest['direction']}')
                 ).toList(),
             ],
           ),
@@ -607,6 +743,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
               onPressed: () {
                 Navigator.of(context).pop();
                 _loadRouteDestinations();
+                _forceRefreshConductorData();
               },
             ),
           ],
@@ -636,6 +773,12 @@ class _ConductorMapsState extends State<ConductorMaps> {
             icon: Icon(Icons.bug_report),
             onPressed: () => _showDebugDialog(),
             tooltip: 'Debug Route ID',
+          ),
+          // Refresh markers button
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: () => _refreshMarkers(),
+            tooltip: 'Refresh Markers',
           ),
         ],
       ),
@@ -677,6 +820,7 @@ class _ConductorMapsState extends State<ConductorMaps> {
                   key: const ValueKey('conductor_map'),
                   onMapCreated: (GoogleMapController controller) {
                     _mapController = controller;
+                    _refreshMarkers(); // Refresh markers when map is created
                   },
                   initialCameraPosition: CameraPosition(
                     target: LatLng(
@@ -739,6 +883,35 @@ class _ConductorMapsState extends State<ConductorMaps> {
                               color: Colors.grey[700],
                             ),
                           ),
+                          if (_activeTripDirection != null) ...[
+                            Container(
+                              margin: EdgeInsets.only(top: 2),
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _activePlaceCollection == 'Place' ? Colors.blue[100] : Colors.orange[100],
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _activePlaceCollection == 'Place' ? Colors.blue[300]! : Colors.orange[300]!,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                '$_activeTripDirection',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w600,
+                                  color: _activePlaceCollection == 'Place' ? Colors.blue[700] : Colors.orange[700],
+                                ),
+                              ),
+                            ),
+                            Text(
+                              'Collection: $_activePlaceCollection',
+                              style: GoogleFonts.outfit(
+                                fontSize: 9,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                           Text(
                             'Range: ${DestinationService.getRouteRange(_routeDestinations)['firstKm']}-${DestinationService.getRouteRange(_routeDestinations)['lastKm']} km',
                             style: GoogleFonts.outfit(
@@ -751,6 +924,38 @@ class _ConductorMapsState extends State<ConductorMaps> {
                     ),
                   ),
                 ),
+                
+                // Warning message when no markers for current direction
+                if (_activePlaceCollection != null && !_hasMarkersForCurrentDirection())
+                  Positioned(
+                    top: 120,
+                    left: 16,
+                    right: 16,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[100],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.orange[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.orange[700], size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'No route markers found for ${_activePlaceCollection == 'Place' ? 'forward' : 'reverse'} direction',
+                              style: GoogleFonts.outfit(
+                                fontSize: 11,
+                                color: Colors.orange[800],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
     );

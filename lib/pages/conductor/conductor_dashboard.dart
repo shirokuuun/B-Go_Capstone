@@ -20,6 +20,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   bool _isTracking = false;
   String _statusMessage = 'Location tracking is off';
   String _conductorName = '';
+  String? _conductorDocId;
 
   @override
   void initState() {
@@ -46,6 +47,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           setState(() {
             _isTracking = isOnlineInDatabase;
             _conductorName = conductorName;
+            _conductorDocId = query.docs.first.id;
           });
         }
       }
@@ -71,6 +73,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     try {
       if (_isTracking) {
         await _locationService.stopLocationTracking();
+        
         setState(() {
           _isTracking = false;
         });
@@ -80,6 +83,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         _showSnackBar('Starting location tracking...', Colors.blue);
         
         await _locationService.startLocationTracking();
+        
         setState(() {
           _isTracking = true;
         });
@@ -872,7 +876,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                           'Instructions',
                           style: GoogleFonts.outfit(
                             fontSize: cardTitleFontSize,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -884,7 +888,9 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       '• Passengers will see your bus location in real-time\n'
                       '• Your location updates every 10 meters or 30 seconds\n'
                       '• Check pre-booked passengers below for guaranteed seats\n'
-                      '• Use the Maps tab to see passenger locations',
+                      '• Use the Maps tab to see passenger locations\n'
+                      '• Geofencing automatically decrements passenger count at drop-offs\n'
+                      '• Geofence radius: 100 meters for accurate passenger drop-off detection',
                       style: GoogleFonts.outfit(
                         fontSize: instructionsFontSize,
                         color: Colors.grey[600],
@@ -894,6 +900,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                 ),
               ),
             ),
+            SizedBox(height: spacing),
           ],
         ),
       ),

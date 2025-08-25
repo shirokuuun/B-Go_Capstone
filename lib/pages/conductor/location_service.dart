@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'dart:async';
 
 class LocationService {
@@ -11,6 +12,9 @@ class LocationService {
   StreamSubscription<Position>? _positionStream;
   Timer? _locationUpdateTimer;
   bool _isTracking = false;
+  final GeofencingService _geofencingService = GeofencingService();
+  String? _currentRoute;
+  String? _currentConductorDocId;
 
   // Start location tracking for conductor
   Future<void> startLocationTracking() async {
@@ -43,14 +47,37 @@ class LocationService {
       }
       print('✅ Location permissions granted');
 
+      // Get conductor information for geofencing
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final query = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('uid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+
+        if (query.docs.isNotEmpty) {
+          final conductorData = query.docs.first.data();
+          _currentRoute = conductorData['route'];
+          _currentConductorDocId = query.docs.first.id;
+          
+          // Start geofencing monitoring for passenger drop-offs
+          if (_currentRoute != null && _currentConductorDocId != null) {
+            await _geofencingService.startConductorMonitoring(_currentRoute!, _currentConductorDocId!);
+            print('✅ Geofencing monitoring started for route: $_currentRoute');
+          }
+        }
+      }
+
       _isTracking = true;
       print('✅ Location tracking started successfully');
 
       // Start listening to location updates
       _positionStream = Geolocator.getPositionStream(
         locationSettings: LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 10, // Update every 10 meters
+          accuracy: LocationAccuracy.best,
+          distanceFilter: 5, // Update every 5 meters for more precise tracking
+          timeLimit: Duration(seconds: 10), // Time limit for location updates
         ),
       ).listen(
         (Position position) {
@@ -62,11 +89,12 @@ class LocationService {
         },
       );
 
-      // Also update location every 30 seconds as backup
-      _locationUpdateTimer = Timer.periodic(Duration(seconds: 30), (timer) async {
+      // Also update location every 15 seconds as backup (matching geofencing interval)
+      _locationUpdateTimer = Timer.periodic(Duration(seconds: 15), (timer) async {
         try {
           Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
+            desiredAccuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 10),
           );
           print('🔄 Periodic location update: ${position.latitude}, ${position.longitude}');
           _updateLocationInFirestore(position);
@@ -86,6 +114,9 @@ class LocationService {
     _isTracking = false;
     await _positionStream?.cancel();
     _locationUpdateTimer?.cancel();
+    
+    // Stop geofencing monitoring
+    _geofencingService.stopMonitoring();
     
     // Mark conductor as offline
     await _markConductorOffline();

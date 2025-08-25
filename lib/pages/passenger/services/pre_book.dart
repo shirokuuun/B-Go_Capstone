@@ -10,6 +10,7 @@ import 'package:b_go/pages/passenger/services/passenger_location_service.dart';
 import 'package:qr_flutter/qr_flutter.dart'; // Added for QR code generation
 import 'dart:convert'; // Added for JSON encoding
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 
 class PreBook extends StatefulWidget {
   const PreBook({super.key});
@@ -85,6 +86,8 @@ class _PreBookState extends State<PreBook> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _getCurrentLocation(); // Get passenger's current location
     });
+    // Start geofencing service for passenger monitoring
+    GeofencingService().startMonitoring();
   }
 
   Future<void> _fetchVerifiedIDType() async {

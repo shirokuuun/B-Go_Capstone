@@ -38,7 +38,6 @@ class RouteService {
   static Future<List<Map<String, dynamic>>> fetchPlaces(
       String route, {String? placeCollection}) async {
     try {
-      print('🔍 RouteService: Fetching places for route: "$route" with collection: "$placeCollection"');
       
       // Get the Firestore instance
       FirebaseFirestore firestore = FirebaseFirestore.instance;

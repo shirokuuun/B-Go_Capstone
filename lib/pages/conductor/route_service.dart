@@ -34,7 +34,7 @@ class RouteService {
     }
   }
 
-  // Get PLACES from route
+  // Get PLACES from route - optimized with reduced logging
   static Future<List<Map<String, dynamic>>> fetchPlaces(
       String route, {String? placeCollection}) async {
     try {
@@ -55,12 +55,17 @@ class RouteService {
       // Fetch all documents in the places subcollection
       QuerySnapshot querySnapshot = await placesRef.get();
       
-            print('🔍 RouteService: Found ${querySnapshot.docs.length} documents for route "$route"');
+      print('🔍 RouteService: Found ${querySnapshot.docs.length} documents for route "$route"');
       
-      // Debug: Print all document IDs and data
-      for (var doc in querySnapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        print('🔍 RouteService: Document ${doc.id}: ${data}');
+      // Reduced debug logging for performance
+      if (querySnapshot.docs.length > 10) {
+        print('🔍 RouteService: Large dataset detected (${querySnapshot.docs.length} docs) - reducing debug output');
+      } else {
+        // Only log details for small datasets
+        for (var doc in querySnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          print('🔍 RouteService: Document ${doc.id}: ${data}');
+        }
       }
       
       // Convert the documents to a list of maps, properly handling the data
@@ -78,30 +83,28 @@ class RouteService {
         }
         
             // Special handling for Mataas Na Kahoy Palengke route (both display name and Firestore name)
-    if (route == 'Mataas Na Kahoy Palengke') {
-          print('🔍 RouteService: Applying special handling for route: "$route"');
-          String placeName = data['Name']?.toString() ?? doc.id;
-          print('🔍 RouteService: Processing place: "$placeName" in collection: "$collectionName"');
-          
-          if (collectionName == 'Place') {
-            // Forward direction: Lipa Palengke to Mataas na Kahoy
-            if (placeName == 'Lipa Palengke') {
-              distance = 0.0; // Starting point
-            } else if (placeName == 'Mataas na Kahoy Terminal') {
-              distance = 8.0; // End point
+            if (route == 'Mataas Na Kahoy Palengke') {
+              String placeName = data['Name']?.toString() ?? doc.id;
+              
+              if (collectionName == 'Place') {
+                // Forward direction: Lipa Palengke to Mataas na Kahoy
+                if (placeName == 'Lipa Palengke') {
+                  distance = 0.0; // Starting point
+                } else if (placeName == 'Mataas na Kahoy Terminal') {
+                  distance = 8.0; // End point
+                }
+                // For other places, keep original distance calculation from database
+              } else if (collectionName == 'Place 2') {
+                // Reverse direction: Mataas na Kahoy to Lipa Palengke
+                if (placeName == 'Mataas na Kahoy Terminal') {
+                  distance = 0.0; // Starting point
+                } else if (placeName == 'Lipa Palengke') {
+                  distance = 8.0; // End point
+                }
+                // For intermediate stops, the distance should already be correct in the database
+                // as they are stored relative to the route direction
+              }
             }
-            // For other places, keep original distance calculation from database
-          } else if (collectionName == 'Place 2') {
-            // Reverse direction: Mataas na Kahoy to Lipa Palengke
-            if (placeName == 'Mataas na Kahoy Terminal') {
-              distance = 0.0; // Starting point
-            } else if (placeName == 'Lipa Palengke') {
-              distance = 8.0; // End point
-            }
-            // For intermediate stops, the distance should already be correct in the database
-            // as they are stored relative to the route direction
-          }
-        }
         
         return {
           'name': data['Name']?.toString() ?? doc.id, // Use 'Name' field or doc.id as fallback
@@ -118,7 +121,12 @@ class RouteService {
         return distanceA.compareTo(distanceB);
       });
       
-      print('🔍 RouteService: Returning ${places.length} sorted places: ${places.map((p) => '${p['name']} (${p['km']}km)').toList()}');
+      // Reduced logging for performance
+      if (places.length <= 10) {
+        print('🔍 RouteService: Returning ${places.length} sorted places: ${places.map((p) => '${p['name']} (${p['km']}km)').toList()}');
+      } else {
+        print('🔍 RouteService: Returning ${places.length} sorted places (showing first 5): ${places.take(5).map((p) => '${p['name']} (${p['km']}km)').toList()}...');
+      }
       
       return places;
     } catch (e) {
@@ -270,6 +278,8 @@ class RouteService {
       'discountAmount': totalDiscountStr,
       'discountList': discountList,
       'discountBreakdown': discountBreakdown,
+      'status': 'boarded', // Add status for manually ticketed passengers
+      'ticketType': 'manual', // Distinguish from QR-scanned tickets
     });
 
          // Also save to daily trip structure (trip1 or trip2)
@@ -309,6 +319,8 @@ class RouteService {
                'discountAmount': totalDiscountStr,
                'discountList': discountList,
                'discountBreakdown': discountBreakdown,
+               'status': 'boarded', // Add status for manually ticketed passengers
+               'ticketType': 'manual', // Distinguish from QR-scanned tickets
              });
        }
      } catch (e) {
@@ -374,6 +386,260 @@ static Future<void> updateTripStatus(
       .doc(ticketDocName);
 
   await tripDoc.update({'active': isActive});
+}
+
+// ✅ Update manually ticketed passenger status to accomplished
+static Future<void> updateManualTicketStatus(
+  String conductorId,
+  String date,
+  String ticketDocName,
+  String newStatus,
+) async {
+  try {
+    // Update in remittance collection
+    final remittanceDoc = FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(date)
+        .collection('tickets')
+        .doc(ticketDocName);
+
+    final remittanceData = await remittanceDoc.get();
+    if (!remittanceData.exists) {
+      throw Exception('Ticket not found in remittance collection');
+    }
+
+    final ticketData = remittanceData.data() as Map<String, dynamic>;
+    final quantity = ticketData['quantity'] ?? 0;
+    final currentStatus = ticketData['status'] ?? 'boarded';
+
+    // Only allow status changes from "boarded" to "accomplished"
+    if (currentStatus == 'boarded' && newStatus == 'accomplished') {
+      await remittanceDoc.update({
+        'status': newStatus,
+        'accomplishedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Also update in daily trip structure
+      try {
+        final dailyTripDoc = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(date)
+            .get();
+
+        if (dailyTripDoc.exists) {
+          final dailyTripData = dailyTripDoc.data();
+          final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+          final tripCollection = 'trip$currentTrip';
+
+          final dailyTripTicketDoc = FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('dailyTrips')
+              .doc(date)
+              .collection(tripCollection)
+              .doc('tickets')
+              .collection('tickets')
+              .doc(ticketDocName);
+
+          await dailyTripTicketDoc.update({
+            'status': newStatus,
+            'accomplishedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        print('Failed to update daily trip structure: $e');
+        // Continue with normal operation even if daily trip structure fails
+      }
+
+      // Decrement passenger count when status changes to accomplished
+      if (quantity > 0) {
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .update({
+              'passengerCount': FieldValue.increment(-quantity)
+            });
+        print('✅ Passenger count decremented by $quantity');
+      }
+
+      // Update remittance summary
+      try {
+        Map<String, dynamic>? remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
+        if (remittanceSummary != null) {
+          await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
+          print('✅ Remittance summary updated for $date');
+        }
+      } catch (e) {
+        print('Error updating remittance summary: $e');
+      }
+
+      print('✅ Ticket status updated to $newStatus successfully');
+    } else {
+      throw Exception('Invalid status transition from $currentStatus to $newStatus');
+    }
+  } catch (e) {
+    print('❌ Error updating ticket status: $e');
+    throw e;
+  }
+}
+
+// ✅ Get all manually ticketed passengers with their current status
+static Future<List<Map<String, dynamic>>> getManualTickets(
+  String conductorId,
+  String date,
+) async {
+  try {
+    final ticketsSnapshot = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(date)
+        .collection('tickets')
+        .where('ticketType', isEqualTo: 'manual')
+        .get();
+
+    return ticketsSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id,
+        ...data,
+      };
+    }).toList();
+  } catch (e) {
+    print('❌ Error fetching manual tickets: $e');
+    return [];
+  }
+}
+
+// ✅ Get all QR-scanned tickets with their current status
+static Future<List<Map<String, dynamic>>> getQRTickets(
+  String conductorId,
+  String date,
+) async {
+  try {
+    final ticketsSnapshot = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(date)
+        .collection('tickets')
+        .where('ticketType', isEqualTo: 'qr')
+        .get();
+
+    return ticketsSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return {
+        'id': doc.id,
+        ...data,
+      };
+    }).toList();
+  } catch (e) {
+    print('❌ Error fetching QR tickets: $e');
+    return [];
+  }
+}
+
+// ✅ Update QR-scanned ticket status to accomplished
+static Future<void> updateQRTicketStatus(
+  String conductorId,
+  String date,
+  String ticketDocName,
+  String newStatus,
+) async {
+  try {
+    // Update in remittance collection
+    final remittanceDoc = FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(date)
+        .collection('tickets')
+        .doc(ticketDocName);
+
+    final remittanceData = await remittanceDoc.get();
+    if (!remittanceData.exists) {
+      throw Exception('Ticket not found in remittance collection');
+    }
+
+    final ticketData = remittanceData.data() as Map<String, dynamic>;
+    final quantity = ticketData['quantity'] ?? 0;
+    final currentStatus = ticketData['status'] ?? 'boarded';
+
+    // Only allow status changes from "boarded" to "accomplished"
+    if (currentStatus == 'boarded' && newStatus == 'accomplished') {
+      await remittanceDoc.update({
+        'status': newStatus,
+        'accomplishedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Also update in daily trip structure
+      try {
+        final dailyTripDoc = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(date)
+            .get();
+
+        if (dailyTripDoc.exists) {
+          final dailyTripData = dailyTripDoc.data();
+          final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+          final tripCollection = 'trip$currentTrip';
+
+          final dailyTripTicketDoc = FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('dailyTrips')
+              .doc(date)
+              .collection(tripCollection)
+              .doc('tickets')
+              .collection('tickets')
+              .doc(ticketDocName);
+
+          await dailyTripTicketDoc.update({
+            'status': newStatus,
+            'accomplishedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      } catch (e) {
+        print('Failed to update daily trip structure: $e');
+        // Continue with normal operation even if daily trip structure fails
+      }
+
+      // Decrement passenger count when status changes to accomplished
+      if (quantity > 0) {
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .update({
+              'passengerCount': FieldValue.increment(-quantity)
+            });
+        print('✅ Passenger count decremented by $quantity');
+      }
+
+      // Update remittance summary
+      try {
+        Map<String, dynamic>? remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
+        if (remittanceSummary != null) {
+          await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
+          print('✅ Remittance summary updated for $date');
+        }
+      } catch (e) {
+        print('Error updating remittance summary: $e');
+      }
+
+      print('✅ QR ticket status updated to $newStatus successfully');
+    } else {
+      throw Exception('Invalid status transition from $currentStatus to $newStatus');
+    }
+  } catch (e) {
+    print('❌ Error updating QR ticket status: $e');
+    throw e;
+  }
 }
 
 //  Fetch trip details for a ticket

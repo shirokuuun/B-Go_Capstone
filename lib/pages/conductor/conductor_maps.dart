@@ -44,9 +44,9 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
   DateTime? _lastGeofencingCheck;
   
   // Optimization variables
-  static const int _locationUpdateInterval = 30;
+  static const int _locationUpdateInterval = 5;
   static const Duration _debounceDelay = Duration(milliseconds: 800);
-  static const Duration _geofencingCooldown = Duration(seconds: 15); // Reduced cooldown
+  static const Duration _geofencingCooldown = Duration(seconds: 10); // Reduced cooldown
   Timer? _debounceTimer;
   
   // Memory optimization
@@ -63,8 +63,8 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
   bool _isAppActive = true;
   
   // Geofencing constants
-  static const double _dropOffRadius = 300.0;
-  static const double _readyDropOffRadius = 50.0;
+  static const double _dropOffRadius = 600.0;
+  static const double _readyDropOffRadius = 250.0;
 
   // Helper method to convert any numeric value to double
   double? _convertToDouble(dynamic value) {

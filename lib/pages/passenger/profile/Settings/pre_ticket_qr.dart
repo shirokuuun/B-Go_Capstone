@@ -154,6 +154,8 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
           indicatorColor: Colors.white,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
           tabs: [
             Tab(text: 'All'),
             Tab(text: 'Pending'),
@@ -309,7 +311,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
       ),
     );
   }
-
+  
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':

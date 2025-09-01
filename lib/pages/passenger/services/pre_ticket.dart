@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 
 class PreTicket extends StatefulWidget {
   const PreTicket({super.key});
@@ -76,6 +77,13 @@ class _PreTicketState extends State<PreTicket> {
       placeCollection: 'Place'
     );
     _fetchVerifiedIDType();
+    // Start geofencing service for passenger monitoring
+    GeofencingService().startMonitoring();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   Future<void> _fetchVerifiedIDType() async {
@@ -106,6 +114,62 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
+  // Method to mark ticket as boarded (called when conductor scans QR)
+  static Future<void> markTicketAsBoarded(String ticketId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('preTickets')
+          .doc(ticketId)
+          .update({
+        'status': 'boarded',
+        'boardedAt': DateTime.now(),
+      });
+      print('✅ Pre-ticket marked as boarded: $ticketId');
+    } catch (e) {
+      print('Error marking ticket as boarded: $e');
+    }
+  }
+
+  static Future<void> markTicketAsAccomplished(String ticketId, String userId) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('preTickets')
+        .doc(ticketId)
+        .update({
+      'status': 'accomplished',
+      'accomplishedAt': DateTime.now(),
+    });
+    print('✅ Pre-ticket marked as accomplished: $ticketId');
+  } catch (e) {
+    print('Error marking pre-ticket as accomplished: $e');
+  }
+}
+
+  // Method to check if a ticket can be marked as accomplished
+  static Future<bool> canMarkTicketAccomplished(String ticketId, String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('preTickets')
+          .doc(ticketId)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        final status = data?['status'];
+        return status == 'boarded';
+      }
+      return false;
+    } catch (e) {
+      print('Error checking ticket status: $e');
+      return false;
+    }
+  }
 
 
   void _onRouteChanged(String? newRoute) {
@@ -712,8 +776,8 @@ class _ReceiptModal extends StatelessWidget {
       'time': formattedTime,
       'from': fromPlace['name'],
       'to': toPlace['name'],
-                        'fromKm': (fromPlace['km'] as num).toInt(),
-                  'toKm': (toPlace['km'] as num).toInt(),
+      'fromKm': (fromPlace['km'] as num).toInt(),
+      'toKm': (toPlace['km'] as num).toInt(),
       'fare': baseFare,
       'quantity': quantity,
       'amount': totalAmount,
@@ -769,6 +833,7 @@ class _ReceiptModal extends StatelessWidget {
                   qrData: jsonEncode(qrData),
                   discountBreakdown: discountBreakdown,
                   showConfirmButton: true,
+                  route: route,
                 ),
               ),
             );
@@ -1014,6 +1079,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
   final String qrData;
   final List<String>? discountBreakdown;
   final bool showConfirmButton;
+  final String route;
 
   const QRCodeFullScreenPage({
     Key? key,
@@ -1025,6 +1091,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
     required this.qrData,
     this.discountBreakdown,
     this.showConfirmButton = true,
+    required this.route,
   }) : super(key: key);
 
   Future<bool> canCreatePreTicket() async {
@@ -1076,6 +1143,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
       'discountBreakdown': discountBreakdown,
       'status': 'pending', // Add status field
       'createdAt': now, // Save as local time
+      'route': route, // Route from the pre-ticket creation
     };
     
     print('🔍 savePreTicket - Data to save: $data');

@@ -16,7 +16,7 @@ if (localPropsFile.exists()) {
 
 android {
     namespace 'com.example.capstone_project'
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -33,7 +33,7 @@ android {
         applicationId = "com.example.capstone_project"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
+        minSdkVersion = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

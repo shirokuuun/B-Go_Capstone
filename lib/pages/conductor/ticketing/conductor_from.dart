@@ -4,6 +4,7 @@ import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:b_go/pages/conductor/conductor_departure.dart';
 import 'package:b_go/pages/conductor/sos.dart';
 import 'package:b_go/pages/conductor/remittance_service.dart';
+import 'package:b_go/pages/conductor/passenger_status_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -29,7 +30,7 @@ class ConductorFrom extends StatefulWidget {
 }
 
 class _ConductorFromState extends State<ConductorFrom> {
-  late Future<List<Map<String, dynamic>>> placesFuture;
+  Future<List<Map<String, dynamic>>>? placesFuture;
   String selectedPlaceCollection = 'Place';
   late List<Map<String, String>> routeDirections;
   
@@ -48,6 +49,11 @@ class _ConductorFromState extends State<ConductorFrom> {
     super.initState();
     _initializeRouteDirections();
     _checkActiveTrip();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 
   void _initializeRouteDirections() {
@@ -90,6 +96,8 @@ class _ConductorFromState extends State<ConductorFrom> {
   }
 
   Future<void> _checkActiveTrip() async {
+    if (!mounted) return;
+    
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -105,9 +113,11 @@ class _ConductorFromState extends State<ConductorFrom> {
         final activeTrip = conductorData['activeTrip'];
 
         if (activeTrip != null && activeTrip['isActive'] == true) {
-          setState(() {
-            selectedPlaceCollection = activeTrip['placeCollection'] ?? 'Place';
-          });
+          if (mounted) {
+            setState(() {
+              selectedPlaceCollection = activeTrip['placeCollection'] ?? 'Place';
+            });
+          }
         }
       }
     } catch (e) {
@@ -115,6 +125,8 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
 
     // Initialize places future after determining the correct collection
+    if (!mounted) return;
+    
     print('🔍 ConductorFrom: Route: "${widget.route}"');
     print('🔍 ConductorFrom: Selected collection: "$selectedPlaceCollection"');
     
@@ -122,34 +134,45 @@ class _ConductorFromState extends State<ConductorFrom> {
     String firestoreRouteName = _routeFirestoreNames[widget.route] ?? widget.route;
     print('🔍 ConductorFrom: Firestore route name: "$firestoreRouteName"');
     
-    placesFuture = RouteService.fetchPlaces(firestoreRouteName,
-        placeCollection: selectedPlaceCollection);
+    if (mounted) {
+      setState(() {
+        placesFuture = RouteService.fetchPlaces(firestoreRouteName,
+            placeCollection: selectedPlaceCollection);
+      });
+    }
   }
 
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
       List<Map<String, dynamic>> allPlaces) async {
+    if (!mounted) return;
+    
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content:
-                Text('No valid drop-off locations after selected pick-up.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('No valid drop-off locations after selected pick-up.')),
+        );
+      }
       return;
     }
-    final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
-      MaterialPageRoute(
-        builder: (context) => _ToSelectionPageConductor(
-          toPlaces: toPlaces,
-          route: widget.route,
-          role: widget.role,
-          fromPlace: fromPlace,
-          placeCollection: selectedPlaceCollection,
+    
+    if (mounted) {
+      final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute(
+          builder: (context) => _ToSelectionPageConductor(
+            toPlaces: toPlaces,
+            route: widget.route,
+            role: widget.role,
+            fromPlace: fromPlace,
+            placeCollection: selectedPlaceCollection,
+          ),
         ),
-      ),
-    );
-    // No further action needed here; navigation handled in _ToSelectionPageConductor
+      );
+      // No further action needed here; navigation handled in _ToSelectionPageConductor
+    }
   }
 
   @override
@@ -357,84 +380,406 @@ class _ConductorFromState extends State<ConductorFrom> {
                           ),
                         ),
                         const SizedBox(height: 16),
-                        FutureBuilder<List<Map<String, dynamic>>>(
-                          future: placesFuture,
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState ==
-                                ConnectionState.waiting) {
-                              return const Center(
-                                  child: CircularProgressIndicator());
-                            } else if (snapshot.hasError) {
-                              return Center(
-                                  child: Text('Error: ${snapshot.error}'));
-                            } else if (!snapshot.hasData ||
-                                snapshot.data!.isEmpty) {
-                              return const Center(
-                                  child: Text('No places found.'));
-                            }
-                            final myList = snapshot.data!;
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                mainAxisSpacing: 16,
-                                crossAxisSpacing: 16,
-                                childAspectRatio: 2.2,
-                              ),
-                              itemCount: myList.length,
-                              itemBuilder: (context, index) {
-                                final item = myList[index];
-                                return ElevatedButton(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0091AD),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 8, horizontal: 4),
-                                  ),
-                                  onPressed: () =>
-                                      _showToSelectionPage(item, myList),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        item['name'] ?? '',
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 14,
-                                          color: Colors.white,
+                        if (placesFuture == null)
+                          const Center(child: CircularProgressIndicator())
+                        else
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            key: ValueKey('places_future_${widget.route}_$selectedPlaceCollection'),
+                            future: placesFuture,
+                            builder: (context, snapshot) {
+                              // Add safety check for mounted state
+                              if (!mounted) {
+                                return const SizedBox.shrink();
+                              }
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                    child: CircularProgressIndicator());
+                              } else if (snapshot.hasError) {
+                                return Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                                        const SizedBox(height: 16),
+                                        Text('Error: ${snapshot.error}'),
+                                        const SizedBox(height: 16),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              // Reinitialize the future
+                                              String firestoreRouteName = _routeFirestoreNames[widget.route] ?? widget.route;
+                                              placesFuture = RouteService.fetchPlaces(firestoreRouteName,
+                                                  placeCollection: selectedPlaceCollection);
+                                            });
+                                          },
+                                          child: const Text('Retry'),
                                         ),
-                                        textAlign: TextAlign.center,
+                                      ],
+                                    ));
+                              } else if (!snapshot.hasData ||
+                                  snapshot.data == null ||
+                                  snapshot.data!.isEmpty) {
+                                return const Center(
+                                    child: Text('No places found.'));
+                              }
+                              
+                              final myList = snapshot.data!;
+                              return GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 2.2,
+                                ),
+                                itemCount: myList.length,
+                                itemBuilder: (context, index) {
+                                  final item = myList[index];
+                                  return ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0091AD),
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      if (item['km'] != null)
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 8, horizontal: 4),
+                                    ),
+                                    onPressed: () =>
+                                        _showToSelectionPage(item, myList),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
                                         Text(
-                                          '${(item['km'] as num).toInt()} km',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.white70,
+                                          item['name'] ?? '',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 14,
+                                            color: Colors.white,
                                           ),
+                                          textAlign: TextAlign.center,
                                         ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
+                                        if (item['km'] != null)
+                                          Text(
+                                            '${(item['km'] as num).toInt()} km',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
                       ],
                     ),
                   ),
                 );
               },
             ),
-          )
+          ),
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 24),
+                
+                // Manually Ticketed Passengers Section
+                const Padding(
+                  padding: EdgeInsets.only(left: 10),
+                  child: Text(
+                    "Manually Ticketed Passengers:",
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  key: const ValueKey('manual_tickets_future'),
+                  future: _getManualTickets(),
+                  builder: (context, snapshot) {
+                    // Add safety check for mounted state
+                    if (!mounted) {
+                      return const SizedBox.shrink();
+                    }
+                    
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    } else if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
+                      return Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'No manually ticketed passengers yet',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    final manualTickets = snapshot.data!;
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: manualTickets.length,
+                      itemBuilder: (context, index) {
+                        final ticket = manualTickets[index];
+                        final status = ticket['status'] ?? 'boarded';
+                        final isAccomplished = status == 'accomplished';
+                        
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isAccomplished ? Colors.green[50] : Colors.blue[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isAccomplished ? Colors.green[300]! : Colors.blue[300]!,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${ticket['from']} → ${ticket['to']}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Passengers: ${ticket['quantity']}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Fare: ₱${ticket['totalFare']}',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isAccomplished 
+                                              ? Colors.green[100] 
+                                              : Colors.blue[100],
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: Text(
+                                          isAccomplished ? 'ACCOMPLISHED' : 'BOARDED',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: isAccomplished 
+                                                ? Colors.green[700] 
+                                                : Colors.blue[700],
+                                          ),
+                                        ),
+                                      ),
+                                      if (!isAccomplished) ...[
+                                        const SizedBox(height: 8),
+                                        ElevatedButton(
+                                          onPressed: () => _markTicketAccomplished(ticket),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.green[600],
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 16,
+                                              vertical: 8,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            'Mark Accomplished',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
+
   }
+  
+  // Helper method to get manually ticketed passengers
+  Future<List<Map<String, dynamic>>> _getManualTickets() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return [];
+      
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+      
+      if (conductorDoc.docs.isEmpty) return [];
+      
+      final conductorId = conductorDoc.docs.first.id;
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      
+      return await RouteService.getManualTickets(conductorId, today);
+    } catch (e) {
+      print('Error fetching manual tickets: $e');
+      return [];
+    }
+  }
+  
+Future<void> _markTicketAccomplished(Map<String, dynamic> ticket) async {
+  if (!mounted) return;
+  
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    final conductorDoc = await FirebaseFirestore.instance
+        .collection('conductors')
+        .where('uid', isEqualTo: user.uid)
+        .limit(1)
+        .get();
+    
+    if (conductorDoc.docs.isEmpty) return;
+    
+    final conductorId = conductorDoc.docs.first.id;
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final ticketId = ticket['id'] as String;
+    final quantity = ticket['quantity'] as int;
+    final from = ticket['from'] as String;
+    final to = ticket['to'] as String;
+    
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Passenger Drop-off'),
+        content: Text(
+          'Mark $quantity passenger(s) from $from to $to as accomplished?\n\nThis will decrease the passenger count by $quantity.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[600],
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true && mounted) {
+      // Use the PassengerStatusService to handle the accomplishment
+      // Import: import 'package:b_go/pages/conductor/passenger_status_service.dart';
+      await PassengerStatusService.markManualTicketAccomplished(
+        conductorId: conductorId,
+        date: today,
+        ticketId: ticketId,
+        quantity: quantity,
+        from: from,
+        to: to,
+      );
+      
+      // Refresh the UI
+      if (mounted) {
+        setState(() {});
+      }
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$quantity passenger(s) from $from to $to marked as accomplished. Passenger count decreased by $quantity.',
+            ),
+            backgroundColor: Colors.green[600],
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      print('Manual ticket accomplished: $ticketId, decremented passenger count by $quantity');
+    }
+  } catch (e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+    print('Error marking ticket accomplished: $e');
+  }
+}
+
+// Also add this import at the top of your conductor_from.dart file:
+// import 'package:b_go/pages/conductor/passenger_status_service.dart';// Updated method for conductor_from.dart
+// Replace your existing _markTicketAccomplished method with this:
+
+
 }
 
 class _ToSelectionPageConductor extends StatelessWidget {
@@ -807,19 +1152,26 @@ class _QRScanPageState extends State<QRScanPage> {
   bool _isProcessing = false;
 
   @override
+  void dispose() {
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: MobileScanner(
         onDetect: (capture) async {
           // Prevent multiple executions
-          if (_isProcessing) {
-            print('QR scan already in progress, ignoring duplicate detection');
+          if (_isProcessing || !mounted) {
+            print('QR scan already in progress or widget disposed, ignoring duplicate detection');
             return;
           }
 
-          setState(() {
-            _isProcessing = true;
-          });
+          if (mounted) {
+            setState(() {
+              _isProcessing = true;
+            });
+          }
 
           final barcode = capture.barcodes.first;
           final qrData = barcode.rawValue;
@@ -834,36 +1186,44 @@ class _QRScanPageState extends State<QRScanPage> {
               print('✅ Successfully parsed QR data: $data');
               await storePreTicketToFirestore(data);
               print('✅ Successfully stored to Firestore');
-              Navigator.of(context).pop(true);
+              if (mounted) {
+                Navigator.of(context).pop(true);
+              }
             } catch (e) {
               print('❌ Error processing QR scan: $e');
               // Show error message to conductor
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 5),
+                  ),
+                );
+                Navigator.of(context).pop(false);
+              }
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isProcessing = false;
+                });
+              }
+            }
+          } else {
+            print('❌ QR data is null or empty');
+            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text(
-                      'Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
+                  content: Text('Invalid QR code: No data detected'),
                   backgroundColor: Colors.red,
-                  duration: Duration(seconds: 5),
+                  duration: Duration(seconds: 3),
                 ),
               );
-              Navigator.of(context).pop(false);
-            } finally {
               setState(() {
                 _isProcessing = false;
               });
             }
-          } else {
-            print('❌ QR data is null or empty');
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Invalid QR code: No data detected'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
-            setState(() {
-              _isProcessing = false;
-            });
           }
         },
       ),
@@ -1364,6 +1724,8 @@ Future<void> _createTripRecord(Map<String, dynamic> data, String documentId,
     'documentId': documentId,
     'documentType': type,
     'scannedBy': user.uid,
+    'status': 'boarded', // Add status for QR-scanned tickets
+    'ticketType': 'qr', // Distinguish from manual tickets
   });
 
   print('✅ Successfully created trip record: $tripDocName for $type');
@@ -1435,6 +1797,8 @@ Future<void> _createConductorTicketRecord(Map<String, dynamic> data,
       'documentId': documentId,
       'documentType': type,
       'scannedBy': user.uid,
+      'status': 'boarded', // Add status for QR-scanned tickets
+      'ticketType': 'qr', // Distinguish from manual tickets
     });
 
     // Also save to daily trip structure (trip1 or trip2)
@@ -1476,6 +1840,8 @@ Future<void> _createConductorTicketRecord(Map<String, dynamic> data,
           'documentId': documentId,
           'documentType': type,
           'scannedBy': user.uid,
+          'status': 'boarded', // Add status for QR-scanned tickets
+          'ticketType': 'qr', // Distinguish from manual tickets
         });
       }
     } catch (e) {

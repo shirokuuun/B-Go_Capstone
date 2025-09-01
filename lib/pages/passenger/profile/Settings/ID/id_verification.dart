@@ -65,7 +65,7 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
           'backUrl': backUrl,
           'idType': idType ?? 'Unknown', // Ensure it's not null
           'status': 'pending',
-          'submittedAt': FieldValue.serverTimestamp(),
+          'createdAt': DateTime.now(),
         });
         firestoreSuccess = true;
       } catch (e) {

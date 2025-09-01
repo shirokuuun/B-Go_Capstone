@@ -114,13 +114,6 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-
-
-
-
-
-
-
   // Method to mark ticket as boarded (called when conductor scans QR)
   static Future<void> markTicketAsBoarded(String ticketId, String userId) async {
     try {
@@ -138,6 +131,23 @@ class _PreTicketState extends State<PreTicket> {
       print('Error marking ticket as boarded: $e');
     }
   }
+
+  static Future<void> markTicketAsAccomplished(String ticketId, String userId) async {
+  try {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('preTickets')
+        .doc(ticketId)
+        .update({
+      'status': 'accomplished',
+      'accomplishedAt': DateTime.now(),
+    });
+    print('✅ Pre-ticket marked as accomplished: $ticketId');
+  } catch (e) {
+    print('Error marking pre-ticket as accomplished: $e');
+  }
+}
 
   // Method to check if a ticket can be marked as accomplished
   static Future<bool> canMarkTicketAccomplished(String ticketId, String userId) async {

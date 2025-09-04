@@ -310,117 +310,171 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
-
-                    // --- OUTSIDE THE BOX ---
+                    SizedBox(height: 25),
 
                     // Or divider
                     Row(
                       children: [
                         const Expanded(
                             child: Divider(
-                                thickness: 2, color: Color(0xFFE7E7E7))),
+                                thickness: 1, color: Color(0xFFE7E7E7))),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text("Or",
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text("Or login with",
                               style: GoogleFonts.outfit(
-                                  fontSize: 20,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500)),
+                                  fontSize: 16,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w400)),
                         ),
                         const Expanded(
                             child: Divider(
-                                thickness: 1.5, color: Color(0xFFE7E7E7))),
+                                thickness: 1, color: Color(0xFFE7E7E7))),
                       ],
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(height: 25),
 
-                    // sign in with Google
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              final userCredential =
-                                  await _authServices.SignInWithGoogle();
-                              if (userCredential == null) return;
-                              
-                              // Handle successful Google Sign-In
-                              if (!mounted) return;
-                              
-                              final user = userCredential.user;
-                              if (user != null) {
-                                // Check if user is a conductor
-                                String email = user.email!;
-                                String username = email.split('@').first;
-                                String conductorDocId = username[0].toUpperCase() + username.substring(1);
+                    // Social login buttons
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 100.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Google Sign-In Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                try {
+                                  final userCredential =
+                                      await _authServices.SignInWithGoogle();
+                                  if (userCredential == null) return;
+                                  
+                                  // Handle successful Google Sign-In
+                                  if (!mounted) return;
+                                  
+                                  final user = userCredential.user;
+                                  if (user != null) {
+                                    // Check if user is a conductor
+                                    String email = user.email!;
+                                    String username = email.split('@').first;
+                                    String conductorDocId = username[0].toUpperCase() + username.substring(1);
 
-                                final conductorDoc = await FirebaseFirestore.instance
-                                    .collection('conductors')
-                                    .doc(conductorDocId)
-                                    .get();
+                                    final conductorDoc = await FirebaseFirestore.instance
+                                        .collection('conductors')
+                                        .doc(conductorDocId)
+                                        .get();
 
-                                if (!mounted) return;
+                                    if (!mounted) return;
 
-                                if (conductorDoc.exists) {
-                                  final route = conductorDoc.data()?['route'] ?? '';
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+                                    if (conductorDoc.exists) {
+                                      final route = conductorDoc.data()?['route'] ?? '';
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+                                        ),
+                                      );
+                                    } else {
+                                      // Not a conductor, navigate as a normal user
+                                      Navigator.pushReplacementNamed(context, '/user_selection');
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text("Google Sign-In Failed"),
+                                      content: Text(e.toString()),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: Text("OK"),
+                                        ),
+                                      ],
                                     ),
                                   );
-                                } else {
-                                  // Not a conductor, navigate as a normal user
-                                  Navigator.pushReplacementNamed(context, '/user_selection');
                                 }
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text("Google Sign-In Failed"),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: Text("OK"),
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 1),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFE5E9F0),
+                                        borderRadius: BorderRadius.circular(25),
+                                      ),
+                                      child: Center(
+                                        child: Image.asset(
+                                          'assets/google-icon.png',
+                                          width: 30,
+                                          height: 30,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              );
-                            }
-                          },
-                          child: Image.asset(
-                            'assets/google-icon.png',
-                            height: 40,
-                            width: 40,
+                              ),
+                            ),
                           ),
-                        ),
 
-                        SizedBox(width: 5),
 
-                        // Phone Sign-In Icon
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(context,
-                                '/phone_login'); 
-                          },
-                          child: Image.asset(
-                            'assets/phone-call.png',
-                            height: 40,
-                            width: 40,
+                          // Twitter Sign-In Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pushNamed(context, '/phone_login'); 
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 1),
+
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFE5E9F0),
+                                        borderRadius: BorderRadius.circular(25),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.phone,
+                                          size: 30,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
 
-                        SizedBox(width: 5),
+                    SizedBox(height: 25),
 
-                        // Conductor Login Icon
-                        GestureDetector(
-                          onTap: () {
+                    // Conductor Login Button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFE5E9F0),
+                            padding: EdgeInsets.all(12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -428,21 +482,27 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             );
                           },
-                          child: Container(
-                            height: 40,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              color: Color(0xFFE5E9F0),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.directions_bus,
-                              color: Color(0xFF0091AD),
-                              size: 28,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                color: Color(0xFF0091AD),
+                                size: 20,
+                              ),
+                              SizedBox(width: 8),
+                              Text(
+                                'Conductor Login',
+                                style: GoogleFonts.outfit(
+                                  color: Color(0xFF0091AD),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
 
                     SizedBox(height: 25),

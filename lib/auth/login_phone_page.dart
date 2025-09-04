@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/auth/auth_services.dart';
+import 'package:b_go/auth/otp_verification_page.dart';
 import 'dart:math' as math;
 
 class LoginPhonePage extends StatefulWidget {
@@ -14,11 +15,9 @@ class LoginPhonePage extends StatefulWidget {
 
 class _LoginPhonePageState extends State<LoginPhonePage> {
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController otpController = TextEditingController();
   final AuthServices _authServices = AuthServices();
 
   String? _verificationId;
-  bool _otpSent = false;
   bool _isLoading = false;
 
   // Country code dropdown
@@ -43,7 +42,6 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
   @override
   void dispose() {
     phoneController.dispose();
-    otpController.dispose();
     super.dispose();
   }
 
@@ -117,13 +115,22 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
         codeSent: (String verificationId, int? resendToken) {
           setState(() {
             _verificationId = verificationId;
-            _otpSent = true;
             _isLoading = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP sent to $fullPhone'),
-              backgroundColor: Colors.green,
+          
+          // Navigate to OTP verification page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPVerificationPage(
+                phoneNumber: fullPhone,
+                verificationId: verificationId,
+                isRegistration: false,
+                onVerificationSuccess: () {
+                  // Navigate to user selection after successful verification
+                  Navigator.pushReplacementNamed(context, '/user_selection');
+                },
+              ),
             ),
           );
         },
@@ -142,52 +149,25 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
     }
   }
 
-  Future<void> _verifyOTP() async {
-    if (_verificationId == null) return;
-    
-    String otp = otpController.text.trim();
-    if (otp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter the OTP.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
-    setState(() => _isLoading = true);
-    
-    try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
-      );
-      
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Login successful!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pushReplacementNamed(context, '/user_selection');
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invalid OTP or verification failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    Responsive responsive = Responsive(context);
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
+    
+    // Calculate responsive dimensions
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Responsive sizing
+    final logoWidth = isMobile ? 120.0 : (isTablet ? 150.0 : 180.0);
+    final titleFontSize = isMobile ? 35.0 : (isTablet ? 45.0 : 50.0);
+    final subtitleFontSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
+    final buttonHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
+    
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -234,10 +214,10 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                   ],
                 ),
                 padding: EdgeInsets.only(
-                  top: responsive.height * 0.05,
-                  left: responsive.width * 0.07,
-                  right: responsive.width * 0.07,
-                  bottom: responsive.height * 0.25,
+                  top: screenHeight * 0.05,
+                  left: screenWidth * 0.07,
+                  right: screenWidth * 0.07,
+                  bottom: screenHeight * 0.25,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,13 +231,13 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                           Text(
                             "Hello!",
                             style: GoogleFonts.outfit(
-                              fontSize: 45,
+                              fontSize: titleFontSize,
                             ),
                           ),
                           Text(
                             "Login with Phone Number!",
                             style: GoogleFonts.outfit(
-                              fontSize: 18,
+                              fontSize: subtitleFontSize,
                               fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
@@ -291,13 +271,11 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                                   FontWeight.w500)),
                                     );
                                   }).toList(),
-                                  onChanged: !_otpSent
-                                      ? (value) {
-                                          setState(() {
-                                            selectedCountryCode = value!;
-                                          });
-                                        }
-                                      : null,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedCountryCode = value!;
+                                    });
+                                  },
                                 ),
                               ),
                             ),
@@ -305,7 +283,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                               child: TextField(
                                 controller: phoneController,
                                 keyboardType: TextInputType.phone,
-                                enabled: !_otpSent,
+                                enabled: true,
                                 style: GoogleFonts.outfit(
                                   color: Colors.black,
                                 ),
@@ -324,35 +302,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                       ),
                     ),
                     SizedBox(height: 20),
-                    if (_otpSent)
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 25.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Color(0xFFE5E9F0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 20.0),
-                            child: TextField(
-                              controller: otpController,
-                              keyboardType: TextInputType.number,
-                              style: GoogleFonts.outfit(
-                                color: Colors.black,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Enter OTP",
-                                hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+
 
                     SizedBox(height: 20),
                     Padding(
@@ -366,7 +316,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                 backgroundColor: phoneController.text.trim().isNotEmpty 
                                     ? Color(0xFF0091AD) 
                                     : Colors.grey,
-                                minimumSize: Size(double.infinity, 60),
+                                minimumSize: Size(double.infinity, buttonHeight),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -374,10 +324,10 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                 disabledBackgroundColor: Color(0x68454547),
                               ),
                               onPressed: phoneController.text.trim().isNotEmpty 
-                                  ? (_otpSent ? _verifyOTP : _sendOTP)
+                                  ? _sendOTP
                                   : null,
                               child: Text(
-                                _otpSent ? 'Verify OTP' : 'Send OTP',
+                                'Send OTP',
                                 style: GoogleFonts.outfit(
                                   color: Colors.white,
                                   fontSize: 20,

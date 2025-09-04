@@ -4,6 +4,7 @@ import 'package:b_go/pages/conductor/location_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'dart:math' as math;
 
 class ConductorDashboard extends StatefulWidget {
   final String route;
@@ -117,6 +118,238 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  void _showManualPassengerAdjustmentDialog(BuildContext context, int currentPassengerCount) {
+    final TextEditingController quantityController = TextEditingController();
+    final TextEditingController reasonController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            'Manual Passenger Count Adjustment',
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current passenger count: $currentPassengerCount',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF0091AD),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'How many passengers should be subtracted?',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: quantityController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'Enter number of passengers',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: Icon(Icons.people),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Reason for adjustment (optional):',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 8),
+                TextField(
+                  controller: reasonController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'e.g., Geofencing failed, manual drop-off, etc.',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    prefixIcon: Icon(Icons.note),
+                  ),
+                ),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[200]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This is a manual adjustment when geofencing fails. Use only when passengers have actually been dropped off.',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            color: Colors.orange[700],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final quantityText = quantityController.text.trim();
+                if (quantityText.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter the number of passengers'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                final quantity = int.tryParse(quantityText);
+                if (quantity == null || quantity <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please enter a valid number greater than 0'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                if (quantity > currentPassengerCount) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Cannot subtract more passengers than currently on board'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                Navigator.of(context).pop();
+                await _adjustPassengerCount(quantity, reasonController.text.trim());
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0091AD),
+                foregroundColor: Colors.white,
+              ),
+              child: Text(
+                'Adjust Count',
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  Future<void> _adjustPassengerCount(int quantity, String reason) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _showSnackBar('User not authenticated', Colors.red);
+        return;
+      }
+
+      // Get conductor document
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+      
+      if (conductorDoc.docs.isEmpty) {
+        _showSnackBar('Conductor data not found', Colors.red);
+        return;
+      }
+
+      final conductorId = conductorDoc.docs.first.id;
+      final currentCount = conductorDoc.docs.first.data()['passengerCount'] ?? 0;
+      final newCount = math.max<int>(0, currentCount - quantity);
+
+      // Update passenger count
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .update({
+        'passengerCount': newCount,
+        'lastManualAdjustment': {
+          'timestamp': FieldValue.serverTimestamp(),
+          'quantity': quantity,
+          'reason': reason.isNotEmpty ? reason : 'Manual adjustment',
+          'previousCount': currentCount,
+          'newCount': newCount,
+        },
+      });
+
+      // Log the adjustment in a separate collection for audit purposes
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('passengerAdjustments')
+          .add({
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'manual_subtraction',
+        'quantity': quantity,
+        'reason': reason.isNotEmpty ? reason : 'Manual adjustment',
+        'previousCount': currentCount,
+        'newCount': newCount,
+        'route': widget.route,
+        'conductorId': conductorId,
+      });
+
+      _showSnackBar(
+        'Successfully adjusted passenger count: $currentCount → $newCount (-$quantity)',
+        Colors.green,
+      );
+
+      // Refresh the UI
+      setState(() {});
+      
+    } catch (e) {
+      _showSnackBar('Error adjusting passenger count: $e', Colors.red);
+      print('Error adjusting passenger count: $e');
+    }
   }
 
   Widget _buildPreBookedPassengersList() {
@@ -663,46 +896,16 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                     ),
                                   ),
                                 ],
+                                
+
                                 SizedBox(height: mediumSpacing),
                                 Row(
                                   children: [
                                     Expanded(
                                       child: ElevatedButton(
                                         onPressed: boardedPassengers > 0 ? () async {
-                                          // Reset passenger count
-                                          final user = FirebaseAuth.instance.currentUser;
-                                          if (user != null) {
-                                            try {
-                                              final conductorDoc = await FirebaseFirestore.instance
-                                                  .collection('conductors')
-                                                  .where('uid', isEqualTo: user.uid)
-                                                  .limit(1)
-                                                  .get();
-                                              
-                                              if (conductorDoc.docs.isNotEmpty) {
-                                                await FirebaseFirestore.instance
-                                                    .collection('conductors')
-                                                    .doc(conductorDoc.docs.first.id)
-                                                    .update({
-                                                      'passengerCount': 0
-                                                    });
-                                                
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Passenger count reset to 0'),
-                                                    backgroundColor: Colors.green,
-                                                  ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text('Error resetting passenger count: $e'),
-                                                  backgroundColor: Colors.red,
-                                                ),
-                                              );
-                                            }
-                                          }
+                                          // Show manual passenger count adjustment dialog
+                                          _showManualPassengerAdjustmentDialog(context, boardedPassengers);
                                         } : null,
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.orange,
@@ -712,7 +915,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                           ),
                                         ),
                                         child: Text(
-                                          'Reset Count',
+                                          'Adjust Count',
                                           style: GoogleFonts.outfit(
                                             fontSize: resetButtonFontSize,
                                             fontWeight: FontWeight.w500,
@@ -886,11 +1089,13 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       '• Start location tracking when you begin your route\n'
                       '• Stop tracking when you end your shift\n'
                       '• Passengers will see your bus location in real-time\n'
-                      '• Your location updates every 10 meters or 30 seconds\n'
-                      '• Check pre-booked passengers below for guaranteed seats\n'
+                      '• Your location updates every 5 seconds\n'
+                      '• Check pre-booked passengers for guaranteed seats\n'
                       '• Use the Maps tab to see passenger locations\n'
                       '• Geofencing automatically decrements passenger count at drop-offs\n'
-                      '• Geofence radius: 100 meters for accurate passenger drop-off detection',
+                      '• Geofence radius: 250 meters for accurate passenger drop-off detection\n'
+                      '• If geofencing fails, use "Adjust Count" to manually subtract dropped-off passengers\n'
+                      '• Manual adjustments are logged for audit purposes',
                       style: GoogleFonts.outfit(
                         fontSize: instructionsFontSize,
                         color: Colors.grey[600],

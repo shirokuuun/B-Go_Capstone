@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:b_go/pages/conductor/destination_service.dart';
-import 'package:b_go/pages/conductor/passenger_status_service.dart';
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
@@ -346,168 +345,213 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
     }
     _lastGeofencingCheck = now;
     
-    List<Map<String, dynamic>> passengersNear = [];
-    List<Map<String, dynamic>> readyForDropOff = [];
-    
-    // Check pre-bookings
-    for (final booking in _activeBookings) {
-      final toLat = booking['toLatitude'];
-      final toLng = booking['toLongitude'];
+    try {
+      List<Map<String, dynamic>> passengersNear = [];
+      List<Map<String, dynamic>> readyForDropOff = [];
       
-      if (toLat != null && toLng != null) {
-        final distance = Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          toLat,
-          toLng,
-        );
+      // Check pre-bookings
+      for (final booking in _activeBookings) {
+        if (_isDisposed) return;
         
-        if (distance <= _dropOffRadius) {
-          if (distance <= _readyDropOffRadius) {
-            readyForDropOff.add({...booking, 'ticketType': 'preBooking'});
-          } else {
-            passengersNear.add({...booking, 'ticketType': 'preBooking'});
+        final toLat = _convertToDouble(booking['toLatitude']);
+        final toLng = _convertToDouble(booking['toLongitude']);
+        
+        if (toLat != null && toLng != null) {
+          final distance = Geolocator.distanceBetween(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            toLat,
+            toLng,
+          );
+          
+          if (distance <= _dropOffRadius) {
+            if (distance <= _readyDropOffRadius) {
+              readyForDropOff.add({...booking, 'ticketType': 'preBooking'});
+            } else {
+              passengersNear.add({...booking, 'ticketType': 'preBooking'});
+            }
           }
         }
       }
-    }
-    
-    // Check pre-tickets (scanned from PreTicket page)
-    for (final ticket in _activePreTickets) {
-      double? toLat = ticket['toLatitude'];
-      double? toLng = ticket['toLongitude'];
       
-      // If coordinates are missing, try to get them from the destination name
-      if ((toLat == null || toLng == null) && ticket['to'] != null) {
-        final coords = _getCoordinatesForPlace(ticket['to']);
-        if (coords != null) {
-          toLat = coords['latitude'];
-          toLng = coords['longitude'];
-          // Update the ticket with coordinates for future use
-          ticket['toLatitude'] = toLat;
-          ticket['toLongitude'] = toLng;
-        }
-      }
-      
-      if (toLat != null && toLng != null) {
-        final distance = Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          toLat,
-          toLng,
-        );
+      // Check pre-tickets (scanned from PreTicket page)
+      for (final ticket in _activePreTickets) {
+        if (_isDisposed) return;
         
-        if (distance <= _dropOffRadius) {
-          if (distance <= _readyDropOffRadius) {
-            readyForDropOff.add({...ticket, 'ticketType': 'preTicket'});
-          } else {
-            passengersNear.add({...ticket, 'ticketType': 'preTicket'});
+        double? toLat = _convertToDouble(ticket['toLatitude']);
+        double? toLng = _convertToDouble(ticket['toLongitude']);
+        
+        // If coordinates are missing, try to get them from the destination name
+        if ((toLat == null || toLng == null) && ticket['to'] != null) {
+          final coords = _getCoordinatesForPlace(ticket['to']);
+          if (coords != null) {
+            toLat = coords['latitude'];
+            toLng = coords['longitude'];
+            // Update the ticket with coordinates for future use
+            ticket['toLatitude'] = toLat;
+            ticket['toLongitude'] = toLng;
+          }
+        }
+        
+        if (toLat != null && toLng != null) {
+          final distance = Geolocator.distanceBetween(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            toLat,
+            toLng,
+          );
+          
+          if (distance <= _dropOffRadius) {
+            if (distance <= _readyDropOffRadius) {
+              readyForDropOff.add({...ticket, 'ticketType': 'preTicket'});
+            } else {
+              passengersNear.add({...ticket, 'ticketType': 'preTicket'});
+            }
           }
         }
       }
-    }
-    
-    // Check manual tickets
-    for (final ticket in _activeManualTickets) {
-      double? toLat = ticket['toLatitude'];
-      double? toLng = ticket['toLongitude'];
       
-      // If coordinates are missing, try to get them from the destination name
-      if ((toLat == null || toLng == null) && ticket['to'] != null) {
-        final coords = _getCoordinatesForPlace(ticket['to']);
-        if (coords != null) {
-          toLat = coords['latitude'];
-          toLng = coords['longitude'];
-          // Update the ticket with coordinates for future use
-          ticket['toLatitude'] = toLat;
-          ticket['toLongitude'] = toLng;
-        }
-      }
-      
-      if (toLat != null && toLng != null) {
-        final distance = Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          toLat,
-          toLng,
-        );
+      // Check manual tickets
+      for (final ticket in _activeManualTickets) {
+        if (_isDisposed) return;
         
-        if (distance <= _dropOffRadius) {
-          if (distance <= _readyDropOffRadius) {
-            readyForDropOff.add({...ticket, 'ticketType': 'manual'});
-          } else {
-            passengersNear.add({...ticket, 'ticketType': 'manual'});
+        double? toLat = _convertToDouble(ticket['toLatitude']);
+        double? toLng = _convertToDouble(ticket['toLongitude']);
+        
+        // If coordinates are missing, try to get them from the destination name
+        if ((toLat == null || toLng == null) && ticket['to'] != null) {
+          final coords = _getCoordinatesForPlace(ticket['to']);
+          if (coords != null) {
+            toLat = coords['latitude'];
+            toLng = coords['longitude'];
+            // Update the ticket with coordinates for future use
+            ticket['toLatitude'] = toLat;
+            ticket['toLongitude'] = toLng;
+          }
+        }
+        
+        if (toLat != null && toLng != null) {
+          final distance = Geolocator.distanceBetween(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            toLat,
+            toLng,
+          );
+          
+          if (distance <= _dropOffRadius) {
+            if (distance <= _readyDropOffRadius) {
+              readyForDropOff.add({...ticket, 'ticketType': 'manual'});
+            } else {
+              passengersNear.add({...ticket, 'ticketType': 'manual'});
+            }
           }
         }
       }
+      
+      print('Geofencing check: ${_activeBookings.length} pre-bookings, ${_activePreTickets.length} pre-tickets, ${_activeManualTickets.length} manual tickets');
+      print('Found ${passengersNear.length} passengers near drop-off, ${readyForDropOff.length} ready for drop-off');
+      
+      // Update UI safely
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _passengersNearDropOff = passengersNear + readyForDropOff;
+          _showDropOffBanner = _passengersNearDropOff.isNotEmpty;
+        });
+      }
+      
+      // Process ready passengers for automatic drop-off
+      if (readyForDropOff.isNotEmpty) {
+        _processReadyPassengers(readyForDropOff);
+      }
+    } catch (e) {
+      print('Error in geofencing check: $e');
+      // Don't crash the app, just log the error
     }
-    
-    print('Geofencing check: ${_activeBookings.length} pre-bookings, ${_activePreTickets.length} pre-tickets, ${_activeManualTickets.length} manual tickets');
-    print('Found ${passengersNear.length} passengers near drop-off, ${readyForDropOff.length} ready for drop-off');
-    
-    // Update UI
-    if (mounted && !_isDisposed) {
-      setState(() {
-        _passengersNearDropOff = passengersNear + readyForDropOff;
-        _showDropOffBanner = _passengersNearDropOff.isNotEmpty;
-      });
-    }
-    
-    // Process ready passengers for automatic drop-off
-    _processReadyPassengers(readyForDropOff);
   }
 
   // UPDATED: Process passengers ready for drop-off with support for pre-tickets
   void _processReadyPassengers(List<Map<String, dynamic>> readyPassengers) {
     if (_isDisposed || readyPassengers.isEmpty) return;
     
-    for (final passenger in readyPassengers) {
-      final passengerId = passenger['id'];
-      final userId = passenger['userId'];
-      final quantity = passenger['quantity'] ?? 1;
-      final from = passenger['from'];
-      final to = passenger['to'];
-      final ticketType = passenger['ticketType'];
+    // Process passengers one by one to avoid overwhelming the system
+    _processPassengerBatch(readyPassengers, 0);
+  }
 
-      print('Auto-dropping off passenger: $passengerId (quantity: $quantity) from $from to $to (type: $ticketType)');
-
-      // Update status and decrement count based on ticket type
-      if (ticketType == 'preBooking') {
-        // Remove from active bookings
-        if (mounted && !_isDisposed) {
-          setState(() {
-            _activeBookings.removeWhere((booking) => booking['id'] == passengerId);
-            passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
-          });
-        }
-        _updatePreBookingStatus(passengerId, 'accomplished');
-      } else if (ticketType == 'preTicket') {
-        // Remove from active pre-tickets
-        if (mounted && !_isDisposed) {
-          setState(() {
-            _activePreTickets.removeWhere((ticket) => ticket['id'] == passengerId);
-            passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
-          });
-        }
-        _updatePreTicketStatus(passengerId, userId, 'accomplished');
-      } else if (ticketType == 'manual') {
-        // Remove from active manual tickets  
-        if (mounted && !_isDisposed) {
-          setState(() {
-            _activeManualTickets.removeWhere((ticket) => ticket['id'] == passengerId);
-            passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
-          });
-        }
-        _updateManualTicketStatus(passengerId, 'dropped_off', passenger);
-      }
+  // NEW: Process passengers in batches to prevent crashes
+  void _processPassengerBatch(List<Map<String, dynamic>> passengers, int startIndex) {
+    if (_isDisposed || startIndex >= passengers.length) return;
+    
+    final batchSize = 2; // Process 2 passengers at a time
+    final endIndex = math.min(startIndex + batchSize, passengers.length);
+    final currentBatch = passengers.sublist(startIndex, endIndex);
+    
+    print('Processing passenger batch ${startIndex + 1}-$endIndex of ${passengers.length}');
+    
+    for (final passenger in currentBatch) {
+      if (_isDisposed) return;
       
-      _showDropOffNotification(passengerId, from, to, quantity);
-      print('Passenger count after drop-off: $passengerCount');
+      try {
+        final passengerId = passenger['id'];
+        final userId = passenger['userId'];
+        final quantity = passenger['quantity'] ?? 1;
+        final from = passenger['from'];
+        final to = passenger['to'];
+        final ticketType = passenger['ticketType'];
+
+        print('Auto-dropping off passenger: $passengerId (quantity: $quantity) from $from to $to (type: $ticketType)');
+
+        // Update status and decrement count based on ticket type
+        if (ticketType == 'preBooking') {
+          // Remove from active bookings
+          if (mounted && !_isDisposed) {
+            setState(() {
+              _activeBookings.removeWhere((booking) => booking['id'] == passengerId);
+              passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
+            });
+          }
+          _updatePreBookingStatus(passengerId, 'accomplished');
+        } else if (ticketType == 'preTicket') {
+          // Remove from active pre-tickets
+          if (mounted && !_isDisposed) {
+            setState(() {
+              _activePreTickets.removeWhere((ticket) => ticket['id'] == passengerId);
+              passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
+            });
+          }
+          _updatePreTicketStatus(passengerId, userId, 'accomplished');
+        } else if (ticketType == 'manual') {
+          // Remove from active manual tickets  
+          if (mounted && !_isDisposed) {
+            setState(() {
+              _activeManualTickets.removeWhere((ticket) => ticket['id'] == passengerId);
+              passengerCount = math.max(0, passengerCount - (quantity is int ? quantity : (quantity as num).toInt()));
+            });
+          }
+          _updateManualTicketStatus(passengerId, 'dropped_off', passenger);
+        }
+        
+        _showDropOffNotification(passengerId, from, to, quantity);
+        print('Passenger count after drop-off: $passengerCount');
+      } catch (e) {
+        print('Error processing passenger drop-off: $e');
+        // Continue with next passenger instead of crashing
+      }
     }
     
-    // Update conductor passenger count in Firebase
-    _updateConductorPassengerCount();
-    _debouncedRefreshMarkers();
+    // Process next batch after a delay
+    if (endIndex < passengers.length && !_isDisposed) {
+      Timer(Duration(milliseconds: 500), () {
+        if (!_isDisposed) {
+          _processPassengerBatch(passengers, endIndex);
+        }
+      });
+    } else {
+      // All passengers processed, update conductor count and refresh markers
+      if (!_isDisposed) {
+        _updateConductorPassengerCount();
+        _debouncedRefreshMarkers();
+      }
+    }
   }
 
   // Update the _updatePreBookingStatus method
@@ -521,7 +565,7 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
           .limit(1)
           .get();
       
-      if (query.docs.isNotEmpty) {
+      if (query.docs.isNotEmpty && !_isDisposed) {
         await query.docs.first.reference.update({
           'status': status,
           'dropOffTimestamp': FieldValue.serverTimestamp(),
@@ -530,9 +574,11 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
             'longitude': _currentPosition!.longitude,
           } : null,
         });
+        print('Updated pre-booking $passengerId status to $status');
       }
     } catch (e) {
       print('Error updating pre-booking status: $e');
+      // Don't crash the app, just log the error
     }
   }
 
@@ -560,9 +606,11 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
             'longitude': _currentPosition!.longitude,
           } : null,
         });
+        print('Updated manual ticket $ticketId status to $status');
       }
     } catch (e) {
       print('Error updating manual ticket status: $e');
+      // Don't crash the app, just log the error
     }
   }
 
@@ -588,6 +636,7 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
       print('Updated pre-ticket $ticketId status to $status');
     } catch (e) {
       print('Error updating pre-ticket status: $e');
+      // Don't crash the app, just log the error
     }
   }
 
@@ -604,7 +653,7 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
           .limit(1)
           .get();
           
-      if (query.docs.isNotEmpty) {
+      if (query.docs.isNotEmpty && !_isDisposed) {
         await query.docs.first.reference.update({
           'passengerCount': passengerCount,
           'lastUpdated': FieldValue.serverTimestamp(),
@@ -614,40 +663,46 @@ class _ConductorMapsState extends State<ConductorMaps> with WidgetsBindingObserv
       }
     } catch (e) {
       print('Error updating conductor count: $e');
+      // Don't crash the app, just log the error
     }
   }
 
   void _showDropOffNotification(String passengerId, String from, String to, int quantity) {
     if (!mounted || _isDisposed) return;
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Passenger Dropped Off',
-                      style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w600, color: Colors.white)),
-                  Text('$from → $to (${quantity > 1 ? '$quantity passengers' : '1 passenger'})',
-                      style: GoogleFonts.outfit(fontSize: 12, color: Colors.white70)),
-                ],
+    try {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Passenger Dropped Off',
+                        style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w600, color: Colors.white)),
+                    Text('$from → $to (${quantity > 1 ? '$quantity passengers' : '1 passenger'})',
+                        style: GoogleFonts.outfit(fontSize: 12, color: Colors.white70)),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: Colors.green[600],
+          duration: Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: EdgeInsets.all(16),
         ),
-        backgroundColor: Colors.green[600],
-        duration: Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.all(16),
-      ),
-    );
+      );
+    } catch (e) {
+      print('Error showing drop-off notification: $e');
+      // Don't crash the app, just log the error
+    }
   }
 
   void _showErrorNotification(String message) {

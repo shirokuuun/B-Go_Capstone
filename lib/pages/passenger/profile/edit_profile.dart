@@ -21,7 +21,7 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  
+
   File? _selectedImage;
   String? _currentProfileImageUrl;
 
@@ -34,13 +34,17 @@ class _EditProfileState extends State<EditProfile> {
       _emailController.text = user.email ?? '';
       _currentProfileImageUrl = user.photoURL;
       // Optionally fetch phone from Firestore if not in Auth
-      FirebaseFirestore.instance.collection('users').doc(user.uid).get().then((doc) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get()
+          .then((doc) {
         if (doc.exists) {
           _phoneController.text = doc['phone'] ?? '';
         }
       });
     }
-    
+
     // Add listener to email controller to trigger rebuild when text changes
     _emailController.addListener(() {
       setState(() {});
@@ -60,9 +64,12 @@ class _EditProfileState extends State<EditProfile> {
   Future<bool> _isPhoneRegisteredUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return false;
-    
+
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         final authMethod = doc.data()?['authMethod'];
         return authMethod == 'phone';
@@ -80,33 +87,33 @@ class _EditProfileState extends State<EditProfile> {
 
     // Check if user has email (was registered with email)
     bool hasEmail = user.email != null && user.email!.isNotEmpty;
-    
+
     // If user doesn't have email (phone user) and wants to add email
     if (!hasEmail && _emailController.text.trim().isNotEmpty) {
       // Must provide password for email login
       if (_passwordController.text.trim().isEmpty) {
         return 'Password is required when adding email for login';
       }
-      
+
       // Validate password strength
       if (_passwordController.text.length < 6) {
         return 'Password must be at least 6 characters long';
       }
     }
-    
+
     // If user has email and wants to change it
     if (hasEmail && _emailController.text.trim() != user.email) {
       // Must provide password for email change
       if (_passwordController.text.trim().isEmpty) {
         return 'Password is required when changing email';
       }
-      
+
       // Validate password strength
       if (_passwordController.text.length < 6) {
         return 'Password must be at least 6 characters long';
       }
     }
-    
+
     return null;
   }
 
@@ -166,9 +173,12 @@ class _EditProfileState extends State<EditProfile> {
 
       // Update user profile with new photo URL
       await user.updatePhotoURL(downloadUrl);
-      
+
       // Update Firestore
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .update({
         'profileImageUrl': downloadUrl,
         'updatedAt': FieldValue.serverTimestamp(),
       });
@@ -189,7 +199,6 @@ class _EditProfileState extends State<EditProfile> {
           duration: Duration(seconds: 2),
         ),
       );
-
     } catch (e) {
       // Close loading dialog
       Navigator.of(context).pop();
@@ -210,13 +219,15 @@ class _EditProfileState extends State<EditProfile> {
         email: email,
         password: password,
       );
-      
+
       // Link the email credential to the current user
-      await FirebaseAuth.instance.currentUser!.linkWithCredential(emailCredential);
-      
+      await FirebaseAuth.instance.currentUser!
+          .linkWithCredential(emailCredential);
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Email successfully linked to your account! You can now log in using either phone or email.'),
+          content: Text(
+              'Email successfully linked to your account! You can now log in using either phone or email.'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 3),
         ),
@@ -294,8 +305,10 @@ class _EditProfileState extends State<EditProfile> {
                               ? NetworkImage(_currentProfileImageUrl!)
                               : null) as ImageProvider?,
                       backgroundColor: Colors.grey[300],
-                      child: _selectedImage == null && _currentProfileImageUrl == null
-                          ? Icon(Icons.person, size: 54, color: Colors.grey[600])
+                      child: _selectedImage == null &&
+                              _currentProfileImageUrl == null
+                          ? Icon(Icons.person,
+                              size: 54, color: Colors.grey[600])
                           : null,
                     ),
                     Positioned(
@@ -306,7 +319,8 @@ class _EditProfileState extends State<EditProfile> {
                         child: CircleAvatar(
                           radius: 16,
                           backgroundColor: Color(0xFF0091AD),
-                          child: Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                          child: Icon(Icons.camera_alt,
+                              color: Colors.white, size: 16),
                         ),
                       ),
                     ),
@@ -322,11 +336,13 @@ class _EditProfileState extends State<EditProfile> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                     ),
                     child: Text(
                       'Upload Profile Picture',
-                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ],
@@ -348,43 +364,57 @@ class _EditProfileState extends State<EditProfile> {
                         keyboardType: TextInputType.emailAddress,
                       ),
                       // Show email verification status
-                      if (_emailController.text.isNotEmpty && 
+                      if (_emailController.text.isNotEmpty &&
                           FirebaseAuth.instance.currentUser?.email != null &&
-                          FirebaseAuth.instance.currentUser?.email!.isNotEmpty == true) ...[
+                          FirebaseAuth
+                                  .instance.currentUser?.email!.isNotEmpty ==
+                              true) ...[
                         SizedBox(height: 8),
                         Container(
                           padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: FirebaseAuth.instance.currentUser?.emailVerified == true 
-                                ? Colors.green.shade50 
+                            color: FirebaseAuth
+                                        .instance.currentUser?.emailVerified ==
+                                    true
+                                ? Colors.green.shade50
                                 : Colors.orange.shade50,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: FirebaseAuth.instance.currentUser?.emailVerified == true 
-                                  ? Colors.green.shade200 
+                              color: FirebaseAuth.instance.currentUser
+                                          ?.emailVerified ==
+                                      true
+                                  ? Colors.green.shade200
                                   : Colors.orange.shade200,
                             ),
                           ),
                           child: Row(
                             children: [
                               Icon(
-                                FirebaseAuth.instance.currentUser?.emailVerified == true 
-                                    ? Icons.verified 
+                                FirebaseAuth.instance.currentUser
+                                            ?.emailVerified ==
+                                        true
+                                    ? Icons.verified
                                     : Icons.warning,
-                                color: FirebaseAuth.instance.currentUser?.emailVerified == true 
-                                    ? Colors.green.shade700 
+                                color: FirebaseAuth.instance.currentUser
+                                            ?.emailVerified ==
+                                        true
+                                    ? Colors.green.shade700
                                     : Colors.orange.shade700,
                                 size: 20,
                               ),
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  FirebaseAuth.instance.currentUser?.emailVerified == true 
+                                  FirebaseAuth.instance.currentUser
+                                              ?.emailVerified ==
+                                          true
                                       ? 'Email verified. You can login using email'
                                       : 'Email not verified. Please check your inbox and verify your email',
                                   style: GoogleFonts.outfit(
-                                    color: FirebaseAuth.instance.currentUser?.emailVerified == true 
-                                        ? Colors.green.shade700 
+                                    color: FirebaseAuth.instance.currentUser
+                                                ?.emailVerified ==
+                                            true
+                                        ? Colors.green.shade700
                                         : Colors.orange.shade700,
                                     fontSize: 14,
                                   ),
@@ -396,9 +426,11 @@ class _EditProfileState extends State<EditProfile> {
                         SizedBox(height: 8),
                       ],
                       // Show helper text for phone users adding email
-                      if (_emailController.text.isNotEmpty && 
-                          (FirebaseAuth.instance.currentUser?.email == null || 
-                           FirebaseAuth.instance.currentUser?.email!.isEmpty == true)) ...[
+                      if (_emailController.text.isNotEmpty &&
+                          (FirebaseAuth.instance.currentUser?.email == null ||
+                              FirebaseAuth
+                                      .instance.currentUser?.email!.isEmpty ==
+                                  true)) ...[
                         SizedBox(height: 8),
                         Container(
                           padding: EdgeInsets.all(12),
@@ -409,7 +441,8 @@ class _EditProfileState extends State<EditProfile> {
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                              Icon(Icons.info_outline,
+                                  color: Colors.blue.shade700, size: 20),
                               SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -444,10 +477,12 @@ class _EditProfileState extends State<EditProfile> {
                 ),
                 SizedBox(height: 32),
                 // Add button to link email with password
-                if (_emailController.text.isNotEmpty && _passwordController.text.isNotEmpty) ...[
+                if (_emailController.text.isNotEmpty &&
+                    _passwordController.text.isNotEmpty) ...[
                   ElevatedButton(
                     onPressed: () async {
-                      await _linkEmailToAccount(_emailController.text.trim(), _passwordController.text);
+                      await _linkEmailToAccount(_emailController.text.trim(),
+                          _passwordController.text);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
@@ -456,11 +491,13 @@ class _EditProfileState extends State<EditProfile> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 4,
-                      padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 48, vertical: 12),
                     ),
                     child: Text(
                       'Link Email for Login',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                   ),
                   SizedBox(height: 16),
@@ -502,7 +539,8 @@ class _EditProfileState extends State<EditProfile> {
                             builder: (BuildContext context) {
                               return Center(
                                 child: CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00CFFF)),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF00CFFF)),
                                 ),
                               );
                             },
@@ -512,32 +550,38 @@ class _EditProfileState extends State<EditProfile> {
                           await user.updateDisplayName(_nameController.text);
 
                           // Check if user is adding email for the first time (phone user)
-                          bool isPhoneUser = user.email == null || user.email!.isEmpty;
-                          
+                          bool isPhoneUser =
+                              user.email == null || user.email!.isEmpty;
+
                           if (isPhoneUser && newEmail.isNotEmpty) {
                             // Phone user is adding email for the first time
                             try {
                               // Create email credential and link it
-                              final emailCredential = EmailAuthProvider.credential(
+                              final emailCredential =
+                                  EmailAuthProvider.credential(
                                 email: newEmail,
                                 password: _passwordController.text,
                               );
-                              
+
                               // Link the email credential to the current user
                               await user.linkWithCredential(emailCredential);
-                              
+
                               // Update Firestore
-                              await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                              await FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user.uid)
+                                  .update({
                                 'name': _nameController.text,
                                 'email': newEmail,
                                 'phone': newPhone,
-                                'authMethod': 'phone_email', // Indicate both methods are available
+                                'authMethod':
+                                    'phone_email', // Indicate both methods are available
                                 'updatedAt': FieldValue.serverTimestamp(),
                               });
 
                               // Send verification email
                               await user.sendEmailVerification();
-                              
+
                               // Close loading dialog
                               Navigator.of(context).pop();
 
@@ -545,12 +589,18 @@ class _EditProfileState extends State<EditProfile> {
                               await showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: Text('Verify your email'),
-                                  content: Text('A verification link has been sent to $newEmail.\n\nPlease verify your email before you can login using email.\n\nYou can continue using the app with your phone number while waiting for verification.'),
+                                  title: Text('Verify your email', style: GoogleFonts.outfit(fontWeight: FontWeight.w600),),
+                                  content: Text(
+                                      'A verification link has been sent to $newEmail.\n\nPlease verify your email before you can login using email.\n\nYou can continue using the app with your phone number while waiting for verification.'),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.of(context).pop(),
-                                      child: Text('OK'),
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      child: Text(
+                                        'OK',
+                                        style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.w600),
+                                      ),
                                     ),
                                     TextButton(
                                       onPressed: () {
@@ -566,7 +616,8 @@ class _EditProfileState extends State<EditProfile> {
                               // Show success message
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text('Email linked successfully! Please check your email for verification.'),
+                                  content: Text(
+                                      'Email linked successfully! Please check your email for verification.'),
                                   backgroundColor: Colors.green,
                                   duration: Duration(seconds: 3),
                                 ),
@@ -577,23 +628,25 @@ class _EditProfileState extends State<EditProfile> {
                                 Navigator.pop(context);
                               }
                               return;
-                              
                             } catch (e) {
                               Navigator.of(context).pop();
                               String message = 'Failed to link email';
                               if (e is FirebaseAuthException) {
                                 switch (e.code) {
                                   case 'email-already-in-use':
-                                    message = 'This email is already in use by another account';
+                                    message =
+                                        'This email is already in use by another account';
                                     break;
                                   case 'invalid-email':
-                                    message = 'Please enter a valid email address';
+                                    message =
+                                        'Please enter a valid email address';
                                     break;
                                   case 'weak-password':
                                     message = 'Password is too weak';
                                     break;
                                   default:
-                                    message = e.message ?? 'Failed to link email';
+                                    message =
+                                        e.message ?? 'Failed to link email';
                                 }
                               }
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -616,10 +669,12 @@ class _EditProfileState extends State<EditProfile> {
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: Text('Verify your new email'),
-                                  content: Text('A verification link has been sent to $newEmail.\n\nTo complete the change, please:\n1. Open your new email inbox.\n2. Click the verification link.\n3. After verification, you can log in using either your phone number or email address.\n\nNote: You may need to set a password for your email login to work.'),
+                                  content: Text(
+                                      'A verification link has been sent to $newEmail.\n\nTo complete the change, please:\n1. Open your new email inbox.\n2. Click the verification link.\n3. After verification, you can log in using either your phone number or email address.\n\nNote: You may need to set a password for your email login to work.'),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.of(context).pop(),
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
                                       child: Text('OK'),
                                     ),
                                   ],
@@ -629,16 +684,19 @@ class _EditProfileState extends State<EditProfile> {
                               return;
                             } on FirebaseAuthException catch (e) {
                               Navigator.of(context).pop();
-                              print('FirebaseAuthException: ${e.code} - ${e.message}');
+                              print(
+                                  'FirebaseAuthException: ${e.code} - ${e.message}');
                               if (e.code == 'requires-recent-login') {
                                 await showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: Text('Re-authentication Required'),
-                                    content: Text('For security reasons, please log in again to change your email.'),
+                                    content: Text(
+                                        'For security reasons, please log in again to change your email.'),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
                                         child: Text('OK'),
                                       ),
                                     ],
@@ -647,13 +705,15 @@ class _EditProfileState extends State<EditProfile> {
                                 final authServices = AuthServices();
                                 await authServices.signOut();
                                 if (mounted) {
-                                  Navigator.of(context).popUntil((route) => route.isFirst);
+                                  Navigator.of(context)
+                                      .popUntil((route) => route.isFirst);
                                 }
                                 return;
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Failed to update email: ${e.message}'),
+                                    content: Text(
+                                        'Failed to update email: ${e.message}'),
                                     backgroundColor: Colors.red,
                                     duration: Duration(seconds: 3),
                                   ),
@@ -664,7 +724,10 @@ class _EditProfileState extends State<EditProfile> {
                           }
 
                           // Update Firestore with all user data
-                          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(user.uid)
+                              .update({
                             'name': _nameController.text,
                             'email': newEmail,
                             'phone': newPhone,
@@ -692,7 +755,6 @@ class _EditProfileState extends State<EditProfile> {
                           if (mounted) {
                             Navigator.pop(context);
                           }
-
                         } on FirebaseAuthException catch (e) {
                           // Close loading dialog
                           Navigator.of(context).pop();
@@ -703,10 +765,12 @@ class _EditProfileState extends State<EditProfile> {
                               context: context,
                               builder: (context) => AlertDialog(
                                 title: Text('Re-authentication Required'),
-                                content: Text('For security reasons, please log in again to change your email.'),
+                                content: Text(
+                                    'For security reasons, please log in again to change your email.'),
                                 actions: [
                                   TextButton(
-                                    onPressed: () => Navigator.of(context).pop(),
+                                    onPressed: () =>
+                                        Navigator.of(context).pop(),
                                     child: Text('OK'),
                                   ),
                                 ],
@@ -715,7 +779,8 @@ class _EditProfileState extends State<EditProfile> {
                             final authServices = AuthServices();
                             await authServices.signOut();
                             if (mounted) {
-                              Navigator.of(context).popUntil((route) => route.isFirst);
+                              Navigator.of(context)
+                                  .popUntil((route) => route.isFirst);
                             }
                             return;
                           }
@@ -730,7 +795,8 @@ class _EditProfileState extends State<EditProfile> {
                               message = 'Password is too weak.';
                               break;
                             default:
-                              message = 'Failed to update profile. Please try again.';
+                              message =
+                                  'Failed to update profile. Please try again.';
                           }
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -744,7 +810,8 @@ class _EditProfileState extends State<EditProfile> {
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('An unexpected error occurred. Please try again.'),
+                              content: Text(
+                                  'An unexpected error occurred. Please try again.'),
                               backgroundColor: Colors.red,
                               duration: Duration(seconds: 3),
                             ),
@@ -764,7 +831,8 @@ class _EditProfileState extends State<EditProfile> {
                   ),
                   child: Text(
                     'Confirm',
-                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.outfit(
+                        fontSize: 20, fontWeight: FontWeight.w500),
                   ),
                 ),
                 SizedBox(height: 32),
@@ -784,14 +852,12 @@ class _ProfileTextField extends StatelessWidget {
   final bool obscureText;
   final TextInputType? keyboardType;
 
-
   const _ProfileTextField({
     required this.controller,
     required this.label,
     required this.icon,
     this.obscureText = false,
     this.keyboardType,
-
   });
 
   @override

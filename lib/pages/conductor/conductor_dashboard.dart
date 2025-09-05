@@ -307,7 +307,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
       final currentCount = conductorDoc.docs.first.data()['passengerCount'] ?? 0;
       final newCount = math.max<int>(0, currentCount - quantity);
 
-      // Update passenger count
+      // Update passenger count (critical operation)
       await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
@@ -322,21 +322,28 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         },
       });
 
-      // Log the adjustment in a separate collection for audit purposes
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('passengerAdjustments')
-          .add({
-        'timestamp': FieldValue.serverTimestamp(),
-        'type': 'manual_subtraction',
-        'quantity': quantity,
-        'reason': reason.isNotEmpty ? reason : 'Manual adjustment',
-        'previousCount': currentCount,
-        'newCount': newCount,
-        'route': widget.route,
-        'conductorId': conductorId,
-      });
+      // Log the adjustment in a separate collection for audit purposes (non-critical)
+      try {
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('passengerAdjustments')
+            .add({
+          'timestamp': FieldValue.serverTimestamp(),
+          'type': 'manual_subtraction',
+          'quantity': quantity,
+          'reason': reason.isNotEmpty ? reason : 'Manual adjustment',
+          'previousCount': currentCount,
+          'newCount': newCount,
+          'route': widget.route,
+          'conductorId': conductorId,
+        });
+        print('✅ Audit log successfully created');
+      } catch (auditError) {
+        // Log audit error but don't fail the main operation
+        print('⚠️ Failed to create audit log (non-critical): $auditError');
+        // You could optionally show a warning to the user here
+      }
 
       _showSnackBar(
         'Successfully adjusted passenger count: $currentCount → $newCount (-$quantity)',

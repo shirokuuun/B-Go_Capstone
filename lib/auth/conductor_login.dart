@@ -18,8 +18,7 @@ class _ConductorLoginState extends State<ConductorLogin> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
-
-
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
@@ -52,11 +51,12 @@ class _ConductorLoginState extends State<ConductorLogin> {
 
       if (query.docs.isEmpty) {
         setState(() {
-          _errorMessage = 'No conductor record found. This conductor must be created via the admin website.';
+          _errorMessage =
+              'No conductor record found. This conductor must be created via the admin website.';
         });
         return;
       }
-      
+
       final doc = query.docs.first;
       final data = doc.data();
       final route = data['route'] ?? '';
@@ -135,7 +135,8 @@ class _ConductorLoginState extends State<ConductorLogin> {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.only(left: 28, right: 28, top: 50, bottom: 150),
+                padding: const EdgeInsets.only(
+                    left: 28, right: 28, top: 50, bottom: 150),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -202,14 +203,25 @@ class _ConductorLoginState extends State<ConductorLogin> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: _passwordController,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             style: GoogleFonts.outfit(color: Colors.black),
                             decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Password",
-                              hintStyle: GoogleFonts.outfit(
+                                border: InputBorder.none,
+                                hintText: "Password",
+                                hintStyle: GoogleFonts.outfit(
+                                    color: Colors.black54,
+                                    fontWeight: FontWeight.w700),
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                },
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -269,7 +281,8 @@ class _ConductorLoginState extends State<ConductorLogin> {
                             Navigator.pushNamed(context, '/login');
                           },
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 2, vertical: 4),
                             minimumSize: Size(0, 0),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),

@@ -1,7 +1,6 @@
   import 'package:b_go/auth/conductor_login.dart';  
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/auth/conductor_login.dart';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -24,7 +23,9 @@ import 'package:b_go/auth/auth_services.dart';
     List<String> availableDates = [];
     String selectedDate = '';
     List<Map<String, dynamic>> tickets = [];
+    List<Map<String, dynamic>> filteredTickets = [];
     bool isLoading = true;
+    String selectedTicketType = 'All'; // 'All', 'Pre-tickets', 'Pre-bookings', 'Manual'
 
     @override
     void initState() {
@@ -57,6 +58,9 @@ import 'package:b_go/auth/auth_services.dart';
       conductorId: conductorId, 
       date: selectedDate,
     );
+    
+    // Initialize filtered tickets
+    filteredTickets = tickets;
   }
 
   setState(() {
@@ -111,11 +115,120 @@ import 'package:b_go/auth/auth_services.dart';
       conductorId: conductorId,
       date: formattedDate,
     );
+    
+    // Update filtered tickets
+    _applyFilter();
 
     setState(() => isLoading = false);
   }
 }
 
+  void _applyFilter() {
+    if (selectedTicketType == 'All') {
+      filteredTickets = tickets;
+    } else {
+      filteredTickets = tickets.where((ticket) {
+        String ticketType = ticket['ticketType'] ?? 'Manual';
+        return ticketType == selectedTicketType;
+      }).toList();
+    }
+  }
+
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Filter Tickets',
+          style: GoogleFonts.outfit(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF0091AD),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFilterOption('All'),
+            _buildFilterOption('Pre-tickets'),
+            _buildFilterOption('Pre-bookings'),
+            _buildFilterOption('Manual'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: GoogleFonts.outfit(color: Color(0xFF0091AD)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterOption(String option) {
+    return ListTile(
+      title: Text(
+        option,
+        style: GoogleFonts.outfit(
+          fontSize: 16,
+          color: selectedTicketType == option ? Color(0xFF0091AD) : Colors.black87,
+          fontWeight: selectedTicketType == option ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+      leading: Radio<String>(
+        value: option,
+        groupValue: selectedTicketType,
+        onChanged: (value) {
+          setState(() {
+            selectedTicketType = value!;
+            _applyFilter();
+          });
+          Navigator.pop(context);
+        },
+        activeColor: Color(0xFF0091AD),
+      ),
+    );
+  }
+
+  String _getTicketStatus(Map<String, dynamic> ticket) {
+    // Check the actual status field from Firebase
+    String status = ticket['status'] ?? 'boarded';
+    
+    // Check for various geofencing completion statuses
+    switch (status.toLowerCase()) {
+      case 'accomplished':
+      case 'completed':
+      case 'dropped_off':
+      case 'finished':
+        return 'Accomplished';
+      case 'boarded':
+      case 'active':
+      case 'in_progress':
+        return 'Boarded';
+      default:
+        // Check for geofencing indicators
+        if (ticket['dropOffTimestamp'] != null || 
+            ticket['dropOffLocation'] != null ||
+            ticket['geofenceStatus'] == 'completed') {
+          return 'Accomplished';
+        }
+        return 'Boarded';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'accomplished':
+        return Colors.green;
+      case 'boarded':
+        return Colors.orange;
+      default:
+        return Colors.grey;
+    }
+  }
 
     String getRouteLabel(String placeCollection) {
       final route = widget.route;
@@ -305,32 +418,71 @@ import 'package:b_go/auth/auth_services.dart';
 
                         const SizedBox(height: 10),
 
-                        GestureDetector(
-                          onTap: () => _showDatePicker(context),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F1F1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade300),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    selectedDate.isNotEmpty ? selectedDate : 'Select a date',
-                                    style: GoogleFonts.outfit(
-                                      color: Colors.black87,
-                                      fontSize: 16,
-                                    ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => _showDatePicker(context),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F1F1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          selectedDate.isNotEmpty ? selectedDate : 'Select a date',
+                                          style: GoogleFonts.outfit(
+                                            color: Colors.black87,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                    ],
                                   ),
                                 ),
-                                const Icon(Icons.arrow_drop_down, color: Colors.grey),
-                              ],
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: _showFilterDialog,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0091AD),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.filter_list, size: 20, color: Colors.white),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      selectedTicketType == 'All' ? 'Filter' : selectedTicketType,
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -338,11 +490,13 @@ import 'package:b_go/auth/auth_services.dart';
 
                   if (isLoading)
                     const Center(child: CircularProgressIndicator())
-                  else if (tickets.isEmpty)
+                  else if (filteredTickets.isEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 20.0),
                       child: Text(
-                        "No tickets for $selectedDate",
+                        selectedTicketType == 'All' 
+                            ? "No tickets for $selectedDate"
+                            : "No $selectedTicketType tickets for $selectedDate",
                         style: GoogleFonts.outfit(fontSize: 16, color: Colors.grey),
                       ),
                     )
@@ -350,10 +504,10 @@ import 'package:b_go/auth/auth_services.dart';
                     ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: tickets.length,
+                      itemCount: filteredTickets.length,
                       itemBuilder: (context, index) {
                         // Reverse the tickets so newest is at the top
-                        final ticket = tickets.reversed.toList()[index];
+                        final ticket = filteredTickets.reversed.toList()[index];
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: Container(
@@ -388,7 +542,7 @@ import 'package:b_go/auth/auth_services.dart';
                                           Text('To: ${ticket['to']}', style: GoogleFonts.outfit(fontSize: 14)),
                                           Text('From KM: $fromKm', style: GoogleFonts.outfit(fontSize: 14)),
                                           Text('To KM: $toKm', style: GoogleFonts.outfit(fontSize: 14)),
-                                          Text('Base Fare (Regular): ${baseFare is List ? (baseFare as List).first.toString() : baseFare} PHP', style: GoogleFonts.outfit(fontSize: 14)),
+                                          Text('Base Fare (Regular): ${baseFare is List ? baseFare.first.toString() : baseFare} PHP', style: GoogleFonts.outfit(fontSize: 14)),
                                           Text('Quantity: $quantity', style: GoogleFonts.outfit(fontSize: 14)),
                                           Text('Total Amount: $totalFare PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
                                           SizedBox(height: 16),
@@ -444,9 +598,33 @@ import 'package:b_go/auth/auth_services.dart';
                                       ],
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      'Quantity: ${ticket['quantity']}',
-                                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.black87),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Quantity: ${ticket['quantity']}',
+                                          style: GoogleFonts.outfit(fontSize: 14, color: Colors.black87),
+                                        ),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: _getStatusColor(_getTicketStatus(ticket)).withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: _getStatusColor(_getTicketStatus(ticket)).withOpacity(0.3),
+                                              width: 1,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            _getTicketStatus(ticket),
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: _getStatusColor(_getTicketStatus(ticket)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(

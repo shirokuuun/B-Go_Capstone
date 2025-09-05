@@ -17,7 +17,6 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
   final TextEditingController phoneController = TextEditingController();
   final AuthServices _authServices = AuthServices();
 
-  String? _verificationId;
   bool _isLoading = false;
 
   // Country code dropdown
@@ -79,7 +78,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
         phoneNumber: fullPhone,
         verificationCompleted: (PhoneAuthCredential credential) async {
           try {
-            UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+            await FirebaseAuth.instance.signInWithCredential(credential);
             setState(() => _isLoading = false);
             Navigator.pushReplacementNamed(context, '/user_selection');
           } catch (e) {
@@ -114,7 +113,6 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
         },
         codeSent: (String verificationId, int? resendToken) {
           setState(() {
-            _verificationId = verificationId;
             _isLoading = false;
           });
           
@@ -135,7 +133,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
           );
         },
         codeAutoRetrievalTimeout: (String verificationId) {
-          setState(() => _verificationId = verificationId);
+          // Handle timeout if needed
         },
       );
     } catch (e) {
@@ -156,20 +154,24 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
-    
-    // Calculate responsive dimensions
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
     
     // Responsive sizing
-    final logoWidth = isMobile ? 120.0 : (isTablet ? 150.0 : 180.0);
-    final titleFontSize = isMobile ? 35.0 : (isTablet ? 45.0 : 50.0);
-    final subtitleFontSize = isMobile ? 16.0 : (isTablet ? 18.0 : 20.0);
-    final buttonHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
+    final logoSize = isMobile ? 120.0 : isTablet ? 140.0 : 150.0;
+    final titleFontSize = isMobile ? 35.0 : isTablet ? 40.0 : 45.0;
+    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 19.0 : 20.0;
+    final textFieldFontSize = isMobile ? 14.0 : isTablet ? 15.0 : 16.0;
+    final hintFontSize = isMobile ? 12.0 : isTablet ? 13.0 : 14.0;
+    final registerFontSize = isMobile ? 13.0 : isTablet ? 13.0 : 14.0;
+    
+    // Responsive padding and spacing
+    final horizontalPadding = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final fieldSpacing = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
+    final containerPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFE5E9F0),
       body: Stack(
         children: [
           Container(
@@ -180,7 +182,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0;
-                double logoWidth = 150;
+                double logoWidth = logoSize;
                 math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 return Transform.translate(
                   offset: Offset(0, -20),
@@ -202,27 +204,15 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                 margin: EdgeInsets.only(
                     top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.only(
-                  top: screenHeight * 0.05,
-                  left: screenWidth * 0.07,
-                  right: screenWidth * 0.07,
-                  bottom: screenHeight * 0.25,
+
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding, 
+                  vertical: isMobile ? 32.0 : isTablet ? 36.0 : 40.0,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 20),
+                    SizedBox(height: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
                     Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -245,20 +235,23 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Row(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 14.0, right: 4.0),
+                              padding: EdgeInsets.only(
+                                  left: containerPadding * 0.8, right: containerPadding * 0.2),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   value: selectedCountryCode,
@@ -267,8 +260,8 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                       value: country['code'],
                                       child: Text(country['code']!,
                                           style: GoogleFonts.outfit(
-                                              fontWeight:
-                                                  FontWeight.w500)),
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: textFieldFontSize)),
                                     );
                                   }).toList(),
                                   onChanged: (value) {
@@ -286,6 +279,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                 enabled: true,
                                 style: GoogleFonts.outfit(
                                   color: Colors.black,
+                                  fontSize: textFieldFontSize,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
@@ -293,6 +287,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                   hintStyle: GoogleFonts.outfit(
                                     color: Colors.black54,
                                     fontWeight: FontWeight.w700,
+                                    fontSize: hintFontSize,
                                   ),
                                 ),
                               ),
@@ -301,13 +296,9 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
-
-
-                    SizedBox(height: 20),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                       child: _isLoading
                           ? const Center(
                               child: CircularProgressIndicator())
@@ -330,13 +321,13 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                                 'Send OTP',
                                 style: GoogleFonts.outfit(
                                   color: Colors.white,
-                                  fontSize: 20,
+                                  fontSize: buttonFontSize,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(height: isMobile ? 350.0 : isTablet ? 360.0 : 365.0),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -344,6 +335,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                           'Don\'t have an account?',
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w500,
+                            fontSize: registerFontSize,
                           ),
                         ),
                         GestureDetector(
@@ -355,6 +347,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
                             style: GoogleFonts.outfit(
                               color: Colors.blue,
                               fontWeight: FontWeight.w500,
+                              fontSize: registerFontSize,
                             ),
                           ),
                         )

@@ -21,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final AuthServices _authServices = AuthServices();
+  bool _obscurePassword = true;
 
   Future signIn() async {
     try {
@@ -243,7 +244,7 @@ class _LoginPageState extends State<LoginPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: passwordController,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             style: GoogleFonts.outfit(color: Colors.black),
                             decoration: InputDecoration(
                               border: InputBorder.none,
@@ -251,6 +252,17 @@ class _LoginPageState extends State<LoginPage> {
                               hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
                                   fontWeight: FontWeight.w700),
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.black54,
+                                ),
+                              ),
                             ),
                           ),
                         ),

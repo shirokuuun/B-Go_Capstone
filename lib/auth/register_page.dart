@@ -28,6 +28,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final AuthServices _authServices = AuthServices();
 
   bool agreedToTerms = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
@@ -259,13 +261,24 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: passwordController,
-                            obscureText: true,
+                            obscureText: _obscurePassword,
                             style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Password",
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ),
@@ -283,13 +296,24 @@ class _RegisterPageState extends State<RegisterPage> {
                           padding: const EdgeInsets.only(left: 20.0),
                           child: TextField(
                             controller: confirmPasswordController,
-                            obscureText: true,
+                            obscureText: _obscureConfirmPassword,
                             style: GoogleFonts.outfit(
                               color: Colors.black,
                             ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Confirm your Password",
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  });
+                                },
+                              ),
                             ),
                           ),
                         ),

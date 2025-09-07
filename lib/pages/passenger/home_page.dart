@@ -48,9 +48,8 @@ class _HomePageState extends State<HomePage> {
     // Use the same colors as defined in _getColorForRoute method
     _busIcons = {
       'batangas': await _createCustomBusIcon(Colors.red),
-      'Mataas na Kahoy': await _createCustomBusIcon(Colors.purple),
-      'Mataas Na Kahoy Palengke':
-          await _createCustomBusIcon(Colors.orange),
+      'mataas na kahoy': await _createCustomBusIcon(Colors.purple),
+      'mataas na kahoy palengke': await _createCustomBusIcon(Colors.orange),
       'rosario':
           await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
       'tiaong': await _createCustomBusIcon(Colors.green),
@@ -394,17 +393,49 @@ class _HomePageState extends State<HomePage> {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
-    
+
     // Responsive sizing
-    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
-    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final busCountFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final busCountSubFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
-    final routeFilterFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
-    final legendTitleFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
-    final legendRouteFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
-    
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final drawerHeaderFontSize = isMobile
+        ? 30.0
+        : isTablet
+            ? 34.0
+            : 38.0;
+    final drawerItemFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final busCountFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final busCountSubFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+    final routeFilterFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final legendTitleFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final legendRouteFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -526,9 +557,7 @@ class _HomePageState extends State<HomePage> {
                 maxWidth: isMobile ? 200 : 250,
               ),
               padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 20, 
-                vertical: isMobile ? 12 : 16
-              ),
+                  horizontal: isMobile ? 16 : 20, vertical: isMobile ? 12 : 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -586,9 +615,8 @@ class _HomePageState extends State<HomePage> {
                   maxWidth: isMobile ? 250 : 300,
                 ),
                 padding: EdgeInsets.symmetric(
-                  horizontal: isMobile ? 16 : 20, 
-                  vertical: isMobile ? 12 : 16
-                ),
+                    horizontal: isMobile ? 16 : 20,
+                    vertical: isMobile ? 12 : 16),
                 decoration: BoxDecoration(
                   color: Color(0xFF0091AD),
                   borderRadius: BorderRadius.circular(25),
@@ -603,7 +631,8 @@ class _HomePageState extends State<HomePage> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.filter_list, color: Colors.white, size: isMobile ? 20 : 24),
+                    Icon(Icons.filter_list,
+                        color: Colors.white, size: isMobile ? 20 : 24),
                     SizedBox(width: isMobile ? 8 : 12),
                     Flexible(
                       child: Text(
@@ -630,7 +659,8 @@ class _HomePageState extends State<HomePage> {
                           color: Colors.white.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(Icons.close, color: Colors.white, size: isMobile ? 16 : 20),
+                        child: Icon(Icons.close,
+                            color: Colors.white, size: isMobile ? 16 : 20),
                       ),
                     ),
                   ],
@@ -678,7 +708,8 @@ class _HomePageState extends State<HomePage> {
                           mainAxisSize: MainAxisSize.min,
                           children: _getUniqueRoutes()
                               .map((route) => Padding(
-                                    padding: EdgeInsets.symmetric(vertical: isMobile ? 2 : 4),
+                                    padding: EdgeInsets.symmetric(
+                                        vertical: isMobile ? 2 : 4),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
@@ -752,7 +783,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Color _getColorForRoute(String route) {
-    switch (route.trim().toLowerCase()) {
+    switch (route.toLowerCase()) {
       case 'batangas':
         return Colors.red;
       case 'rosario':
@@ -763,7 +794,7 @@ class _HomePageState extends State<HomePage> {
         return Colors.yellow;
       case 'mataas na kahoy':
         return Colors.purple;
-              case 'mataas na kahoy palengke':
+      case 'mataas na kahoy palengke':
         return Colors.orange;
       default:
         return Colors.cyan;

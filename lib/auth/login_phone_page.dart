@@ -44,15 +44,84 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendOTP() async {
     String phone = phoneController.text.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter a phone number.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Please enter a phone number.', 'warning');
       return;
     }
 
@@ -62,12 +131,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
     // Check if phone number exists in Firestore before sending OTP
     bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
     if (!isRegistered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('This phone number is not registered. Please register first.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('This phone number is not registered. Please register first.', 'error');
       return;
     }
 
@@ -83,12 +147,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
             Navigator.pushReplacementNamed(context, '/user_selection');
           } catch (e) {
             setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Login failed. Please try again.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            _showCustomSnackBar('Login failed. Please try again.', 'error');
           }
         },
         verificationFailed: (FirebaseAuthException e) {
@@ -104,12 +163,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
             errorMessage = e.message!;
           }
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showCustomSnackBar(errorMessage, 'error');
         },
         codeSent: (String verificationId, int? resendToken) {
           setState(() {
@@ -138,12 +192,7 @@ class _LoginPhonePageState extends State<LoginPhonePage> {
       );
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send OTP. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Failed to send OTP. Please try again.', 'error');
     }
   }
 

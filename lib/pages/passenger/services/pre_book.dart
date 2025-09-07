@@ -90,6 +90,80 @@ class _PreBookState extends State<PreBook> {
     GeofencingService().startMonitoring();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _fetchVerifiedIDType() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -132,37 +206,19 @@ class _PreBookState extends State<PreBook> {
         
         // Show success message to user
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('✅ Location captured: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          _showCustomSnackBar('✅ Location captured: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}', 'success');
         }
       } else {
         print('❌ PreBook: Failed to get passenger location - position is null');
         // Show error to user
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ Failed to get your location. Please check your GPS settings and try again.'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          _showCustomSnackBar('❌ Failed to get your location. Please check your GPS settings and try again.', 'error');
         }
       }
     } catch (e) {
       print('❌ PreBook: Error getting passenger location: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error getting location: $e'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        _showCustomSnackBar('❌ Error getting location: $e', 'error');
       }
     }
   }
@@ -199,38 +255,20 @@ class _PreBookState extends State<PreBook> {
   void _showToSelectionPage(Map<String, dynamic> fromPlace, List<Map<String, dynamic>> allPlaces) async {
     // Check if location is captured before proceeding
     if (_currentLocation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Location access required! Please enable location and try again.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
-        ),
-      );
+      _showCustomSnackBar('⚠️ Location access required! Please enable location and try again.', 'warning');
       return;
     }
 
     // Double-check location is valid
     if (_currentLocation!.latitude == 0.0 && _currentLocation!.longitude == 0.0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Invalid location detected! Please try capturing location again.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
-        ),
-      );
+      _showCustomSnackBar('⚠️ Invalid location detected! Please try capturing location again.', 'warning');
       return;
     }
 
     // Additional validation: check if coordinates are reasonable (not in the middle of the ocean)
     if (_currentLocation!.latitude < -90 || _currentLocation!.latitude > 90 || 
         _currentLocation!.longitude < -180 || _currentLocation!.longitude > 180) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('⚠️ Invalid coordinates detected! Please try capturing location again.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 4),
-        ),
-      );
+      _showCustomSnackBar('⚠️ Invalid coordinates detected! Please try capturing location again.', 'warning');
       return;
     }
 
@@ -239,9 +277,7 @@ class _PreBookState extends State<PreBook> {
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No valid drop-off locations after selected pick-up.')),
-      );
+      _showCustomSnackBar('No valid drop-off locations after selected pick-up.', 'warning');
       return;
     }
     final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
@@ -531,12 +567,7 @@ class _PreBookState extends State<PreBook> {
                                     icon: Icon(Icons.refresh, size: smallIconSize),
                                     onPressed: () {
                                       _getCurrentLocation();
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Requesting location access...'),
-                                          duration: Duration(seconds: 2),
-                                        ),
-                                      );
+                                      _showCustomSnackBar('Requesting location access...', 'info');
                                     },
                                     color: Colors.orange,
                                   ),
@@ -549,12 +580,7 @@ class _PreBookState extends State<PreBook> {
                                 child: ElevatedButton.icon(
                                   onPressed: () {
                                     _getCurrentLocation();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Requesting location access...'),
-                                        duration: Duration(seconds: 2),
-                                      ),
-                                    );
+                                    _showCustomSnackBar('Requesting location access...', 'info');
                                   },
                                   icon: Icon(Icons.location_on, size: smallIconSize),
                                   label: Text('Enable Location Access', style: TextStyle(fontSize: buttonFontSize)),
@@ -573,12 +599,7 @@ class _PreBookState extends State<PreBook> {
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
                                   onPressed: () {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Location: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}'),
-                                        duration: Duration(seconds: 3),
-                                      ),
-                                    );
+                                    _showCustomSnackBar('Location: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}', 'info');
                                   },
                                   icon: Icon(Icons.info, size: smallIconSize),
                                   label: Text('Show Location Details', style: TextStyle(fontSize: buttonFontSize)),
@@ -598,13 +619,7 @@ class _PreBookState extends State<PreBook> {
                                 onPressed: () async {
                                   await _getCurrentLocation();
                                   if (_currentLocation != null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Location captured: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}'),
-                                        backgroundColor: Colors.green,
-                                        duration: Duration(seconds: 3),
-                                      ),
-                                    );
+                                    _showCustomSnackBar('Location captured: ${_currentLocation!.latitude.toStringAsFixed(6)}, ${_currentLocation!.longitude.toStringAsFixed(6)}', 'success');
                                   }
                                 },
                                 icon: Icon(Icons.refresh, size: smallIconSize),

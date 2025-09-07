@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({Key? key}) : super(key: key);
@@ -70,13 +70,70 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    Responsive responsive = Responsive(context);
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 26.0
+            : 28.0;
+    final subtitleFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 15.0
+            : 16.0;
+    final buttonFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 19.0
+            : 20.0;
+    final textFieldFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 15.0
+            : 16.0;
+    final hintFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 13.0
+            : 14.0;
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 17.0
+            : 18.0;
+
+    // Responsive padding and spacing
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final fieldSpacing = isMobile
+        ? 20.0
+        : isTablet
+            ? 25.0
+            : 30.0;
+    final buttonPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final containerPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
 
     return Scaffold(
+        backgroundColor: Color(0xFFE5E9F0),
         appBar: AppBar(
           title: Text(
             'Forgot Password',
-            style: GoogleFonts.outfit(fontSize: 18, color: Colors.white),
+            style: GoogleFonts.outfit(fontSize: appBarFontSize, color: Colors.white),
           ),
           backgroundColor: Color(0xFF0091AD),
           elevation: 0,
@@ -93,37 +150,23 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
               ),
               padding: const EdgeInsets.only(left: 10, bottom: 35),
               alignment: Alignment.topLeft,
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
+              child: Center(),
             ),
             Align(
-              alignment: Alignment.bottomCenter,
+              alignment: Alignment.topCenter,
               child: SingleChildScrollView(
                 child: Container(
                   margin: EdgeInsets.only(
                     top: MediaQuery.of(context).size.height * 0.20,
                   ),
                   width: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(35)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black12,
-                        blurRadius: 16,
-                        offset: Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.only(
-                    top: responsive.height * 0.05,
-                    left: responsive.width * 0.07,
-                    right: responsive.width * 0.07,
-                    bottom: responsive.height * 0.25,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: isMobile
+                        ? 32.0
+                        : isTablet
+                            ? 36.0
+                            : 40.0,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,16 +180,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                             Text(
                               'Enter your email to reset your password',
                               style: GoogleFonts.outfit(
-                                fontSize: 24,
+                                fontSize: titleFontSize,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            SizedBox(height: 10),
+                            SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
                             Center(
                               child: Text(
                                 'Make sure to enter the email you used to register',
                                 style: GoogleFonts.outfit(
-                                  fontSize: 16,
+                                  fontSize: subtitleFontSize,
                                   color: Colors.grey.shade600,
                                 ),
                               ),
@@ -155,25 +198,35 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                       ),
 
-                      SizedBox(height: 35),
+                      SizedBox(height: fieldSpacing),
 
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding * 0.9),
                         child: Container(
                           decoration: BoxDecoration(
-                              color: Color(0xFFE5E9F0),
-                              borderRadius: BorderRadius.circular(12)),
+                            color: Color(0xFFE5E9F0),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.grey.shade400,
+                              width: 1.0,
+                            ),
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.only(left: 20.0),
+                            padding: EdgeInsets.only(left: containerPadding),
                             child: TextField(
                               controller: emailController,
-                              style: TextStyle(
-                                  color: const Color.fromARGB(255, 15, 15, 15)),
+                              style: GoogleFonts.outfit(
+                                color: Colors.black,
+                                fontSize: textFieldFontSize,
+                              ),
                               decoration: InputDecoration(
                                 border: InputBorder.none,
                                 hintText: "Email",
                                 hintStyle: GoogleFonts.outfit(
-                                  color: Colors.grey.shade600,
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize,
                                 ),
                               ),
                             ),
@@ -181,22 +234,28 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         ),
                       ),
 
-                      SizedBox(height: responsive.height * 0.10),
+                      SizedBox(height: fieldSpacing),
 
-                      Center(
-                        child: MaterialButton(
-                          minWidth: 200,
-                          height: 55,
-                          onPressed: passwordReset,
-                          color: Color(0xFF0091AD),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'Reset Password',
-                            style: GoogleFonts.outfit(
-                              fontSize: 21,
-                              color: Colors.white,
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding * 0.9),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0091AD),
+                              padding: EdgeInsets.all(buttonPadding),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: passwordReset,
+                            child: Text(
+                              'Reset Password',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: buttonFontSize,
+                              ),
                             ),
                           ),
                         ),

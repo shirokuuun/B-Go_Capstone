@@ -60,6 +60,80 @@ class _EditProfileState extends State<EditProfile> {
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   // Check if user was registered with phone number
   Future<bool> _isPhoneRegisteredUser() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -132,12 +206,7 @@ class _EditProfileState extends State<EditProfile> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to pick image: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Failed to pick image: $e', 'error');
     }
   }
 
@@ -192,23 +261,11 @@ class _EditProfileState extends State<EditProfile> {
       // Close loading dialog
       Navigator.of(context).pop();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Profile picture updated successfully!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _showCustomSnackBar('Profile picture updated successfully!', 'success');
     } catch (e) {
       // Close loading dialog
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to upload profile picture: $e'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      _showCustomSnackBar('Failed to upload profile picture: $e', 'error');
     }
   }
 
@@ -224,22 +281,9 @@ class _EditProfileState extends State<EditProfile> {
       await FirebaseAuth.instance.currentUser!
           .linkWithCredential(emailCredential);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Email successfully linked to your account! You can now log in using either phone or email.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      _showCustomSnackBar('Email successfully linked to your account! You can now log in using either phone or email.', 'success');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to link email: $e'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      _showCustomSnackBar('Failed to link email: $e', 'error');
     }
   }
 
@@ -248,21 +292,9 @@ class _EditProfileState extends State<EditProfile> {
     if (user != null) {
       try {
         await user.sendEmailVerification();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Verification email sent again!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        _showCustomSnackBar('Verification email sent again!', 'success');
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send verification email: $e'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
+        _showCustomSnackBar('Failed to send verification email: $e', 'error');
       }
     }
   }
@@ -508,13 +540,7 @@ class _EditProfileState extends State<EditProfile> {
                       // Additional validation for email and password
                       String? validationError = _validateEmailAndPassword();
                       if (validationError != null) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(validationError),
-                            backgroundColor: Colors.red,
-                            duration: Duration(seconds: 3),
-                          ),
-                        );
+                        _showCustomSnackBar(validationError, 'warning');
                         return;
                       }
 
@@ -614,14 +640,7 @@ class _EditProfileState extends State<EditProfile> {
                               );
 
                               // Show success message
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      'Email linked successfully! Please check your email for verification.'),
-                                  backgroundColor: Colors.green,
-                                  duration: Duration(seconds: 3),
-                                ),
-                              );
+                              _showCustomSnackBar('Email linked successfully! Please check your email for verification.', 'success');
 
                               // Navigate back to profile page
                               if (mounted) {
@@ -649,13 +668,7 @@ class _EditProfileState extends State<EditProfile> {
                                         e.message ?? 'Failed to link email';
                                 }
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(message),
-                                  backgroundColor: Colors.red,
-                                  duration: Duration(seconds: 3),
-                                ),
-                              );
+                              _showCustomSnackBar(message, 'error');
                               return;
                             }
                           }
@@ -710,14 +723,7 @@ class _EditProfileState extends State<EditProfile> {
                                 }
                                 return;
                               } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        'Failed to update email: ${e.message}'),
-                                    backgroundColor: Colors.red,
-                                    duration: Duration(seconds: 3),
-                                  ),
-                                );
+                                _showCustomSnackBar('Failed to update email: ${e.message}', 'error');
                                 return;
                               }
                             }
@@ -743,13 +749,7 @@ class _EditProfileState extends State<EditProfile> {
                           Navigator.of(context).pop();
 
                           // Show success message
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Profile updated successfully!'),
-                              backgroundColor: Colors.green,
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
+                          _showCustomSnackBar('Profile updated successfully!', 'success');
 
                           // Navigate back to profile page
                           if (mounted) {
@@ -798,24 +798,11 @@ class _EditProfileState extends State<EditProfile> {
                               message =
                                   'Failed to update profile. Please try again.';
                           }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(message),
-                              backgroundColor: Colors.red,
-                              duration: Duration(seconds: 3),
-                            ),
-                          );
+                          _showCustomSnackBar(message, 'error');
                         } catch (e) {
                           // Close loading dialog
                           Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                  'An unexpected error occurred. Please try again.'),
-                              backgroundColor: Colors.red,
-                              duration: Duration(seconds: 3),
-                            ),
-                          );
+                          _showCustomSnackBar('An unexpected error occurred. Please try again.', 'error');
                         }
                       }
                     }

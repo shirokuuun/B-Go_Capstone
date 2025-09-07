@@ -40,15 +40,83 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> signUp() async {
     if (!agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('You must agree to the Terms and Conditions to sign up.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('You must agree to the Terms and Conditions to sign up.', 'warning');
       return;
     }
 
@@ -60,12 +128,7 @@ class _RegisterPageState extends State<RegisterPage> {
     );
 
     if (errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar(errorMessage, 'error');
       return;
     }
 
@@ -117,12 +180,7 @@ class _RegisterPageState extends State<RegisterPage> {
         // Navigate back to login page
         widget.showLoginPage();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send verification email. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showCustomSnackBar('Failed to send verification email. Please try again.', 'error');
       }
     }
   }
@@ -407,7 +465,6 @@ class _RegisterPageState extends State<RegisterPage> {
                                         'Terms and Conditions',
                                         style: GoogleFonts.outfit(
                                           color: Colors.blue,
-                                          decoration: TextDecoration.underline,
                                           fontSize: hintFontSize,
                                         ),
                                       ),

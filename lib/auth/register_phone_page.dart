@@ -39,26 +39,89 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _sendOTP() async {
     if (!agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('You must agree to the Terms and Conditions to sign up.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('You must agree to the Terms and Conditions to sign up.', 'warning');
       return;
     }
 
     String phone = phoneController.text.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter a phone number.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Please enter a phone number.', 'warning');
       return;
     }
 
@@ -69,12 +132,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     // Check if phone number already exists
     bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
     if (isRegistered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('This phone number is already registered. Please login instead.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('This phone number is already registered. Please login instead.', 'error');
       return;
     }
 
@@ -101,12 +159,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             }
           } catch (e) {
             setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Registration failed. Please try again.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            _showCustomSnackBar('Registration failed. Please try again.', 'error');
           }
         },
         onVerificationFailed: (FirebaseAuthException e) {
@@ -140,12 +193,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
               errorMessage = e.message ?? 'Verification failed';
           }
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showCustomSnackBar(errorMessage, 'error');
         },
         onCodeSent: (String verificationId, int? resendToken) {
           setState(() {
@@ -153,13 +201,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
           });
           
           // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP sent successfully to $fullPhone'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          _showCustomSnackBar('OTP sent successfully to $fullPhone', 'success');
           
           // Navigate to OTP verification page
           Navigator.push(
@@ -180,23 +222,12 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
         },
         onCodeAutoRetrievalTimeout: (String verificationId) {
           // Show timeout message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP auto-retrieval timed out. Please enter the code manually.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
+          _showCustomSnackBar('OTP auto-retrieval timed out. Please enter the code manually.', 'warning');
         },
       );
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send OTP. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Failed to send OTP. Please try again.', 'error');
     }
   }
 

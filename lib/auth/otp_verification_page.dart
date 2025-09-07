@@ -115,6 +115,80 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
 
 
   void _startResendCountdown() {
@@ -316,12 +390,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             _errorMessage = null;
           });
           _startResendCountdown();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP resent to ${widget.phoneNumber}'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showCustomSnackBar('OTP resent to ${widget.phoneNumber}', 'success');
         },
         codeAutoRetrievalTimeout: (String verificationId) {
           setState(() {
@@ -356,7 +425,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     final buttonHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
     
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFE5E9F0),
       body: Stack(
         children: [
           Container(
@@ -387,17 +456,6 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
               child: Container(
                 margin: EdgeInsets.only(top: screenHeight * 0.24),
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
                 padding: EdgeInsets.only(
                   top: screenHeight * 0.05,
                   left: screenWidth * 0.07,

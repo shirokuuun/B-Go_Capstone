@@ -52,34 +52,116 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
     super.dispose();
   }
 
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<List<Map<String, dynamic>>> _fetchAndCleanTickets() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
-    final now = DateTime.now(); // Use device local time
-    final startOfDay = DateTime(now.year, now.month, now.day);
-    final endOfDay = startOfDay.add(const Duration(days: 1));
     
     final col = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('preTickets');
     
-    // Only fetch tickets for today
-    final snapshot = await col
-        .where('createdAt', isGreaterThanOrEqualTo: startOfDay)
-        .where('createdAt', isLessThan: endOfDay)
-        .get();
+    // Calculate 30 days ago
+    final now = DateTime.now();
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
     
-    // Clean up old tickets from previous days (not current day)
-    final yesterday = startOfDay.subtract(const Duration(days: 1));
-    final oldTicketsSnapshot = await col
-        .where('createdAt', isLessThan: startOfDay)
-        .get();
-    
-    // Delete tickets from previous days
-    for (var doc in oldTicketsSnapshot.docs) {
-      await col.doc(doc.id).delete();
+    // Clean up tickets older than 30 days (automatic deletion)
+    try {
+      final oldTicketsSnapshot = await col
+          .where('createdAt', isLessThan: thirtyDaysAgo)
+          .get();
+      
+      // Delete tickets older than 30 days
+      for (var doc in oldTicketsSnapshot.docs) {
+        await col.doc(doc.id).delete();
+      }
+      
+      if (oldTicketsSnapshot.docs.isNotEmpty) {
+        print('Cleaned up ${oldTicketsSnapshot.docs.length} tickets older than 30 days');
+      }
+    } catch (e) {
+      print('Error cleaning up old tickets: $e');
     }
+    
+    // Fetch all remaining tickets (within 30 days)
+    final snapshot = await col
+        .where('createdAt', isGreaterThanOrEqualTo: thirtyDaysAgo)
+        .orderBy('createdAt', descending: true)
+        .get();
     
     return snapshot.docs.map((doc) {
       final data = doc.data();
@@ -101,14 +183,22 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
   Future<void> _deleteTicket(String ticketId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final col = FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('preTickets');
-    await col.doc(ticketId).delete();
-    setState(() {
-      _ticketsFuture = _fetchAndCleanTickets();
-    });
+    
+    try {
+      final col = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preTickets');
+      
+      await col.doc(ticketId).delete();
+      
+      setState(() {
+        _ticketsFuture = _fetchAndCleanTickets();
+      });
+    } catch (e) {
+      print('Error deleting ticket: $e');
+      _showCustomSnackBar('Failed to delete ticket', 'error');
+    }
   }
 
   void _showTicketDetails(Map<String, dynamic> ticket) {
@@ -129,6 +219,35 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
     );
   }
 
+  String _formatDate(dynamic createdAt) {
+    if (createdAt == null) return 'Unknown date';
+    
+    DateTime date;
+    if (createdAt is Timestamp) {
+      date = createdAt.toDate();
+    } else if (createdAt is DateTime) {
+      date = createdAt;
+    } else {
+      return 'Unknown date';
+    }
+    
+    final now = DateTime.now();
+    final difference = now.difference(date).inDays;
+    
+    if (difference == 0) {
+      return 'Today';
+    } else if (difference == 1) {
+      return 'Yesterday';
+    } else if (difference < 7) {
+      return '$difference days ago';
+    } else if (difference < 30) {
+      final weeks = (difference / 7).floor();
+      return weeks == 1 ? '1 week ago' : '$weeks weeks ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
@@ -142,7 +261,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
         ),
         centerTitle: true,
         title: Text(
-          'Pre-Ticket QRs',
+          'Pre-Ticket History',
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
@@ -170,6 +289,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
+          
           final allTickets = snapshot.data ?? [];
           final filteredTickets = _filterTickets(allTickets);
           
@@ -179,8 +299,35 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
               emptyMessage = 'No $_selectedFilter pre-tickets found.';
             }
             return Center(
-              child: Text(emptyMessage,
-                  style: GoogleFonts.outfit(fontSize: 16)),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.receipt_long,
+                    size: 64,
+                    color: Colors.grey[400],
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    emptyMessage,
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  if (_selectedFilter == 'all')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text(
+                        'Tickets are automatically deleted after 30 days',
+                        style: GoogleFonts.outfit(
+                          fontSize: 12,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             );
           }
           
@@ -188,7 +335,10 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
             controller: _tabController,
             children: List.generate(4, (index) {
               String filter = ['all', 'pending', 'boarded', 'accomplished'][index];
-              List<Map<String, dynamic>> tickets = filter == 'all' ? allTickets : _filterTickets(allTickets);
+              List<Map<String, dynamic>> tickets = filter == 'all' ? allTickets : allTickets.where((ticket) {
+                final status = ticket['status'] ?? 'pending';
+                return status == filter;
+              }).toList();
               
               if (tickets.isEmpty) {
                 String emptyMessage = 'No pre-tickets found.';
@@ -196,8 +346,24 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                   emptyMessage = 'No $filter pre-tickets found.';
                 }
                 return Center(
-                  child: Text(emptyMessage,
-                      style: GoogleFonts.outfit(fontSize: 16)),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.receipt_long,
+                        size: 64,
+                        color: Colors.grey[400],
+                      ),
+                      SizedBox(height: 16),
+                      Text(
+                        emptyMessage,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
                 );
               }
               
@@ -220,16 +386,34 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                       return await showDialog(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: Text('Delete Ticket'),
-                          content: Text('Are you sure you want to delete this ticket?'),
+                          title: Text(
+                            'Delete Ticket', 
+                            style: GoogleFonts.outfit(fontSize: 20)
+                          ),
+                          content: Text(
+                            'Are you sure you want to delete this ticket? This action cannot be undone.',
+                            style: GoogleFonts.outfit(fontSize: 14)
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(context).pop(false),
-                              child: Text('Cancel'),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  color: Colors.grey[600]
+                                )
+                              ),
                             ),
                             TextButton(
                               onPressed: () => Navigator.of(context).pop(true),
-                              child: Text('Delete', style: TextStyle(color: Colors.red)),
+                              child: Text(
+                                'Delete',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  color: Colors.red
+                                )
+                              ),
                             ),
                           ],
                         ),
@@ -237,9 +421,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                     },
                     onDismissed: (direction) async {
                       await _deleteTicket(t['id']);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Ticket deleted')),
-                      );
+                      _showCustomSnackBar('Ticket deleted successfully', 'success');
                     },
                     child: GestureDetector(
                       onTap: () => _showTicketDetails(t),
@@ -275,24 +457,41 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                                     ),
                                   ),
                                   SizedBox(height: 4),
-                                  Text('Total Fare: ${t['totalFare'] ?? t['fare']} PHP',
-                                      style: GoogleFonts.outfit(fontSize: 14)),
-                                  Text('Passengers: ${t['quantity']}',
-                                      style: GoogleFonts.outfit(fontSize: 14)),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: _getStatusColor(t['status'] ?? 'pending'),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'Status: ${t['status'] ?? 'pending'}',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: 12,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w500,
+                                  Text(
+                                    'Total Fare: ${t['totalFare'] ?? t['fare']} PHP',
+                                    style: GoogleFonts.outfit(fontSize: 14)
+                                  ),
+                                  Text(
+                                    'Passengers: ${t['quantity']}',
+                                    style: GoogleFonts.outfit(fontSize: 14)
+                                  ),
+                                  SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _getStatusColor(t['status'] ?? 'pending'),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${t['status'] ?? 'pending'}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 12,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        _formatDate(t['createdAt']),
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),

@@ -24,21 +24,23 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
   Future<List<Map<String, dynamic>>> _fetchAllBookings() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
-    
+
     final col = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('preBookings');
-    
+
     // Get all pre-bookings and filter in memory to avoid index requirements
     final snapshot = await col.get();
-    
+
     final allBookings = snapshot.docs
-        .where((doc) => doc.data()['status'] == 'paid' || doc.data()['status'] == 'pending_payment')
+        .where((doc) =>
+            doc.data()['status'] == 'paid' ||
+            doc.data()['status'] == 'pending_payment')
         .toList()
-        ..sort((a, b) => (b.data()['createdAt'] as Timestamp)
-            .compareTo(a.data()['createdAt'] as Timestamp));
-    
+      ..sort((a, b) => (b.data()['createdAt'] as Timestamp)
+          .compareTo(a.data()['createdAt'] as Timestamp));
+
     return allBookings.map((doc) {
       final data = doc.data();
       data['id'] = doc.id;
@@ -49,12 +51,12 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
   Future<void> _deleteBooking(String bookingId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    
+
     final col = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('preBookings');
-    
+
     await col.doc(bookingId).delete();
     setState(() {
       _bookingsFuture = _fetchAllBookings();
@@ -67,15 +69,18 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Pending Payment', style: GoogleFonts.outfit(fontSize: 20)),
+          title:
+              Text('Pending Payment', style: GoogleFonts.outfit(fontSize: 20)),
           content: Text(
             'This booking is still pending payment. Would you like to go back to complete the payment?',
-            style: GoogleFonts.outfit(fontSize: 14),
+            style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600]),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
+              child: Text('Cancel',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, color: Colors.grey[600])),
             ),
             ElevatedButton(
               onPressed: () {
@@ -84,23 +89,33 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => PreBookSummaryPage(
+                      bookingId: booking['id'] ?? '',
                       route: booking['route'],
                       directionLabel: booking['direction'],
-                      fromPlace: {'name': booking['from']},
-                      toPlace: {'name': booking['to']},
+                      fromPlace: {
+                        'name': booking['from'],
+                        'km': booking['fromKm']?.toDouble() ?? 0.0,
+                      },
+                      toPlace: {
+                        'name': booking['to'],
+                        'km': booking['toKm']?.toDouble() ?? 0.0,
+                      },
                       quantity: booking['quantity'],
                       fareTypes: List<String>.from(booking['fareTypes'] ?? []),
                       baseFare: booking['fare']?.toDouble() ?? 0.0,
                       totalAmount: booking['amount']?.toDouble() ?? 0.0,
-                      discountBreakdown: List<String>.from(booking['discountBreakdown'] ?? []),
-                      passengerFares: List<double>.from(booking['passengerFares'] ?? []),
+                      discountBreakdown:
+                          List<String>.from(booking['discountBreakdown'] ?? []),
+                      passengerFares:
+                          List<double>.from(booking['passengerFares'] ?? []),
                     ),
                   ),
                 );
               },
-              child: Text('Go Back', style: GoogleFonts.outfit(fontSize: 14)),
+              child: Text('Go Back',
+                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange,
+                backgroundColor: Color(0xFF0091AD),
                 foregroundColor: Colors.white,
               ),
             ),
@@ -122,6 +137,79 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
   String _generateQRData(Map<String, dynamic> booking) {
     // Use the stored qrData from Firebase, which contains the proper JSON format
     return booking['qrData'] ?? '{}';
+  }
+
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -163,22 +251,22 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                     color: Colors.grey[400],
                   ),
                   SizedBox(height: 16),
-                                     Text(
-                     'No reservations yet.',
-                     style: GoogleFonts.outfit(
-                       fontSize: 16,
-                       color: Colors.grey[600],
-                     ),
-                   ),
-                   SizedBox(height: 8),
-                   Text(
-                     'Your paid and pending pre-bookings will appear here.',
-                     style: GoogleFonts.outfit(
-                       fontSize: 14,
-                       color: Colors.grey[500],
-                     ),
-                     textAlign: TextAlign.center,
-                   ),
+                  Text(
+                    'No reservations yet.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Your paid and pending pre-bookings will appear here.',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      color: Colors.grey[500],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ],
               ),
             );
@@ -190,7 +278,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
             itemBuilder: (context, i) {
               final booking = bookings[i];
               final qrData = _generateQRData(booking);
-              
+
               return Dismissible(
                 key: Key(booking['id'] ?? i.toString()),
                 direction: DismissDirection.endToStart,
@@ -204,16 +292,26 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                   return await showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: Text('Delete Reservation'),
-                      content: Text('Are you sure you want to delete this reservation?'),
+                      title: Text('Delete Reservation',
+                          style: GoogleFonts.outfit(fontSize: 20)),
+                      content: Text(
+                          'Are you sure you want to delete this reservation?',
+                          style: GoogleFonts.outfit(fontSize: 14)),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.of(context).pop(false),
-                          child: Text('Cancel'),
+                          child: Text('Cancel',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 14, color: Colors.grey[600])),
                         ),
-                        TextButton(
+                        ElevatedButton(
                           onPressed: () => Navigator.of(context).pop(true),
-                          child: Text('Delete', style: TextStyle(color: Colors.red)),
+                          child: Text('Delete',
+                              style: GoogleFonts.outfit(
+                                  fontSize: 14, color: Colors.white)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                          ),
                         ),
                       ],
                     ),
@@ -221,9 +319,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                 },
                 onDismissed: (direction) async {
                   await _deleteBooking(booking['id']);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Reservation deleted')),
-                  );
+                  _showCustomSnackBar('Reservation deleted', 'success');
                 },
                 child: GestureDetector(
                   onTap: () => _showBookingDetails(booking),
@@ -270,7 +366,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                               SizedBox(height: 4),
                               Text(
                                 'Route: ${booking['route']}',
-                                style: GoogleFonts.outfit(fontSize: 12, color: Colors.grey[600]),
+                                style: GoogleFonts.outfit(
+                                    fontSize: 12, color: Colors.grey[600]),
                               ),
                               Text(
                                 'Total Amount: ${booking['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
@@ -280,21 +377,28 @@ class _ReservationConfirmState extends State<ReservationConfirm> {
                                 'Passengers: ${booking['quantity']}',
                                 style: GoogleFonts.outfit(fontSize: 14),
                               ),
-                                                             Container(
-                                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                 decoration: BoxDecoration(
-                                   color: booking['status'] == 'paid' ? Colors.green[100] : Colors.orange[100],
-                                   borderRadius: BorderRadius.circular(12),
-                                 ),
-                                 child: Text(
-                                   booking['status'] == 'paid' ? 'PAID' : 'PENDING',
-                                   style: GoogleFonts.outfit(
-                                     fontSize: 10,
-                                     fontWeight: FontWeight.bold,
-                                     color: booking['status'] == 'paid' ? Colors.green[700] : Colors.orange[700],
-                                   ),
-                                 ),
-                               ),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: booking['status'] == 'paid'
+                                      ? Colors.green[100]
+                                      : Colors.orange[100],
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Text(
+                                  booking['status'] == 'paid'
+                                      ? 'PAID'
+                                      : 'PENDING',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: booking['status'] == 'paid'
+                                        ? Colors.green[700]
+                                        : Colors.orange[700],
+                                  ),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -325,7 +429,7 @@ class BookingDetailsPage extends StatelessWidget {
     // Use the stored qrData from Firebase, which contains the proper JSON format
     final qrData = booking['qrData'] ?? '{}';
     final size = MediaQuery.of(context).size;
-    
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -380,7 +484,7 @@ class BookingDetailsPage extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 32),
-              
+
               // QR Code Section
               Container(
                 width: double.infinity,
@@ -431,9 +535,9 @@ class BookingDetailsPage extends StatelessWidget {
                   ],
                 ),
               ),
-              
+
               SizedBox(height: 24),
-              
+
               // Booking Details
               Container(
                 width: double.infinity,
@@ -461,33 +565,35 @@ class BookingDetailsPage extends StatelessWidget {
                     _buildDetailRow('From KM:', '${booking['fromKm']}'),
                     _buildDetailRow('To KM:', '${booking['toKm']}'),
                     _buildDetailRow('Quantity:', '${booking['quantity']}'),
-                    _buildDetailRow('Total Amount:', '${booking['amount']?.toStringAsFixed(2) ?? '0.00'} PHP'),
+                    _buildDetailRow('Total Amount:',
+                        '${booking['amount']?.toStringAsFixed(2) ?? '0.00'} PHP'),
                     _buildDetailRow('Status:', 'PAID'),
                     SizedBox(height: 16),
-                    
-                                         // Passenger Details
-                     Text(
-                       'Passenger Details',
-                       style: GoogleFonts.outfit(
-                         fontSize: 16,
-                         fontWeight: FontWeight.w600,
-                       ),
-                     ),
-                     SizedBox(height: 8),
-                     ...(booking['discountBreakdown'] as List<dynamic>? ?? []).map((detail) => 
-                       Padding(
-                         padding: EdgeInsets.only(bottom: 4),
-                         child: Text(
-                           detail.toString(),
-                           style: GoogleFonts.outfit(fontSize: 14),
-                         ),
-                       ),
-                     ),
+
+                    // Passenger Details
+                    Text(
+                      'Passenger Details',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    ...(booking['discountBreakdown'] as List<dynamic>? ?? [])
+                        .map(
+                      (detail) => Padding(
+                        padding: EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          detail.toString(),
+                          style: GoogleFonts.outfit(fontSize: 14),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
               SizedBox(height: 24),
-              
+
               // Important Notes
               Container(
                 width: double.infinity,
@@ -517,15 +623,18 @@ class BookingDetailsPage extends StatelessWidget {
                     SizedBox(height: 12),
                     Text(
                       '• The conductor will see your booking on their map',
-                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.blue[700]),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, color: Colors.blue[700]),
                     ),
                     Text(
                       '• Your seats are guaranteed for this trip',
-                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.blue[700]),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, color: Colors.blue[700]),
                     ),
                     Text(
                       '• Keep this confirmation for your records',
-                      style: GoogleFonts.outfit(fontSize: 14, color: Colors.blue[700]),
+                      style: GoogleFonts.outfit(
+                          fontSize: 14, color: Colors.blue[700]),
                     ),
                   ],
                 ),

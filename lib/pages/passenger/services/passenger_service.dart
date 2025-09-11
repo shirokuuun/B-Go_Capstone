@@ -115,13 +115,12 @@ class PassengerService extends StatelessWidget {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: Text('Pre-Booking Notice'),
+                        title: Text('Pre-Booking Notice', style: GoogleFonts.outfit(fontSize: isMobile ? 16 : 18)),
                         content: Text(
                           'By using Pre-Booking, you are reserving a guaranteed seat for the entire trip (from the starting point to the last stop). The payment is fixed for the full route. Do you want to continue?',
                           style: GoogleFonts.outfit(
                             fontSize: isMobile ? 14 : 16,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF555555),
                           ),
                         ),
                         actions: [
@@ -130,7 +129,7 @@ class PassengerService extends StatelessWidget {
                             child: Text(
                               'Cancel',
                               style: GoogleFonts.outfit(
-                                fontSize: isMobile ? 16 : 18,
+                                fontSize: isMobile ? 14 : 18,
                                 color: Colors.red,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -147,7 +146,7 @@ class PassengerService extends StatelessWidget {
                             child: Text(
                               'Continue',
                               style: GoogleFonts.outfit(
-                                fontSize: isMobile ? 16 : 18,
+                                fontSize: isMobile ? 14 : 18,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),

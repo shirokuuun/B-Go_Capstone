@@ -634,11 +634,14 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0091AD),
+          ),
           onPressed: () => Navigator.of(context).pop(quantity),
-          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -744,11 +747,14 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0091AD),
+          ),
           onPressed: () => Navigator.of(context).pop(selectedTypes),
-          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -767,11 +773,14 @@ class _ConfirmationModal extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0091AD),
+          ),
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text('Yes', style: GoogleFonts.outfit(fontSize: 14)),
+          child: Text('Yes', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -920,7 +929,7 @@ class _ReceiptModal extends StatelessWidget {
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: Colors.black)),
+          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
       ],
     );

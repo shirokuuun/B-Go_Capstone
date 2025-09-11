@@ -5,10 +5,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:b_go/pages/conductor/destination_service.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'dart:async';
-import 'dart:ui' as ui;
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class ConductorMaps extends StatefulWidget {
   final String route;
@@ -38,10 +40,10 @@ class _ConductorMapsState extends State<ConductorMaps>
       _preTicketsSubscription; // Separate subscription for pre-tickets
   StreamSubscription<QuerySnapshot>? _manualTicketsSubscription;
 
-  // ADD: Memory optimization constants
-  static const int MAX_ROUTE_MARKERS = 15; // Reduced from 25
-  static const int MAX_PASSENGER_MARKERS = 8; // Reduced from 15
-  static const int MAX_DESTINATIONS_CACHE = 50; // Limit cached destinations
+  static const int MIN_ROUTE_MARKERS = 12; // Minimum route markers to always show
+  static const int MAX_ROUTE_MARKERS = 20; // Increased max route markers
+  static const int MAX_PASSENGER_MARKERS = 100; // Allow more passenger markers
+  static const int MAX_DESTINATIONS_CACHE = 50;
   static const Duration MARKER_REFRESH_COOLDOWN = Duration(seconds: 2);
 
   int _markerCount = 0;
@@ -124,6 +126,7 @@ class _ConductorMapsState extends State<ConductorMaps>
     if (color == Colors.yellow) return BitmapDescriptor.hueYellow;
     if (color == Colors.green) return BitmapDescriptor.hueGreen;
     if (color == Colors.red) return BitmapDescriptor.hueRed;
+    if (color == Colors.black) return BitmapDescriptor.hueViolet; // Use violet for black markers
     return BitmapDescriptor.hueAzure;
   }
 
@@ -132,6 +135,7 @@ class _ConductorMapsState extends State<ConductorMaps>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _safeInitialize();
+    _startGeofencingService();
   }
 
   Future<void> _safeInitialize() async {
@@ -235,17 +239,19 @@ class _ConductorMapsState extends State<ConductorMaps>
     print('Forced memory cleanup completed');
   }
 
-    void _periodicMemoryCleanup() {
+  void _periodicMemoryCleanup() {
     if (_isDisposed) return;
     
-    // Clean up old cached markers if too many
-    if (_cachedMarkers.length > MAX_ROUTE_MARKERS + MAX_PASSENGER_MARKERS + 10) {
+    // FIXED: Use separate limits for route and passenger markers
+    final totalMarkers = _cachedMarkers.length;
+    final maxTotalMarkers = MIN_ROUTE_MARKERS + MAX_PASSENGER_MARKERS + 50;
+    
+    if (totalMarkers > maxTotalMarkers) {
       _cachedMarkers.clear();
       _lastMarkerCacheKey = '';
-      print('Cleared marker cache due to size (${_cachedMarkers.length})');
+      print('Cleared marker cache due to size ($totalMarkers > $maxTotalMarkers)');
     }
     
-    // Limit stored destinations
     if (_routeDestinations.length > MAX_DESTINATIONS_CACHE) {
       _routeDestinations = _routeDestinations.take(MAX_DESTINATIONS_CACHE).toList();
       print('Trimmed destinations cache to ${MAX_DESTINATIONS_CACHE}');
@@ -265,6 +271,9 @@ class _ConductorMapsState extends State<ConductorMaps>
     _conductorSubscription?.cancel();
     _manualTicketsSubscription?.cancel();
 
+    // Stop geofencing service
+    GeofencingService().stopMonitoring();
+
     // Dispose map controller safely
     _mapController?.dispose();
     _mapController = null;
@@ -282,6 +291,29 @@ class _ConductorMapsState extends State<ConductorMaps>
     _isProcessingBookings = false;
     _isProcessingPreTickets = false; // Reset pre-tickets flag
     _isRefreshingMarkers = false;
+  }
+
+  // Start geofencing service for conductor
+  Future<void> _startGeofencingService() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Get conductor document ID
+      final conductorQuery = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorQuery.docs.isNotEmpty) {
+        final conductorDocId = conductorQuery.docs.first.id;
+        await GeofencingService().startConductorMonitoring(widget.route, conductorDocId);
+        print('✅ Started conductor geofencing service for route: ${widget.route}');
+      }
+    } catch (e) {
+      print('❌ Error starting conductor geofencing service: $e');
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -373,9 +405,10 @@ class _ConductorMapsState extends State<ConductorMaps>
   Future<void> _updateCurrentLocation() async {
     if (_isUpdatingLocation || !_isAppActive || _isDisposed) return;
     
-    // Skip update if too many markers to prevent memory pressure
-    if (_markerCount > MAX_ROUTE_MARKERS + MAX_PASSENGER_MARKERS + 5) {
-      print('Skipping location update due to memory pressure (${_markerCount} markers)');
+    // FIXED: Only check passenger markers for memory pressure, not route markers
+    final passengerMarkerCount = _activeBookings.length + _activePreTickets.length + _activeManualTickets.length;
+    if (passengerMarkerCount > MAX_PASSENGER_MARKERS + 30) {
+      print('Skipping location update due to memory pressure (${passengerMarkerCount} passenger markers)');
       return;
     }
     
@@ -392,7 +425,6 @@ class _ConductorMapsState extends State<ConductorMaps>
           _currentPosition = position;
         });
         
-        // Perform geofencing check with cooldown
         _performGeofencingCheck(position);
       }
     } catch (e) {
@@ -420,9 +452,13 @@ class _ConductorMapsState extends State<ConductorMaps>
       List<Map<String, dynamic>> passengersNear = [];
       List<Map<String, dynamic>> readyForDropOff = [];
 
-      // Check pre-bookings
+      // Check pre-bookings (only boarded ones for geofencing)
       for (final booking in _activeBookings) {
         if (_isDisposed) return;
+
+        // Only process boarded passengers for geofencing
+        final status = booking['status'] ?? '';
+        if (status != 'boarded') continue;
 
         final toLat = _convertToDouble(booking['toLatitude']);
         final toLng = _convertToDouble(booking['toLongitude']);
@@ -806,30 +842,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     }
   }
 
-  void _showErrorNotification(String message) {
-    if (!mounted || _isDisposed) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.error, color: Colors.white),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(message,
-                  style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.w600, color: Colors.white)),
-            ),
-          ],
-        ),
-        backgroundColor: Colors.red[600],
-        duration: Duration(seconds: 5),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: EdgeInsets.all(16),
-      ),
-    );
-  }
 
   void _loadConductorData() {
     if (_isDisposed) return;
@@ -975,11 +987,12 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     _bookingsSubscription?.cancel();
 
-    // Load ONLY pre-bookings (from passengers booking in advance)
+    // Load pre-bookings with both 'paid' and 'boarded' status
+    // 'paid' = waiting to be picked up, 'boarded' = on the bus for geofencing
     final preBookingsStream = FirebaseFirestore.instance
         .collectionGroup('preBookings')
         .where('route', isEqualTo: widget.route)
-        .where('status', isEqualTo: 'boarded')
+        .where('status', whereIn: ['paid', 'boarded'])
         .snapshots();
 
     _bookingsSubscription = preBookingsStream.listen((preBookingsSnapshot) {
@@ -991,12 +1004,12 @@ class _ConductorMapsState extends State<ConductorMaps>
       try {
         List<Map<String, dynamic>> activeBookings = [];
 
-        // Process pre-bookings only
+        // Process pre-bookings with both 'paid' and 'boarded' status
         for (var doc in preBookingsSnapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final status = data['status'] ?? '';
 
-          if (status == 'boarded') {
+          if (status == 'paid' || status == 'boarded') {
             activeBookings.add({
               'id': doc.id,
               'userId': data['userId'],
@@ -1012,6 +1025,7 @@ class _ConductorMapsState extends State<ConductorMaps>
                   _convertToDouble(data['passengerLongitude']),
               'status': status,
               'ticketType': 'preBooking',
+              'qrData': data['qrData'], // Include QR data for scanning
             });
           }
         }
@@ -1064,7 +1078,7 @@ class _ConductorMapsState extends State<ConductorMaps>
 
         // Process pre-tickets (created from PreTicket page)
         for (var doc in preTicketsSnapshot.docs) {
-          final data = doc.data() as Map<String, dynamic>;
+          final data = doc.data();
           final status = data['status'] ?? '';
 
           if (status == 'boarded') {
@@ -1263,7 +1277,6 @@ class _ConductorMapsState extends State<ConductorMaps>
   Set<Marker> _buildMarkers() {
     if (!_isAppActive || _isDisposed) return _cachedMarkers;
     
-    // Rate limit marker refreshes
     final now = DateTime.now();
     if (_lastMarkerRefresh != null && 
         now.difference(_lastMarkerRefresh!) < MARKER_REFRESH_COOLDOWN) {
@@ -1276,12 +1289,10 @@ class _ConductorMapsState extends State<ConductorMaps>
       return _cachedMarkers;
     }
     
-    // Clear old markers first to free memory
     _cachedMarkers.clear();
-    
     final Set<Marker> markers = {};
 
-    // Add conductor marker (always include)
+    // 1. Add conductor marker (always include)
     if (_currentPosition != null) {
       markers.add(
         Marker(
@@ -1295,92 +1306,229 @@ class _ConductorMapsState extends State<ConductorMaps>
         ),
       );
     }
-
-    // Add route markers with stricter limits
-    if (_routeDestinations.isNotEmpty && markers.length < MAX_ROUTE_MARKERS + 1) {
-      final routeMarkers = _createOptimizedRouteMarkers();
+    Set<Marker> routeMarkers = {};
+    // 2. FIXED: Always add route markers first (minimum guaranteed)
+    if (_routeDestinations.isNotEmpty) {
+      routeMarkers = _createGuaranteedRouteMarkers();
       markers.addAll(routeMarkers);
+      print('Added ${routeMarkers.length} route markers (guaranteed)');
     }
 
-    // Add passenger markers with memory limit check
-    if (markers.length < MAX_ROUTE_MARKERS + MAX_PASSENGER_MARKERS + 1) {
-      final passengerMarkers = _createOptimizedPassengerMarkers(
-        MAX_PASSENGER_MARKERS - (markers.length - 1)
-      );
-      markers.addAll(passengerMarkers);
-    }
+    // 3. Add passenger markers (unlimited but with memory awareness)
+    final passengerMarkers = _createSmartPassengerMarkers();
+    markers.addAll(passengerMarkers);
+    print('Added ${passengerMarkers.length} passenger markers');
     
     _cachedMarkers = markers;
     _lastMarkerCacheKey = cacheKey;
     _lastMarkerRefresh = now;
     _markerCount = markers.length;
     
-    print('Created ${markers.length} markers (memory optimized)');
+    print('Created ${markers.length} markers total (${routeMarkers?.length ?? 0} route + ${passengerMarkers.length} passengers + 1 conductor)');
     return markers;
   }
 
-    Set<Marker> _createOptimizedRouteMarkers() {
-    final Set<Marker> markers = {};
-    
-    List<Map<String, dynamic>> filteredDestinations = [];
-    
-    if (_activePlaceCollection != null) {
-      filteredDestinations = _routeDestinations.where((destination) {
-        final direction = destination['direction'] ?? 'unknown';
-        
-        if (_activePlaceCollection == 'Place') {
-          return direction == 'forward' || direction == 'Place';
-        } else if (_activePlaceCollection == 'Place 2') {
-          return direction == 'reverse' || direction == 'Place 2';
-        }
-        return true;
-      }).toList();
-    } else {
-      filteredDestinations = _routeDestinations;
-    }
-
-    // Limit destinations and only take every nth item if too many
-    if (filteredDestinations.length > MAX_ROUTE_MARKERS) {
-      final step = (filteredDestinations.length / MAX_ROUTE_MARKERS).ceil();
-      List<Map<String, dynamic>> sampledDestinations = [];
-      for (int i = 0; i < filteredDestinations.length; i += step) {
-        sampledDestinations.add(filteredDestinations[i]);
-        if (sampledDestinations.length >= MAX_ROUTE_MARKERS) break;
-      }
-      filteredDestinations = sampledDestinations;
-    }
-    
-    for (final destination in filteredDestinations) {
-      if (markers.length >= MAX_ROUTE_MARKERS) break;
-      
-      final name = destination['name'] ?? 'Unknown';
-      final km = destination['km'] ?? 0.0;
-      final latitude = destination['latitude'] ?? 0.0;
-      final longitude = destination['longitude'] ?? 0.0;
+  Set<Marker> _createGuaranteedRouteMarkers() {
+  final Set<Marker> markers = {};
+  
+  List<Map<String, dynamic>> filteredDestinations = [];
+  
+  // Filter by active trip direction if available
+  if (_activePlaceCollection != null) {
+    filteredDestinations = _routeDestinations.where((destination) {
       final direction = destination['direction'] ?? 'unknown';
-
-      if (latitude != 0.0 && longitude != 0.0) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('route_${name}_$direction'),
-            position: LatLng(latitude, longitude),
-            infoWindow: InfoWindow(
-              title: name,
-              snippet: '${km} km - ${widget.route} Route (${direction})',
-            ),
-            icon: _getCircularMarkerIcon(),
-          ),
-        );
+      
+      if (_activePlaceCollection == 'Place') {
+        return direction == 'forward' || direction == 'Place';
+      } else if (_activePlaceCollection == 'Place 2') {
+        return direction == 'reverse' || direction == 'Place 2';
       }
-    }
-
-    return markers;
+      return true;
+    }).toList();
+  } else {
+    filteredDestinations = _routeDestinations;
   }
 
-  // ADD: Optimized passenger marker creation
+  // Ensure we always show at least MIN_ROUTE_MARKERS, but cap at MAX_ROUTE_MARKERS
+  int targetRouteMarkers = math.min(filteredDestinations.length, MAX_ROUTE_MARKERS);
+  targetRouteMarkers = math.max(targetRouteMarkers, math.min(MIN_ROUTE_MARKERS, filteredDestinations.length));
+  
+  // If we have more destinations than our target, sample them evenly
+  List<Map<String, dynamic>> selectedDestinations;
+  if (filteredDestinations.length > targetRouteMarkers) {
+    selectedDestinations = [];
+    final step = filteredDestinations.length / targetRouteMarkers;
+    for (int i = 0; i < targetRouteMarkers; i++) {
+      final index = (i * step).floor();
+      if (index < filteredDestinations.length) {
+        selectedDestinations.add(filteredDestinations[index]);
+      }
+    }
+  } else {
+    selectedDestinations = filteredDestinations;
+  }
+  
+  // Create markers for selected destinations
+  for (final destination in selectedDestinations) {
+    final name = destination['name'] ?? 'Unknown';
+    final km = destination['km'] ?? 0.0;
+    final latitude = destination['latitude'] ?? 0.0;
+    final longitude = destination['longitude'] ?? 0.0;
+    final direction = destination['direction'] ?? 'unknown';
+
+    if (latitude != 0.0 && longitude != 0.0) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('route_${name}_$direction'),
+          position: LatLng(latitude, longitude),
+          infoWindow: InfoWindow(
+            title: name,
+            snippet: '${km} km - ${widget.route} Route (${direction})',
+          ),
+          icon: _getCircularMarkerIcon(),
+        ),
+      );
+    }
+  }
+
+  print('Created ${markers.length} guaranteed route markers from ${filteredDestinations.length} destinations');
+  return markers;
+}
+
+Set<Marker> _createSmartPassengerMarkers() {
+  final Set<Marker> markers = {};
+  
+  // Calculate available memory budget for passenger markers
+  final currentRouteMarkers = _routeDestinations.isNotEmpty ? 
+    math.min(MAX_ROUTE_MARKERS, _routeDestinations.length) : 0;
+  final availableSlots = MAX_PASSENGER_MARKERS; // Don't reduce based on route markers
+  
+  print('Creating smart passenger markers with ${availableSlots} available slots');
+  
+  List<Map<String, dynamic>> allPassengers = [
+    ..._activeBookings.map((b) => {...b, 'ticketType': 'preBooking'}),
+    ..._activePreTickets.map((t) => {...t, 'ticketType': 'preTicket'}),
+    ..._activeManualTickets.map((m) => {...m, 'ticketType': 'manual'}),
+  ];
+  
+  print('Total passengers: ${allPassengers.length}');
+  
+  // If we have more passengers than slots, prioritize by importance and distance
+  List<Map<String, dynamic>> prioritizedPassengers;
+  if (allPassengers.length > availableSlots && _currentPosition != null) {
+    // Sort by priority: waiting passengers first, then by distance
+    allPassengers.sort((a, b) {
+      // Priority 1: Waiting passengers (paid pre-bookings)
+      final aWaiting = a['status'] == 'paid' && a['ticketType'] == 'preBooking';
+      final bWaiting = b['status'] == 'paid' && b['ticketType'] == 'preBooking';
+      
+      if (aWaiting && !bWaiting) return -1;
+      if (!aWaiting && bWaiting) return 1;
+      
+      // Priority 2: Distance to passenger location (for waiting) or destination (for boarded)
+      final aLat = aWaiting ? 
+        (_convertToDouble(a['passengerLatitude']) ?? 0.0) :
+        (_convertToDouble(a['toLatitude']) ?? 0.0);
+      final aLng = aWaiting ? 
+        (_convertToDouble(a['passengerLongitude']) ?? 0.0) :
+        (_convertToDouble(a['toLongitude']) ?? 0.0);
+      
+      final bLat = bWaiting ? 
+        (_convertToDouble(b['passengerLatitude']) ?? 0.0) :
+        (_convertToDouble(b['toLatitude']) ?? 0.0);
+      final bLng = bWaiting ? 
+        (_convertToDouble(b['passengerLongitude']) ?? 0.0) :
+        (_convertToDouble(b['toLongitude']) ?? 0.0);
+      
+      if (aLat == 0.0 || aLng == 0.0) return 1;
+      if (bLat == 0.0 || bLng == 0.0) return -1;
+      
+      final aDist = Geolocator.distanceBetween(
+        _currentPosition!.latitude, _currentPosition!.longitude,
+        aLat, aLng,
+      );
+      final bDist = Geolocator.distanceBetween(
+        _currentPosition!.latitude, _currentPosition!.longitude,
+        bLat, bLng,
+      );
+      
+      return aDist.compareTo(bDist);
+    });
+    
+    prioritizedPassengers = allPassengers.take(availableSlots).toList();
+    print('Prioritized ${prioritizedPassengers.length} passengers out of ${allPassengers.length}');
+  } else {
+    prioritizedPassengers = allPassengers;
+  }
+  
+  // Create markers for prioritized passengers
+  for (final passenger in prioritizedPassengers) {
+    final passengerLat = _convertToDouble(passenger['passengerLatitude']) ?? 0.0;
+    final passengerLng = _convertToDouble(passenger['passengerLongitude']) ?? 0.0;
+
+    if (passengerLat != 0.0 && passengerLng != 0.0) {
+      final ticketType = passenger['ticketType'] ?? 'unknown';
+      final status = passenger['status'] ?? 'unknown';
+      BitmapDescriptor icon;
+      String title;
+      
+      switch (ticketType) {
+        case 'preBooking':
+          if (status == 'paid') {
+            icon = _getSmallCircularMarker(Colors.black);
+            title = 'Pre-booked Passenger (Waiting)';
+          } else if (status == 'boarded') {
+            icon = _getHumanIcon();
+            title = 'Pre-booked Passenger (Boarded)';
+          } else {
+            icon = _getSmallCircularMarker(Colors.blue);
+            title = 'Pre-booked Passenger';
+          }
+          break;
+        case 'preTicket':
+          icon = _getSmallCircularMarker(Colors.orange);
+          title = 'Pre-ticket Passenger';
+          break;
+        case 'manual':
+          icon = _getSmallCircularMarker(Colors.grey);
+          title = 'Manual Ticket';
+          break;
+        default:
+          icon = _getSmallCircularMarker(Colors.purple);
+          title = 'Passenger';
+      }
+      
+      markers.add(
+        Marker(
+          markerId: MarkerId('${ticketType}_${passenger['id']}'),
+          position: LatLng(passengerLat, passengerLng),
+          infoWindow: InfoWindow(
+            title: title,
+            snippet: '${passenger['from']} → ${passenger['to']} (${passenger['quantity']} pax)',
+          ),
+          icon: icon,
+        ),
+      );
+    }
+  }
+  
+  return markers;
+}
+
+
+  // ADD: Optimized passenger marker creation (kept for compatibility) - UNUSED
+  /*
   Set<Marker> _createOptimizedPassengerMarkers(int maxMarkers) {
     final Set<Marker> markers = {};
     int addedMarkers = 0;
+    
+    print('🎯 Creating passenger markers with maxMarkers: $maxMarkers');
+    
+    // Safety check for negative maxMarkers
+    if (maxMarkers <= 0) {
+      print('⚠️ maxMarkers is $maxMarkers, setting to 5 as fallback');
+      maxMarkers = 5;
+    }
     
     // Prioritize passengers closest to drop-off
     List<Map<String, dynamic>> allPassengers = [
@@ -1389,9 +1537,35 @@ class _ConductorMapsState extends State<ConductorMaps>
       ..._activeManualTickets.map((m) => {...m, 'ticketType': 'manual'}),
     ];
     
-    // Sort by proximity to drop-off if current position is available
+    // Sort passengers by proximity - prioritize paid pre-bookings by current location
     if (_currentPosition != null) {
       allPassengers.sort((a, b) {
+        final aStatus = a['status'] ?? '';
+        final aTicketType = a['ticketType'] ?? '';
+        
+        // For paid pre-bookings, sort by current location (passengerLatitude/Longitude)
+        if (aStatus == 'paid' && aTicketType == 'preBooking') {
+          final aLat = _convertToDouble(a['passengerLatitude']) ?? 0.0;
+          final aLng = _convertToDouble(a['passengerLongitude']) ?? 0.0;
+          final bLat = _convertToDouble(b['passengerLatitude']) ?? 0.0;
+          final bLng = _convertToDouble(b['passengerLongitude']) ?? 0.0;
+          
+          if (aLat == 0.0 || aLng == 0.0) return 1;
+          if (bLat == 0.0 || bLng == 0.0) return -1;
+          
+          final aDist = Geolocator.distanceBetween(
+            _currentPosition!.latitude, _currentPosition!.longitude,
+            aLat, aLng,
+          );
+          final bDist = Geolocator.distanceBetween(
+            _currentPosition!.latitude, _currentPosition!.longitude,
+            bLat, bLng,
+          );
+          
+          return aDist.compareTo(bDist);
+        }
+        
+        // For boarded passengers and other tickets, sort by drop-off destination
         final aLat = _convertToDouble(a['toLatitude']) ?? 0.0;
         final aLng = _convertToDouble(a['toLongitude']) ?? 0.0;
         final bLat = _convertToDouble(b['toLatitude']) ?? 0.0;
@@ -1413,6 +1587,18 @@ class _ConductorMapsState extends State<ConductorMaps>
       });
     }
     
+    // Debug: Print passenger data
+    print('=== PASSENGER MARKER DEBUG ===');
+    print('Total passengers: ${allPassengers.length}');
+    for (int i = 0; i < allPassengers.length; i++) {
+      final p = allPassengers[i];
+      print('Passenger $i: ${p['ticketType']} - ${p['status']} - ${p['from']} → ${p['to']}');
+      print('  Passenger location: ${p['passengerLatitude']}, ${p['passengerLongitude']}');
+      print('  Destination: ${p['toLatitude']}, ${p['toLongitude']}');
+    }
+    print('Max markers allowed: $maxMarkers');
+    print('==============================');
+    
     // Add markers for closest passengers only
     for (final passenger in allPassengers) {
       if (addedMarkers >= maxMarkers) break;
@@ -1420,15 +1606,26 @@ class _ConductorMapsState extends State<ConductorMaps>
       final passengerLat = _convertToDouble(passenger['passengerLatitude']) ?? 0.0;
       final passengerLng = _convertToDouble(passenger['passengerLongitude']) ?? 0.0;
 
+      print('Processing passenger: ${passenger['ticketType']} - ${passenger['status']} at ($passengerLat, $passengerLng)');
+
       if (passengerLat != 0.0 && passengerLng != 0.0) {
         final ticketType = passenger['ticketType'] ?? 'unknown';
+        final status = passenger['status'] ?? 'unknown';
         BitmapDescriptor icon;
         String title;
         
         switch (ticketType) {
           case 'preBooking':
-            icon = _getHumanIcon();
-            title = 'Pre-booked Passenger';
+            if (status == 'paid') {
+              icon = _getSmallCircularMarker(Colors.black); // Black for waiting to be picked up
+              title = 'Pre-booked Passenger (Waiting)';
+            } else if (status == 'boarded') {
+              icon = _getHumanIcon(); // Human icon for boarded passengers
+              title = 'Pre-booked Passenger (Boarded)';
+            } else {
+              icon = _getSmallCircularMarker(Colors.blue);
+              title = 'Pre-booked Passenger';
+            }
             break;
           case 'preTicket':
             icon = _getSmallCircularMarker(Colors.orange);
@@ -1455,61 +1652,17 @@ class _ConductorMapsState extends State<ConductorMaps>
           ),
         );
         addedMarkers++;
+        print('✅ Created marker for ${ticketType} - ${status} at ($passengerLat, $passengerLng)');
+      } else {
+        print('❌ Skipped passenger ${passenger['ticketType']} - ${passenger['status']}: Invalid coordinates ($passengerLat, $passengerLng)');
       }
     }
     
     return markers;
   }
+  */
 
 
-  Set<Marker> _createRouteMarkers() {
-    final Set<Marker> markers = {};
-    const maxRouteMarkers = 25;
-
-    List<Map<String, dynamic>> filteredDestinations = [];
-
-    if (_activePlaceCollection != null) {
-      filteredDestinations = _routeDestinations.where((destination) {
-        final direction = destination['direction'] ?? 'unknown';
-
-        if (_activePlaceCollection == 'Place') {
-          return direction == 'forward' || direction == 'Place';
-        } else if (_activePlaceCollection == 'Place 2') {
-          return direction == 'reverse' || direction == 'Place 2';
-        }
-        return true;
-      }).toList();
-    } else {
-      filteredDestinations = _routeDestinations;
-    }
-
-    final limitedDestinations =
-        filteredDestinations.take(maxRouteMarkers).toList();
-
-    for (final destination in limitedDestinations) {
-      final name = destination['name'] ?? 'Unknown';
-      final km = destination['km'] ?? 0.0;
-      final latitude = destination['latitude'] ?? 0.0;
-      final longitude = destination['longitude'] ?? 0.0;
-      final direction = destination['direction'] ?? 'unknown';
-
-      if (latitude != 0.0 && longitude != 0.0) {
-        markers.add(
-          Marker(
-            markerId: MarkerId('route_${name}_$direction'),
-            position: LatLng(latitude, longitude),
-            infoWindow: InfoWindow(
-              title: name,
-              snippet: '${km} km - ${widget.route} Route (${direction})',
-            ),
-            icon: _getCircularMarkerIcon(),
-          ),
-        );
-      }
-    }
-
-    return markers;
-  }
 
   void _debouncedRefreshMarkers() {
     if (_isRefreshingMarkers || _isDisposed) return;
@@ -1659,6 +1812,11 @@ class _ConductorMapsState extends State<ConductorMaps>
         actions: [
           if (_currentPosition != null && !_isDisposed) ...[
             IconButton(
+              icon: Icon(Icons.qr_code_scanner),
+              onPressed: _openQRScanner,
+              tooltip: 'Scan QR Code',
+            ),
+            IconButton(
               icon: Icon(Icons.location_on),
               onPressed: _manualGeofencingCheck,
               tooltip: 'Check Geofencing',
@@ -1769,24 +1927,40 @@ class _ConductorMapsState extends State<ConductorMaps>
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF0091AD))),
 
-            // Three separate sections for different ticket types
-            Row(
+            // Separate sections for different ticket types and statuses
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
               children: [
-                // Pre-bookings section
+                // Paid pre-bookings (waiting to be picked up) - Black markers
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue[50],
+                    color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!, width: 1),
+                    border: Border.all(color: Colors.grey[400]!, width: 1),
                   ),
-                  child: Text('${_activeBookings.length} pre-bookings',
+                  child: Text('${_activeBookings.where((b) => b['status'] == 'paid').length} waiting',
                       style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: Colors.blue[700])),
+                          color: Colors.grey[800])),
                 ),
-                SizedBox(width: 4),
+
+                // Boarded pre-bookings (on the bus)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green[200]!, width: 1),
+                  ),
+                  child: Text('${_activeBookings.where((b) => b['status'] == 'boarded').length} boarded',
+                      style: GoogleFonts.outfit(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.green[700])),
+                ),
 
                 // Pre-tickets section
                 Container(
@@ -1802,7 +1976,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                           fontWeight: FontWeight.w500,
                           color: Colors.orange[700])),
                 ),
-                SizedBox(width: 4),
 
                 // Manual tickets section
                 Container(
@@ -2020,4 +2193,230 @@ class _ConductorMapsState extends State<ConductorMaps>
       ),
     );
   }
+
+  // Add QR scanner method
+  void _openQRScanner() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _QRScannerPage(),
+      ),
+    ).then((result) {
+      if (result == true) {
+        // Refresh markers and passenger count after successful scan
+        _debouncedRefreshMarkers();
+        _refreshPassengerCount();
+      }
+    });
+  }
+}
+
+// QR Scanner page for conductor maps
+class _QRScannerPage extends StatefulWidget {
+  @override
+  State<_QRScannerPage> createState() => _QRScannerPageState();
+}
+
+class _QRScannerPageState extends State<_QRScannerPage> {
+  bool _isProcessing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
+        backgroundColor: Color(0xFF0091AD),
+        foregroundColor: Colors.white,
+      ),
+      body: MobileScanner(
+        onDetect: (capture) async {
+          if (_isProcessing) {
+            print('QR scan already in progress, ignoring duplicate detection');
+            return;
+          }
+          
+          setState(() {
+            _isProcessing = true;
+          });
+          
+          final barcode = capture.barcodes.first;
+          final qrData = barcode.rawValue;
+          
+          if (qrData != null && qrData.isNotEmpty) {
+            try {
+              final data = parseQRData(qrData);
+              await storePreTicketToFirestore(data);
+              Navigator.of(context).pop(true);
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+              Navigator.of(context).pop(false);
+            } finally {
+              setState(() {
+                _isProcessing = false;
+              });
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Invalid QR code: No data detected'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            setState(() {
+              _isProcessing = false;
+            });
+          }
+        },
+      ),
+    );
+  }
+}
+
+// Helper functions for QR code processing (reused from conductor_from.dart)
+Map<String, dynamic> parseQRData(String qrData) {
+  try {
+    final Map<String, dynamic> data = jsonDecode(qrData);
+    return data;
+  } catch (e) {
+    throw Exception('Invalid QR code format: $e');
+  }
+}
+
+Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) throw Exception('User not authenticated');
+
+  final qrDataString = jsonEncode(data);
+  final quantity = data['quantity'] ?? 1;
+
+  // Get conductor document
+  final conductorDoc = await FirebaseFirestore.instance
+      .collection('conductors')
+      .where('uid', isEqualTo: user.uid)
+      .get();
+
+  if (conductorDoc.docs.isEmpty) {
+    throw Exception('Conductor profile not found');
+  }
+
+  // Check if this is a pre-booking or pre-ticket
+  final type = data['type'] ?? '';
+  if (type == 'preBooking') {
+    await _processPreBooking(data, user, conductorDoc, quantity, qrDataString);
+  } else {
+    await _processPreTicket(data, user, conductorDoc, quantity, qrDataString);
+  }
+}
+
+Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
+  
+  // Find the paid pre-booking
+  final preBookingsQuery = await FirebaseFirestore.instance
+      .collectionGroup('preBookings')
+      .where('qrData', isEqualTo: qrDataString)
+      .where('status', isEqualTo: 'paid')
+      .get();
+
+  if (preBookingsQuery.docs.isEmpty) {
+    throw Exception('No paid pre-booking found with this QR code. Please ensure payment is completed.');
+  }
+
+  final paidPreBooking = preBookingsQuery.docs.first;
+  final preBookingData = paidPreBooking.data();
+
+  // Check if already boarded
+  if (preBookingData['status'] == 'boarded' || preBookingData['boardingStatus'] == 'boarded') {
+    throw Exception('This pre-booking has already been scanned and boarded.');
+  }
+
+  // Update pre-booking status to "boarded"
+  await paidPreBooking.reference.update({
+    'status': 'boarded',
+    'boardedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'boardingStatus': 'boarded',
+  });
+
+  // Store in conductor's preBookings collection
+  final conductorDocId = conductorDoc.docs.first.id;
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('preBookings')
+      .add({
+    'qrData': qrDataString,
+    'originalDocumentId': paidPreBooking.id,
+    'originalCollection': paidPreBooking.reference.parent.path,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'qr': true,
+    'status': 'boarded',
+    'data': data,
+  });
+
+  // Increment passenger count
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+}
+
+Future<void> _processPreTicket(Map<String, dynamic> data, User user, QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
+  
+  // Find the pending pre-ticket
+  final preTicketsQuery = await FirebaseFirestore.instance
+      .collectionGroup('preTickets')
+      .where('qrData', isEqualTo: qrDataString)
+      .where('status', isEqualTo: 'pending')
+      .get();
+
+  if (preTicketsQuery.docs.isEmpty) {
+    throw Exception('No pending pre-ticket found with this QR code.');
+  }
+
+  final pendingPreTicket = preTicketsQuery.docs.first;
+  final preTicketData = pendingPreTicket.data();
+
+  // Check if already boarded
+  if (preTicketData['status'] == 'boarded') {
+    throw Exception('This pre-ticket has already been scanned and boarded.');
+  }
+
+  // Update pre-ticket status to "boarded"
+  await pendingPreTicket.reference.update({
+    'status': 'boarded',
+    'boardedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'scannedAt': FieldValue.serverTimestamp(),
+  });
+
+  // Store in conductor's preTickets collection
+  final conductorDocId = conductorDoc.docs.first.id;
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('preTickets')
+      .add({
+    'qrData': qrDataString,
+    'originalDocumentId': pendingPreTicket.id,
+    'originalCollection': pendingPreTicket.reference.parent.path,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'qr': true,
+    'status': 'boarded',
+    'data': data,
+  });
+
+  // Increment passenger count
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
 }

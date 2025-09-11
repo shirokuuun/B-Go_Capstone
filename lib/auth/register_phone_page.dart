@@ -419,7 +419,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                         'Terms and Conditions',
                                         style: GoogleFonts.outfit(
                                           color: Colors.blue,
-                                          decoration: TextDecoration.underline,
                                           fontWeight: FontWeight.w500,
                                           fontSize: hintFontSize,
                                         ),

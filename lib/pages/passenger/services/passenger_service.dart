@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:b_go/pages/passenger/services/bus_picker.dart';
 
 class PassengerService extends StatelessWidget {
   const PassengerService({super.key});
@@ -10,7 +11,6 @@ class PassengerService extends StatelessWidget {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
     
     // Responsive sizing
     final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
@@ -141,7 +141,12 @@ class PassengerService extends StatelessWidget {
                             ),
                             onPressed: () {
                               Navigator.of(context).pop();
-                              Navigator.pushNamed(context, '/pre_book');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const BusPicker(),
+                                ),
+                              );
                             },
                             child: Text(
                               'Continue',

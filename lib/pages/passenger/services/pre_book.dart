@@ -12,9 +12,11 @@ import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'package:b_go/services/payment_service.dart';
 import 'package:flutter/services.dart';
+import 'package:b_go/pages/passenger/services/bus_picker.dart';
 
 class PreBook extends StatefulWidget {
-  const PreBook({super.key});
+  final Map<String, dynamic>? selectedConductor;
+  const PreBook({super.key, this.selectedConductor});
 
   @override
   State<PreBook> createState() => _PreBookState();
@@ -74,13 +76,29 @@ class _PreBookState extends State<PreBook> {
   Position? _currentLocation; // Added for passenger location tracking
   final PassengerLocationService _locationService = PassengerLocationService();
   String selectedPlaceCollection = 'Place'; // Added for direction selection
+  Map<String, dynamic>? selectedConductor; // Store selected conductor info
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize with selected conductor if available
+    if (widget.selectedConductor != null) {
+      selectedConductor = widget.selectedConductor;
+      selectedRoute = selectedConductor!['route'] ?? 'Batangas';
+      
+      // Set direction based on conductor's active trip
+      final activeTrip = selectedConductor!['activeTrip'];
+      if (activeTrip != null) {
+        final isReturnTrip = activeTrip['isReturnTrip'] ?? false;
+        directionIndex = isReturnTrip ? 1 : 0;
+        selectedPlaceCollection = isReturnTrip ? 'Place 2' : 'Place';
+      }
+    }
+    
     placesFuture = RouteService.fetchPlaces(
         _routeFirestoreNames[selectedRoute] ?? selectedRoute,
-        placeCollection: 'Place');
+        placeCollection: selectedPlaceCollection);
     _fetchVerifiedIDType();
     // Delay location request slightly to ensure UI is loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -363,6 +381,7 @@ class _PreBookState extends State<PreBook> {
         quantity: quantity,
         fareTypes: fareTypes,
         currentLocation: _currentLocation, // Pass the location directly
+        selectedConductor: selectedConductor, // Pass conductor info
       ),
     );
   }
@@ -372,7 +391,6 @@ class _PreBookState extends State<PreBook> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
 
     // Get screen dimensions for better responsive calculations
     final screenHeight = MediaQuery.of(context).size.height;
@@ -508,7 +526,12 @@ class _PreBookState extends State<PreBook> {
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back,
                                 color: Colors.white),
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const BusPicker(),
+                              ),
+                            ),
                           ),
                         ),
                         Expanded(
@@ -518,27 +541,50 @@ class _PreBookState extends State<PreBook> {
                                 fontSize: titleFontSize, color: Colors.white),
                           ),
                         ),
-                        Padding(
-                          padding: EdgeInsets.only(right: 10.0),
-                          child: DropdownButton<String>(
-                            value: selectedRoute,
-                            dropdownColor: const Color(0xFF007A8F),
-                            style: GoogleFonts.outfit(
-                                fontSize: dropdownFontSize,
-                                color: Colors.white),
-                            iconEnabledColor: Colors.white,
-                            underline: Container(),
-                            items: routeChoices
-                                .map((route) => DropdownMenuItem(
-                                      value: route,
-                                      child: Text(routeLabels[route]![0],
-                                          style:
-                                              TextStyle(color: Colors.white)),
-                                    ))
-                                .toList(),
-                            onChanged: _onRouteChanged,
+                        if (selectedConductor == null)
+                          Padding(
+                            padding: EdgeInsets.only(right: 10.0),
+                            child: DropdownButton<String>(
+                              value: selectedRoute,
+                              dropdownColor: const Color(0xFF007A8F),
+                              style: GoogleFonts.outfit(
+                                  fontSize: dropdownFontSize,
+                                  color: Colors.white),
+                              iconEnabledColor: Colors.white,
+                              underline: Container(),
+                              items: routeChoices
+                                  .map((route) => DropdownMenuItem(
+                                        value: route,
+                                        child: Text(routeLabels[route]![0],
+                                            style:
+                                                TextStyle(color: Colors.white)),
+                                      ))
+                                  .toList(),
+                              onChanged: _onRouteChanged,
+                            ),
+                          )
+                        else
+                          Padding(
+                            padding: EdgeInsets.only(right: 10.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.directions_bus,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Bus #${selectedConductor!['busNumber'] ?? 'N/A'}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: dropdownFontSize,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -547,7 +593,7 @@ class _PreBookState extends State<PreBook> {
                         horizontal: horizontalPadding,
                         vertical: verticalPadding),
                     child: GestureDetector(
-                      onTap: _toggleDirection,
+                      onTap: selectedConductor == null ? _toggleDirection : null,
                       child: Container(
                         padding: EdgeInsets.symmetric(
                             horizontal: containerPadding,
@@ -775,6 +821,97 @@ class _PreBookState extends State<PreBook> {
                         ),
                       ),
                     ),
+                    // Conductor information section
+                    if (selectedConductor != null) ...[
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: isMobile ? 10 : 12,
+                            vertical: isMobile
+                                ? (screenHeight * 0.01)
+                                : (screenHeight * 0.012)),
+                        child: Container(
+                          padding: EdgeInsets.all(locationPadding),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.blue,
+                              width: 1,
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.directions_bus,
+                                    color: Colors.blue,
+                                    size: iconSize,
+                                  ),
+                                  SizedBox(width: isMobile ? 8 : 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Selected Bus: ${selectedConductor!['name'] ?? 'Unknown Conductor'}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: locationStatusFontSize,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.blue.shade700,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        SizedBox(height: isMobile ? 2 : 4),
+                                        Text(
+                                          'Bus #${selectedConductor!['busNumber'] ?? 'N/A'} • ${selectedConductor!['passengerCount'] ?? 0} passengers',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: locationCoordFontSize,
+                                            color: Colors.blue.shade600,
+                                          ),
+                                        ),
+                                        if (selectedConductor!['activeTrip']?['direction'] != null) ...[
+                                          SizedBox(height: isMobile ? 2 : 4),
+                                          Text(
+                                            'Route: ${selectedConductor!['activeTrip']['direction']}',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: locationCoordFontSize,
+                                              color: Colors.blue.shade600,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[100],
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Online',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: locationCoordFontSize - 1,
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                     FutureBuilder<List<Map<String, dynamic>>>(
                       future: placesFuture,
                       builder: (context, snapshot) {
@@ -870,7 +1007,6 @@ class _ToSelectionPage extends StatelessWidget {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
 
     // Get screen dimensions for better responsive calculations
     final screenHeight = MediaQuery.of(context).size.height;
@@ -1313,6 +1449,7 @@ class _ReceiptModal extends StatelessWidget {
   final int quantity;
   final List<String> fareTypes;
   final Position? currentLocation; // Added for location passing
+  final Map<String, dynamic>? selectedConductor; // Added for conductor info
   _ReceiptModal(
       {required this.route,
       required this.directionLabel,
@@ -1320,7 +1457,8 @@ class _ReceiptModal extends StatelessWidget {
       required this.toPlace,
       required this.quantity,
       required this.fareTypes,
-      this.currentLocation});
+      this.currentLocation,
+      this.selectedConductor});
 
   // Calculate full trip fare for pre-booking (from start to end of route)
   double computeFullTripFare(String route) {
@@ -1402,6 +1540,9 @@ class _ReceiptModal extends StatelessWidget {
       'userId': user.uid,
       'timestamp': now.millisecondsSinceEpoch,
       'boardingStatus': 'pending', // Add boarding status
+      'conductorId': selectedConductor?['id'],
+      'conductorName': selectedConductor?['name'],
+      'busNumber': selectedConductor?['busNumber'],
     };
 
     final data = {
@@ -1431,6 +1572,10 @@ class _ReceiptModal extends StatelessWidget {
       'paymentDeadline': now.add(Duration(minutes: 10)), // 10 minutes from now
       'createdAt': now,
       'userId': user.uid,
+      // Add conductor information
+      'conductorId': selectedConductor?['id'],
+      'conductorName': selectedConductor?['name'],
+      'busNumber': selectedConductor?['busNumber'],
       // Add QR data for conductor scanning
       'qrData': jsonEncode(qrData),
     };
@@ -1438,16 +1583,31 @@ class _ReceiptModal extends StatelessWidget {
     print('💾 PreBook: Complete booking data: $data');
 
     try {
+      print('💾 PreBook: Attempting to save booking to Firebase...');
+      print('💾 PreBook: User ID: ${user.uid}');
+      print('💾 PreBook: Data keys: ${data.keys.toList()}');
+      
       final docRef = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preBookings')
           .add(data);
-      print(
-          '✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
-      return docRef.id;
+      
+      print('✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
+      print('✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
+      
+      // Verify the booking was actually saved by reading it back
+      final savedDoc = await docRef.get();
+      if (savedDoc.exists) {
+        print('✅ PreBook: Booking verification successful - document exists');
+        return docRef.id;
+      } else {
+        print('❌ PreBook: Booking verification failed - document does not exist');
+        throw Exception('Booking was not saved properly');
+      }
     } catch (e) {
       print('❌ PreBook: Error saving booking to Firebase: $e');
+      print('❌ PreBook: Error type: ${e.runtimeType}');
       throw e;
     }
   }
@@ -1487,24 +1647,6 @@ class _ReceiptModal extends StatelessWidget {
         'Passenger ${i + 1}: $type${isDiscounted ? ' (20% off)' : ' (No discount)'} — ${passengerFare.toStringAsFixed(2)} PHP',
       );
     }
-
-    // Create QR data for display
-    final qrData = {
-      'type': 'preBooking',
-      'route': route,
-      'direction': directionLabel,
-      'from': fromPlace['name'],
-      'to': toPlace['name'],
-      'fromKm': (fromPlace['km'] as num).toInt(),
-      'toKm': (toPlace['km'] as num).toInt(),
-      'fare': baseFare,
-      'quantity': quantity,
-      'amount': totalAmount,
-      'fareTypes': fareTypes,
-      'discountBreakdown': discountBreakdown,
-      'passengerFares': passengerFares,
-      'timestamp': now.millisecondsSinceEpoch,
-    };
 
     return AlertDialog(
       title: Text('Receipt',
@@ -1586,10 +1728,14 @@ class _ReceiptModal extends StatelessWidget {
               return;
             }
 
+            print('💾 PreBook: Starting booking save process...');
             final bookingId = await savePreBooking(context, baseFare,
                 totalAmount, discountBreakdown, passengerFares);
 
-            if (bookingId != null) {
+            print('💾 PreBook: Booking save result - ID: $bookingId');
+
+            if (bookingId != null && bookingId.isNotEmpty) {
+              print('✅ PreBook: Booking saved successfully, navigating to summary page');
               Navigator.of(context).pop();
               // Navigate to summary page with booking ID
               Navigator.of(context).push(
@@ -1610,11 +1756,12 @@ class _ReceiptModal extends StatelessWidget {
                 ),
               );
             } else {
+              print('❌ PreBook: Booking save failed - bookingId is null or empty');
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('❌ Failed to save booking. Please try again.'),
                   backgroundColor: Colors.red,
-                  duration: Duration(seconds: 3),
+                  duration: Duration(seconds: 5),
                 ),
               );
             }
@@ -2098,6 +2245,22 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         return;
       }
 
+      // Validate booking ID before proceeding
+      if (widget.bookingId.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: Booking ID is missing. Please try creating the booking again.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        return;
+      }
+
+      print('🚀 PreBook: Launching payment with booking ID: ${widget.bookingId}');
+      print('🚀 PreBook: Payment amount: ${widget.totalAmount}');
+      print('🚀 PreBook: Route: ${widget.route}');
+
       final result = await PaymentService.launchPaymentPage(
         bookingId: widget.bookingId,
         amount: widget.totalAmount,
@@ -2110,8 +2273,62 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
       );
 
       if (!result['success']) {
-        // Show dialog with payment URL for manual opening
-        _showPaymentUrlDialog(context, result['url'] ?? '');
+        // Show error message and payment URL if available
+        String errorMessage = result['error'] ?? 'Failed to launch payment page';
+        if (result['url'] != null && result['url'].isNotEmpty) {
+          _showPaymentUrlDialog(context, result['url'], errorMessage);
+        } else {
+          // If no URL available, try direct simulation
+          print('🔄 PaymentService: No URL available, trying direct simulation');
+          final simulationResult = await PaymentService.simulatePaymentCompletion(widget.bookingId);
+          if (simulationResult) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Payment simulated successfully! Redirecting...'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 2),
+              ),
+            );
+            
+            Future.delayed(Duration(seconds: 2), () {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => ReservationConfirm(),
+                  ),
+                );
+              }
+            });
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('❌ $errorMessage'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+      } else if (result['simulated'] == true) {
+        // Handle direct simulation
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Payment simulated successfully! Redirecting...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // Navigate to confirmation page after a short delay
+        Future.delayed(Duration(seconds: 2), () {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ReservationConfirm(),
+              ),
+            );
+          }
+        });
       }
     } catch (e) {
       print('Error launching payment page: $e');
@@ -2194,6 +2411,9 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         // Handle both API response format and direct Firestore format
         final status = paymentStatus['status'] ?? paymentStatus['paymentStatus'] ?? 'pending';
         final isTestMode = paymentStatus['testMode'] ?? false;
+        final paymentError = paymentStatus['paymentError'];
+        
+        print('🔍 Payment status check: $status, testMode: $isTestMode, error: $paymentError');
         
         if (status == 'paid') {
           _timer.cancel();
@@ -2203,10 +2423,11 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
             SnackBar(
               content: Text(
                 isTestMode 
-                  ? 'Test payment successful! Your reservation is confirmed.'
-                  : 'Payment successful! Your reservation is confirmed.'
+                  ? '✅ Test payment successful! Your reservation is confirmed.'
+                  : '✅ Payment successful! Your reservation is confirmed.'
               ),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
             ),
           );
 
@@ -2220,41 +2441,42 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
           _timer.cancel();
           _paymentStatusTimer.cancel();
 
+          String errorMsg = 'Payment failed. Please try again.';
+          if (paymentError != null && paymentError.isNotEmpty) {
+            errorMsg = 'Payment failed: $paymentError';
+          }
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Payment failed. Please try again.'),
+              content: Text('❌ $errorMsg'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
             ),
           );
-        } else if (paymentStatus['status'] == 'paid') {
-          // Direct Firestore response format (fallback)
+        } else if (status == 'payment_expired' || status == 'expired') {
           _timer.cancel();
           _paymentStatusTimer.cancel();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content:
-                  Text('Payment successful! Your reservation is confirmed.'),
-              backgroundColor: Colors.green,
+              content: Text('⏰ Payment session expired. Please try again.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
             ),
           );
-
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ReservationConfirm(),
-            ),
-          );
-        } else if (paymentStatus['status'] == 'payment_failed') {
+        } else if (status == 'cancelled') {
           _timer.cancel();
           _paymentStatusTimer.cancel();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Payment failed. Please try again.'),
-              backgroundColor: Colors.red,
+              content: Text('❌ Payment was cancelled.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 3),
             ),
           );
         }
+        // For 'pending_payment' or 'payment_initiated' status, continue monitoring
       }
     } catch (e) {
       print('Error checking payment status: $e');
@@ -2293,7 +2515,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
     );
   }
 
-  void _showPaymentUrlDialog(BuildContext context, String paymentUrl) {
+  void _showPaymentUrlDialog(BuildContext context, String paymentUrl, [String? errorMessage]) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -2303,6 +2525,21 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (errorMessage != null) ...[
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red[200]!),
+                  ),
+                  child: Text(
+                    'Error: $errorMessage',
+                    style: GoogleFonts.outfit(fontSize: 12, color: Colors.red[700]),
+                  ),
+                ),
+                SizedBox(height: 16),
+              ],
               Text(
                 'Unable to open payment page automatically. Please copy the link below and open it in your browser:',
                 style: GoogleFonts.outfit(fontSize: 14),

@@ -12,7 +12,6 @@ import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'package:b_go/services/payment_service.dart';
 import 'package:flutter/services.dart';
-import 'package:b_go/pages/passenger/services/bus_picker.dart';
 
 class PreBook extends StatefulWidget {
   final Map<String, dynamic>? selectedConductor;
@@ -81,12 +80,12 @@ class _PreBookState extends State<PreBook> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize with selected conductor if available
     if (widget.selectedConductor != null) {
       selectedConductor = widget.selectedConductor;
       selectedRoute = selectedConductor!['route'] ?? 'Batangas';
-      
+
       // Set direction based on conductor's active trip
       final activeTrip = selectedConductor!['activeTrip'];
       if (activeTrip != null) {
@@ -95,7 +94,7 @@ class _PreBookState extends State<PreBook> {
         selectedPlaceCollection = isReturnTrip ? 'Place 2' : 'Place';
       }
     }
-    
+
     placesFuture = RouteService.fetchPlaces(
         _routeFirestoreNames[selectedRoute] ?? selectedRoute,
         placeCollection: selectedPlaceCollection);
@@ -228,7 +227,7 @@ class _PreBookState extends State<PreBook> {
         // Show success message to user
         if (mounted) {
           _showCustomSnackBar(
-              '✅ Location captured: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
+              'Location captured: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}',
               'success');
         }
       } else {
@@ -526,12 +525,7 @@ class _PreBookState extends State<PreBook> {
                           child: IconButton(
                             icon: const Icon(Icons.arrow_back,
                                 color: Colors.white),
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const BusPicker(),
-                              ),
-                            ),
+                            onPressed: () => Navigator.of(context).pop(),
                           ),
                         ),
                         Expanded(
@@ -593,7 +587,8 @@ class _PreBookState extends State<PreBook> {
                         horizontal: horizontalPadding,
                         vertical: verticalPadding),
                     child: GestureDetector(
-                      onTap: selectedConductor == null ? _toggleDirection : null,
+                      onTap:
+                          selectedConductor == null ? _toggleDirection : null,
                       child: Container(
                         padding: EdgeInsets.symmetric(
                             horizontal: containerPadding,
@@ -873,7 +868,9 @@ class _PreBookState extends State<PreBook> {
                                             color: Colors.blue.shade600,
                                           ),
                                         ),
-                                        if (selectedConductor!['activeTrip']?['direction'] != null) ...[
+                                        if (selectedConductor!['activeTrip']
+                                                ?['direction'] !=
+                                            null) ...[
                                           SizedBox(height: isMobile ? 2 : 4),
                                           Text(
                                             'Route: ${selectedConductor!['activeTrip']['direction']}',
@@ -1586,23 +1583,26 @@ class _ReceiptModal extends StatelessWidget {
       print('💾 PreBook: Attempting to save booking to Firebase...');
       print('💾 PreBook: User ID: ${user.uid}');
       print('💾 PreBook: Data keys: ${data.keys.toList()}');
-      
+
       final docRef = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preBookings')
           .add(data);
-      
-      print('✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
-      print('✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
-      
+
+      print(
+          '✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
+      print(
+          '✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
+
       // Verify the booking was actually saved by reading it back
       final savedDoc = await docRef.get();
       if (savedDoc.exists) {
         print('✅ PreBook: Booking verification successful - document exists');
         return docRef.id;
       } else {
-        print('❌ PreBook: Booking verification failed - document does not exist');
+        print(
+            '❌ PreBook: Booking verification failed - document does not exist');
         throw Exception('Booking was not saved properly');
       }
     } catch (e) {
@@ -1735,7 +1735,8 @@ class _ReceiptModal extends StatelessWidget {
             print('💾 PreBook: Booking save result - ID: $bookingId');
 
             if (bookingId != null && bookingId.isNotEmpty) {
-              print('✅ PreBook: Booking saved successfully, navigating to summary page');
+              print(
+                  '✅ PreBook: Booking saved successfully, navigating to summary page');
               Navigator.of(context).pop();
               // Navigate to summary page with booking ID
               Navigator.of(context).push(
@@ -1756,7 +1757,8 @@ class _ReceiptModal extends StatelessWidget {
                 ),
               );
             } else {
-              print('❌ PreBook: Booking save failed - bookingId is null or empty');
+              print(
+                  '❌ PreBook: Booking save failed - bookingId is null or empty');
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('❌ Failed to save booking. Please try again.'),
@@ -1799,6 +1801,7 @@ class PreBookSummaryPage extends StatefulWidget {
   final double totalAmount;
   final List<String> discountBreakdown;
   final List<double> passengerFares;
+  final DateTime? paymentDeadline; // Add payment deadline parameter
 
   const PreBookSummaryPage({
     Key? key,
@@ -1813,6 +1816,7 @@ class PreBookSummaryPage extends StatefulWidget {
     required this.totalAmount,
     required this.discountBreakdown,
     required this.passengerFares,
+    this.paymentDeadline,
   }) : super(key: key);
 
   @override
@@ -1828,7 +1832,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
   @override
   void initState() {
     super.initState();
-    _deadline = DateTime.now().add(Duration(minutes: 10));
+    // Use passed deadline or create new one
+    _deadline = widget.paymentDeadline ?? DateTime.now().add(Duration(minutes: 10));
     _startTimer();
     _startPaymentStatusCheck();
   }
@@ -1865,8 +1870,12 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         actions: [
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // Go back to pre-booking page
+              Navigator.of(context).pop(); // Close dialog
+              // Navigate back to home page
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/home',
+                (route) => false,
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF0091AD),
@@ -1888,29 +1897,31 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
 
   Future<void> cancelPreBooking(BuildContext context) async {
     try {
-      final success = await PaymentService.cancelBooking(widget.bookingId);
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Pre-booking cancelled!'),
-              backgroundColor: Colors.orange),
-        );
-        Navigator.of(context).pop();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Failed to cancel booking. Please try again.'),
-              backgroundColor: Colors.red),
-        );
+      // Delete the booking from Firestore
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        _showCustomSnackBar('User not authenticated. Please try again.', 'error');
+        return;
       }
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preBookings')
+          .doc(widget.bookingId)
+          .delete();
+
+      _showCustomSnackBar('Pre-booking cancelled and deleted!', 'success');
+      
+      // Navigate back to home page by popping all pages until we reach the home page
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        '/home',
+        (route) => false, // Remove all previous routes
+      );
     } catch (e) {
       print('Error cancelling booking: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Error cancelling booking. Please try again.'),
-            backgroundColor: Colors.red),
-      );
+      _showCustomSnackBar(
+          'Error cancelling booking. Please try again.', 'error');
     }
   }
 
@@ -1943,7 +1954,10 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            // Go back to the previous page (PreBook)
+            Navigator.of(context).pop();
+          },
         ),
         title: Text('Payment Page',
             style: GoogleFonts.outfit(
@@ -2019,79 +2033,6 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
               ),
             ),
             SizedBox(height: 24),
-            // Payment Instructions
-            Container(
-              padding: EdgeInsets.all(16),
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue[200]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.payment, color: Colors.blue[700], size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Payment Instructions',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue[700],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '1. Click the "Pay Now" button below',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14, color: Colors.blue[700]),
-                  ),
-                  Text(
-                    '2. You will be redirected to our admin website',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14, color: Colors.blue[700]),
-                  ),
-                  Text(
-                    '3. Complete payment using PayMongo',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14, color: Colors.blue[700]),
-                  ),
-                  Text(
-                    '4. Return to this app after payment',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14, color: Colors.blue[700]),
-                  ),
-                  SizedBox(height: 12),
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info, color: Colors.green[700], size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Status: Pending Payment (Testing Mode)',
-                            style: GoogleFonts.outfit(
-                                fontSize: 12, color: Colors.green[700]),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
             // Booking Details
             Expanded(
               child: Padding(
@@ -2138,7 +2079,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
             ),
             // Action Buttons
             Padding(
-              padding: const EdgeInsets.only(bottom: 24.0, left: 16.0, right: 16.0),
+              padding:
+                  const EdgeInsets.only(bottom: 24.0, left: 16.0, right: 16.0),
               child: Column(
                 children: [
                   // Main Action Buttons Row
@@ -2178,13 +2120,13 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
                               ),
                             ),
                             onPressed: () {
-                              // TODO: Replace with actual admin website URL
-                              _launchAdminWebsite();
+                              _simulatePaymentAndRedirect();
                             },
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.payment, color: Colors.white, size: 18),
+                                Icon(Icons.payment,
+                                    color: Colors.white, size: 18),
                                 SizedBox(width: 6),
                                 Text('Pay Now',
                                     style: GoogleFonts.outfit(
@@ -2196,33 +2138,6 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
-                  // Test Payment Button (for development only)
-                  Container(
-                    width: double.infinity,
-                    height: 40,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange[400],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      onPressed: () {
-                        _simulateTestPayment();
-                      },
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.science, color: Colors.white, size: 16),
-                          SizedBox(width: 4),
-                          Text('Test Payment',
-                              style: GoogleFonts.outfit(
-                                  color: Colors.white, fontSize: 10)),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -2232,131 +2147,30 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
     );
   }
 
-  Future<void> _launchAdminWebsite() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('User not authenticated. Please log in again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // Validate booking ID before proceeding
-      if (widget.bookingId.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error: Booking ID is missing. Please try creating the booking again.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 5),
-          ),
-        );
-        return;
-      }
-
-      print('🚀 PreBook: Launching payment with booking ID: ${widget.bookingId}');
-      print('🚀 PreBook: Payment amount: ${widget.totalAmount}');
-      print('🚀 PreBook: Route: ${widget.route}');
-
-      final result = await PaymentService.launchPaymentPage(
-        bookingId: widget.bookingId,
-        amount: widget.totalAmount,
-        route: widget.route,
-        fromPlace: widget.fromPlace['name'],
-        toPlace: widget.toPlace['name'],
-        quantity: widget.quantity,
-        fareTypes: widget.fareTypes,
-        userId: user.uid,
-      );
-
-      if (!result['success']) {
-        // Show error message and payment URL if available
-        String errorMessage = result['error'] ?? 'Failed to launch payment page';
-        if (result['url'] != null && result['url'].isNotEmpty) {
-          _showPaymentUrlDialog(context, result['url'], errorMessage);
-        } else {
-          // If no URL available, try direct simulation
-          print('🔄 PaymentService: No URL available, trying direct simulation');
-          final simulationResult = await PaymentService.simulatePaymentCompletion(widget.bookingId);
-          if (simulationResult) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('✅ Payment simulated successfully! Redirecting...'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
-            
-            Future.delayed(Duration(seconds: 2), () {
-              if (mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => ReservationConfirm(),
-                  ),
-                );
-              }
-            });
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('❌ $errorMessage'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 5),
-              ),
-            );
-          }
-        }
-      } else if (result['simulated'] == true) {
-        // Handle direct simulation
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Payment simulated successfully! Redirecting...'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        
-        // Navigate to confirmation page after a short delay
-        Future.delayed(Duration(seconds: 2), () {
-          if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (context) => ReservationConfirm(),
-              ),
-            );
-          }
-        });
-      }
-    } catch (e) {
-      print('Error launching payment page: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error opening payment page. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _simulateTestPayment() async {
+  Future<void> _simulatePaymentAndRedirect() async {
     try {
       // Show confirmation dialog
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Test Payment'),
-          content: Text('This will simulate a successful payment for testing purposes. Continue?'),
+          title:
+              Text('Confirm Payment', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
+          content: Text(
+            'This will pay your pre book ticket. Continue?',
+            style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600]),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel'),
+              child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
             ),
-            TextButton(
+            ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text('Continue'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Color(0xFF0091AD),
+              ),
+              child: Text('Continue',
+                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
             ),
           ],
         ),
@@ -2364,40 +2178,104 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
 
       if (confirmed == true) {
         // Simulate payment completion
-        final success = await PaymentService.simulatePaymentCompletion(widget.bookingId);
-        
+        final success =
+            await PaymentService.simulatePaymentCompletion(widget.bookingId);
+
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Test payment completed successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
-          // Navigate to confirmation page
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ReservationConfirm(),
-            ),
-          );
+          // Show custom snackbar
+          _showCustomSnackBar('Booking has been paid successfully!', 'success');
+
+          Future.delayed(Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/home',
+                (route) => false, // Remove all previous routes
+              );
+            }
+          });
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to simulate payment. Please try again.'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _showCustomSnackBar(
+              '❌ Failed to simulate payment. Please try again.', 'error');
         }
       }
     } catch (e) {
-      print('Error simulating test payment: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error simulating payment. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      print('Error simulating payment: $e');
+      _showCustomSnackBar(
+          '❌ Error simulating payment. Please try again.', 'error');
     }
+  }
+
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _checkPaymentStatus() async {
@@ -2409,33 +2287,35 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
 
       if (paymentStatus != null) {
         // Handle both API response format and direct Firestore format
-        final status = paymentStatus['status'] ?? paymentStatus['paymentStatus'] ?? 'pending';
+        final status = paymentStatus['status'] ??
+            paymentStatus['paymentStatus'] ??
+            'pending';
         final isTestMode = paymentStatus['testMode'] ?? false;
         final paymentError = paymentStatus['paymentError'];
-        
-        print('🔍 Payment status check: $status, testMode: $isTestMode, error: $paymentError');
-        
+
+        print(
+            '🔍 Payment status check: $status, testMode: $isTestMode, error: $paymentError');
+
         if (status == 'paid') {
           _timer.cancel();
           _paymentStatusTimer.cancel();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                isTestMode 
+              content: Text(isTestMode
                   ? '✅ Test payment successful! Your reservation is confirmed.'
-                  : '✅ Payment successful! Your reservation is confirmed.'
-              ),
+                  : '✅ Payment successful! Your reservation is confirmed.'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 3),
             ),
           );
 
           // Navigate to reservation confirmation page
-          Navigator.of(context).pushReplacement(
+          Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
               builder: (context) => ReservationConfirm(),
             ),
+            (route) => false, // Remove all previous routes
           );
         } else if (status == 'payment_failed' || status == 'failed') {
           _timer.cancel();
@@ -2512,79 +2392,6 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
           ),
         ],
       ),
-    );
-  }
-
-  void _showPaymentUrlDialog(BuildContext context, String paymentUrl, [String? errorMessage]) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Payment Page', style: GoogleFonts.outfit(fontSize: 18)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (errorMessage != null) ...[
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[200]!),
-                  ),
-                  child: Text(
-                    'Error: $errorMessage',
-                    style: GoogleFonts.outfit(fontSize: 12, color: Colors.red[700]),
-                  ),
-                ),
-                SizedBox(height: 16),
-              ],
-              Text(
-                'Unable to open payment page automatically. Please copy the link below and open it in your browser:',
-                style: GoogleFonts.outfit(fontSize: 14),
-              ),
-              SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[300]!),
-                ),
-                child: SelectableText(
-                  paymentUrl,
-                  style:
-                      GoogleFonts.outfit(fontSize: 12, color: Colors.blue[700]),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Close', style: GoogleFonts.outfit(fontSize: 14)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: paymentUrl));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Payment URL copied to clipboard!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-                Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF0091AD),
-              ),
-              child: Text('Copy URL',
-                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
-            ),
-          ],
-        );
-      },
     );
   }
 }

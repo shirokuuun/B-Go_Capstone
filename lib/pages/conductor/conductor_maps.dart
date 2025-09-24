@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:b_go/pages/conductor/destination_service.dart';
+import 'package:b_go/services/direction_validation_service.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
@@ -46,7 +47,6 @@ class _ConductorMapsState extends State<ConductorMaps>
   static const int MAX_DESTINATIONS_CACHE = 50;
   static const Duration MARKER_REFRESH_COOLDOWN = Duration(seconds: 2);
 
-  int _markerCount = 0;
   DateTime? _lastMarkerRefresh;
 
   // Track active trip direction
@@ -229,7 +229,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     _cachedMarkers.clear();
     
     // Reset counters
-    _markerCount = 0;
     passengerCount = 0;
     
     // Clear cache keys
@@ -987,8 +986,9 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     _bookingsSubscription?.cancel();
 
-    // Load pre-bookings with both 'paid' and 'boarded' status
-    // 'paid' = waiting to be picked up, 'boarded' = on the bus for geofencing
+    // Load pre-bookings with 'paid' status for real-time tracking
+    // 'paid' = waiting to be picked up with real-time location updates
+    // 'boarded' = on the bus for geofencing (no longer tracked)
     final preBookingsStream = FirebaseFirestore.instance
         .collectionGroup('preBookings')
         .where('route', isEqualTo: widget.route)
@@ -1010,6 +1010,20 @@ class _ConductorMapsState extends State<ConductorMaps>
           final status = data['status'] ?? '';
 
           if (status == 'paid' || status == 'boarded') {
+            // For 'paid' status, use real-time passenger location
+            // For 'boarded' status, use destination location for geofencing
+            double? passengerLat, passengerLng;
+            
+            if (status == 'paid') {
+              // Use real-time passenger location for waiting passengers
+              passengerLat = _convertToDouble(data['passengerLatitude']);
+              passengerLng = _convertToDouble(data['passengerLongitude']);
+            } else {
+              // For boarded passengers, use destination for geofencing
+              passengerLat = _convertToDouble(data['toLatitude']);
+              passengerLng = _convertToDouble(data['toLongitude']);
+            }
+
             activeBookings.add({
               'id': doc.id,
               'userId': data['userId'],
@@ -1020,12 +1034,12 @@ class _ConductorMapsState extends State<ConductorMaps>
               'fromLongitude': _convertToDouble(data['fromLongitude']),
               'toLatitude': _convertToDouble(data['toLatitude']),
               'toLongitude': _convertToDouble(data['toLongitude']),
-              'passengerLatitude': _convertToDouble(data['passengerLatitude']),
-              'passengerLongitude':
-                  _convertToDouble(data['passengerLongitude']),
+              'passengerLatitude': passengerLat,
+              'passengerLongitude': passengerLng,
               'status': status,
               'ticketType': 'preBooking',
               'qrData': data['qrData'], // Include QR data for scanning
+              'isRealTime': status == 'paid', // Flag for real-time tracking
             });
           }
         }
@@ -1306,10 +1320,9 @@ class _ConductorMapsState extends State<ConductorMaps>
         ),
       );
     }
-    Set<Marker> routeMarkers = {};
     // 2. FIXED: Always add route markers first (minimum guaranteed)
     if (_routeDestinations.isNotEmpty) {
-      routeMarkers = _createGuaranteedRouteMarkers();
+      final routeMarkers = _createGuaranteedRouteMarkers();
       markers.addAll(routeMarkers);
       print('Added ${routeMarkers.length} route markers (guaranteed)');
     }
@@ -1322,9 +1335,8 @@ class _ConductorMapsState extends State<ConductorMaps>
     _cachedMarkers = markers;
     _lastMarkerCacheKey = cacheKey;
     _lastMarkerRefresh = now;
-    _markerCount = markers.length;
     
-    print('Created ${markers.length} markers total (${routeMarkers?.length ?? 0} route + ${passengerMarkers.length} passengers + 1 conductor)');
+    print('Created ${markers.length} markers total (${passengerMarkers.length} passengers + 1 conductor)');
     return markers;
   }
 
@@ -1399,8 +1411,6 @@ Set<Marker> _createSmartPassengerMarkers() {
   final Set<Marker> markers = {};
   
   // Calculate available memory budget for passenger markers
-  final currentRouteMarkers = _routeDestinations.isNotEmpty ? 
-    math.min(MAX_ROUTE_MARKERS, _routeDestinations.length) : 0;
   final availableSlots = MAX_PASSENGER_MARKERS; // Don't reduce based on route markers
   
   print('Creating smart passenger markers with ${availableSlots} available slots');
@@ -1469,14 +1479,15 @@ Set<Marker> _createSmartPassengerMarkers() {
     if (passengerLat != 0.0 && passengerLng != 0.0) {
       final ticketType = passenger['ticketType'] ?? 'unknown';
       final status = passenger['status'] ?? 'unknown';
+      final isRealTime = passenger['isRealTime'] ?? false;
       BitmapDescriptor icon;
       String title;
       
       switch (ticketType) {
         case 'preBooking':
-          if (status == 'paid') {
-            icon = _getSmallCircularMarker(Colors.black);
-            title = 'Pre-booked Passenger (Waiting)';
+          if (status == 'paid' && isRealTime) {
+            icon = _getSmallCircularMarker(Colors.red); // Red for waiting passengers with real-time tracking
+            title = 'Pre-booked Passenger (Waiting - Real-time)';
           } else if (status == 'boarded') {
             icon = _getHumanIcon();
             title = 'Pre-booked Passenger (Boarded)';
@@ -1514,156 +1525,6 @@ Set<Marker> _createSmartPassengerMarkers() {
   
   return markers;
 }
-
-
-  // ADD: Optimized passenger marker creation (kept for compatibility) - UNUSED
-  /*
-  Set<Marker> _createOptimizedPassengerMarkers(int maxMarkers) {
-    final Set<Marker> markers = {};
-    int addedMarkers = 0;
-    
-    print('🎯 Creating passenger markers with maxMarkers: $maxMarkers');
-    
-    // Safety check for negative maxMarkers
-    if (maxMarkers <= 0) {
-      print('⚠️ maxMarkers is $maxMarkers, setting to 5 as fallback');
-      maxMarkers = 5;
-    }
-    
-    // Prioritize passengers closest to drop-off
-    List<Map<String, dynamic>> allPassengers = [
-      ..._activeBookings.map((b) => {...b, 'ticketType': 'preBooking'}),
-      ..._activePreTickets.map((t) => {...t, 'ticketType': 'preTicket'}),
-      ..._activeManualTickets.map((m) => {...m, 'ticketType': 'manual'}),
-    ];
-    
-    // Sort passengers by proximity - prioritize paid pre-bookings by current location
-    if (_currentPosition != null) {
-      allPassengers.sort((a, b) {
-        final aStatus = a['status'] ?? '';
-        final aTicketType = a['ticketType'] ?? '';
-        
-        // For paid pre-bookings, sort by current location (passengerLatitude/Longitude)
-        if (aStatus == 'paid' && aTicketType == 'preBooking') {
-          final aLat = _convertToDouble(a['passengerLatitude']) ?? 0.0;
-          final aLng = _convertToDouble(a['passengerLongitude']) ?? 0.0;
-          final bLat = _convertToDouble(b['passengerLatitude']) ?? 0.0;
-          final bLng = _convertToDouble(b['passengerLongitude']) ?? 0.0;
-          
-          if (aLat == 0.0 || aLng == 0.0) return 1;
-          if (bLat == 0.0 || bLng == 0.0) return -1;
-          
-          final aDist = Geolocator.distanceBetween(
-            _currentPosition!.latitude, _currentPosition!.longitude,
-            aLat, aLng,
-          );
-          final bDist = Geolocator.distanceBetween(
-            _currentPosition!.latitude, _currentPosition!.longitude,
-            bLat, bLng,
-          );
-          
-          return aDist.compareTo(bDist);
-        }
-        
-        // For boarded passengers and other tickets, sort by drop-off destination
-        final aLat = _convertToDouble(a['toLatitude']) ?? 0.0;
-        final aLng = _convertToDouble(a['toLongitude']) ?? 0.0;
-        final bLat = _convertToDouble(b['toLatitude']) ?? 0.0;
-        final bLng = _convertToDouble(b['toLongitude']) ?? 0.0;
-        
-        if (aLat == 0.0 || aLng == 0.0) return 1;
-        if (bLat == 0.0 || bLng == 0.0) return -1;
-        
-        final aDist = Geolocator.distanceBetween(
-          _currentPosition!.latitude, _currentPosition!.longitude,
-          aLat, aLng,
-        );
-        final bDist = Geolocator.distanceBetween(
-          _currentPosition!.latitude, _currentPosition!.longitude,
-          bLat, bLng,
-        );
-        
-        return aDist.compareTo(bDist);
-      });
-    }
-    
-    // Debug: Print passenger data
-    print('=== PASSENGER MARKER DEBUG ===');
-    print('Total passengers: ${allPassengers.length}');
-    for (int i = 0; i < allPassengers.length; i++) {
-      final p = allPassengers[i];
-      print('Passenger $i: ${p['ticketType']} - ${p['status']} - ${p['from']} → ${p['to']}');
-      print('  Passenger location: ${p['passengerLatitude']}, ${p['passengerLongitude']}');
-      print('  Destination: ${p['toLatitude']}, ${p['toLongitude']}');
-    }
-    print('Max markers allowed: $maxMarkers');
-    print('==============================');
-    
-    // Add markers for closest passengers only
-    for (final passenger in allPassengers) {
-      if (addedMarkers >= maxMarkers) break;
-      
-      final passengerLat = _convertToDouble(passenger['passengerLatitude']) ?? 0.0;
-      final passengerLng = _convertToDouble(passenger['passengerLongitude']) ?? 0.0;
-
-      print('Processing passenger: ${passenger['ticketType']} - ${passenger['status']} at ($passengerLat, $passengerLng)');
-
-      if (passengerLat != 0.0 && passengerLng != 0.0) {
-        final ticketType = passenger['ticketType'] ?? 'unknown';
-        final status = passenger['status'] ?? 'unknown';
-        BitmapDescriptor icon;
-        String title;
-        
-        switch (ticketType) {
-          case 'preBooking':
-            if (status == 'paid') {
-              icon = _getSmallCircularMarker(Colors.black); // Black for waiting to be picked up
-              title = 'Pre-booked Passenger (Waiting)';
-            } else if (status == 'boarded') {
-              icon = _getHumanIcon(); // Human icon for boarded passengers
-              title = 'Pre-booked Passenger (Boarded)';
-            } else {
-              icon = _getSmallCircularMarker(Colors.blue);
-              title = 'Pre-booked Passenger';
-            }
-            break;
-          case 'preTicket':
-            icon = _getSmallCircularMarker(Colors.orange);
-            title = 'Pre-ticket Passenger';
-            break;
-          case 'manual':
-            icon = _getSmallCircularMarker(Colors.grey);
-            title = 'Manual Ticket';
-            break;
-          default:
-            icon = _getSmallCircularMarker(Colors.purple);
-            title = 'Passenger';
-        }
-        
-        markers.add(
-          Marker(
-            markerId: MarkerId('${ticketType}_${passenger['id']}'),
-            position: LatLng(passengerLat, passengerLng),
-            infoWindow: InfoWindow(
-              title: title,
-              snippet: '${passenger['from']} → ${passenger['to']} (${passenger['quantity']} pax)',
-            ),
-            icon: icon,
-          ),
-        );
-        addedMarkers++;
-        print('✅ Created marker for ${ticketType} - ${status} at ($passengerLat, $passengerLng)');
-      } else {
-        print('❌ Skipped passenger ${passenger['ticketType']} - ${passenger['status']}: Invalid coordinates ($passengerLat, $passengerLng)');
-      }
-    }
-    
-    return markers;
-  }
-  */
-
-
-
   void _debouncedRefreshMarkers() {
     if (_isRefreshingMarkers || _isDisposed) return;
 
@@ -1932,19 +1793,19 @@ Set<Marker> _createSmartPassengerMarkers() {
               spacing: 4,
               runSpacing: 4,
               children: [
-                // Paid pre-bookings (waiting to be picked up) - Black markers
+                // Paid pre-bookings (waiting to be picked up) - Red markers with real-time tracking
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Colors.red[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[400]!, width: 1),
+                    border: Border.all(color: Colors.red[200]!, width: 1),
                   ),
-                  child: Text('${_activeBookings.where((b) => b['status'] == 'paid').length} waiting',
+                  child: Text('${_activeBookings.where((b) => b['status'] == 'paid' && b['isRealTime'] == true).length} waiting (real-time)',
                       style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: Colors.grey[800])),
+                          color: Colors.red[800])),
                 ),
 
                 // Boarded pre-bookings (on the bus)
@@ -2305,11 +2166,45 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
     throw Exception('Conductor profile not found');
   }
 
+  final conductorData = conductorDoc.docs.first.data();
+  final conductorRoute = conductorData['route'];
+  final route = data['route'];
+
+  // Validate route match
+  if (conductorRoute != route) {
+    throw Exception(
+        'Invalid route. You are a $conductorRoute conductor but trying to scan a $route ticket. Only $conductorRoute tickets can be scanned.');
+  }
+
   // Check if this is a pre-booking or pre-ticket
   final type = data['type'] ?? '';
   if (type == 'preBooking') {
     await _processPreBooking(data, user, conductorDoc, quantity, qrDataString);
   } else {
+    // Validate direction compatibility for pre-tickets
+    if (type == 'preTicket') {
+      final passengerDirection = data['direction'];
+      final passengerPlaceCollection = data['placeCollection'];
+      
+      if (passengerDirection != null && passengerPlaceCollection != null) {
+        final isDirectionCompatible = await DirectionValidationService.validateDirectionCompatibilityByCollection(
+          passengerRoute: route,
+          passengerPlaceCollection: passengerPlaceCollection,
+          conductorUid: user.uid,
+        );
+        
+        if (!isDirectionCompatible) {
+          // Get conductor's active trip direction for better error message
+          final activeTrip = conductorData['activeTrip'];
+          final conductorDirection = activeTrip?['direction'] ?? 'Unknown';
+          
+          throw Exception(
+            'Direction mismatch! Your ticket is for "$passengerDirection" but the conductor is currently on "$conductorDirection" trip. Please wait for the correct direction or contact the conductor.'
+          );
+        }
+      }
+    }
+    
     await _processPreTicket(data, user, conductorDoc, quantity, qrDataString);
   }
 }
@@ -2342,6 +2237,9 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user, QuerySnaps
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
     'boardingStatus': 'boarded',
+    // Stop real-time location tracking by removing location update fields
+    'locationTrackingStopped': true,
+    'locationTrackingStoppedAt': FieldValue.serverTimestamp(),
   });
 
   // Store in conductor's preBookings collection

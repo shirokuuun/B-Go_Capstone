@@ -11,6 +11,7 @@ import 'dart:convert'; // Added for JSON encoding
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'package:b_go/services/payment_service.dart';
+import 'package:b_go/services/realtime_location_service.dart';
 import 'package:flutter/services.dart';
 
 class PreBook extends StatefulWidget {
@@ -1828,6 +1829,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
   late Timer _paymentStatusTimer;
   late DateTime _deadline;
   int _remainingSeconds = 600; // 10 minutes in seconds
+  final RealtimeLocationService _locationService = RealtimeLocationService();
 
   @override
   void initState() {
@@ -1892,6 +1894,9 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
   void dispose() {
     _timer.cancel();
     _paymentStatusTimer.cancel();
+    // Don't stop real-time location tracking when page is disposed
+    // The location service should continue running for the conductor to see real-time updates
+    // It will be stopped when the passenger is scanned by the conductor
     super.dispose();
   }
 
@@ -2182,8 +2187,17 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
             await PaymentService.simulatePaymentCompletion(widget.bookingId);
 
         if (success) {
-          // Show custom snackbar
-          _showCustomSnackBar('Booking has been paid successfully!', 'success');
+          // Start real-time location tracking for the paid booking
+          print('🚀 Starting real-time location tracking for booking: ${widget.bookingId}');
+          final trackingStarted = await _locationService.startTracking(widget.bookingId);
+          
+          if (trackingStarted) {
+            print('✅ Real-time location tracking started successfully');
+            _showCustomSnackBar('Booking has been paid successfully! Real-time location tracking started.', 'success');
+          } else {
+            print('❌ Failed to start real-time location tracking');
+            _showCustomSnackBar('Booking has been paid successfully! Location tracking may not be available.', 'success');
+          }
 
           Future.delayed(Duration(seconds: 2), () {
             if (mounted) {

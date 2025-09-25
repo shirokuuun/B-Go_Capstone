@@ -15,12 +15,12 @@ class ReservationConfirm extends StatefulWidget {
 class _ReservationConfirmState extends State<ReservationConfirm> with TickerProviderStateMixin {
   late Future<List<Map<String, dynamic>>> _bookingsFuture;
   late TabController _tabController;
-  String _selectedFilter = 'all'; // 'all', 'pending', 'paid', 'boarded'
+  String _selectedFilter = 'all'; // 'all', 'pending', 'paid', 'boarded', 'accomplished', 'cancelled'
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _bookingsFuture = _fetchAllBookings();
     
     // Listen to tab changes
@@ -39,6 +39,12 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
               break;
             case 3:
               _selectedFilter = 'boarded';
+              break;
+            case 4:
+              _selectedFilter = 'accomplished';
+              break;
+            case 5:
+              _selectedFilter = 'cancelled';
               break;
           }
         });
@@ -67,7 +73,10 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
     final allBookings = snapshot.docs
         .where((doc) =>
             doc.data()['status'] == 'paid' ||
-            doc.data()['status'] == 'pending_payment')
+            doc.data()['status'] == 'pending_payment' ||
+            doc.data()['status'] == 'boarded' ||
+            doc.data()['status'] == 'accomplished' ||
+            doc.data()['status'] == 'cancelled')
         .toList()
       ..sort((a, b) => (b.data()['createdAt'] as Timestamp)
           .compareTo(a.data()['createdAt'] as Timestamp));
@@ -85,15 +94,18 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
     }
     return bookings.where((booking) {
       final status = booking['status'] ?? 'pending_payment';
-      final boardingStatus = booking['boardingStatus'] ?? 'pending';
       
       switch (_selectedFilter) {
         case 'pending':
           return status == 'pending_payment';
         case 'paid':
-          return status == 'paid' && boardingStatus == 'pending';
+          return status == 'paid';
         case 'boarded':
-          return status == 'paid' && boardingStatus == 'boarded';
+          return status == 'boarded';
+        case 'accomplished':
+          return status == 'accomplished';
+        case 'cancelled':
+          return status == 'cancelled';
         default:
           return true;
       }
@@ -190,24 +202,32 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
   }
 
 
-  Color _getStatusColor(String status, String boardingStatus) {
+  Color _getStatusColor(String status) {
     if (status == 'pending_payment') {
       return Colors.orange;
-    } else if (status == 'paid' && boardingStatus == 'boarded') {
+    } else if (status == 'boarded') {
       return Colors.blue;
     } else if (status == 'paid') {
       return Colors.green;
+    } else if (status == 'accomplished') {
+      return Colors.purple;
+    } else if (status == 'cancelled') {
+      return Colors.red;
     }
     return Colors.grey;
   }
 
-  String _getStatusText(String status, String boardingStatus) {
+  String _getStatusText(String status) {
     if (status == 'pending_payment') {
       return 'PENDING';
-    } else if (status == 'paid' && boardingStatus == 'boarded') {
+    } else if (status == 'boarded') {
       return 'BOARDED';
     } else if (status == 'paid') {
       return 'PAID';
+    } else if (status == 'accomplished') {
+      return 'ACCOMPLISHED';
+    } else if (status == 'cancelled') {
+      return 'CANCELLED';
     }
     return 'UNKNOWN';
   }
@@ -317,6 +337,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
             Tab(text: 'Pending'),
             Tab(text: 'Paid'),
             Tab(text: 'Boarded'),
+            Tab(text: 'Accomplished'),
+            Tab(text: 'Cancelled'),
           ],
         ),
       ),
@@ -331,8 +353,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
           
           return TabBarView(
             controller: _tabController,
-            children: List.generate(4, (index) {
-              String filter = ['all', 'pending', 'paid', 'boarded'][index];
+            children: List.generate(6, (index) {
+              String filter = ['all', 'pending', 'paid', 'boarded', 'accomplished', 'cancelled'][index];
               List<Map<String, dynamic>> bookings = _filterBookings(allBookings);
               
               if (bookings.isEmpty) {
@@ -380,7 +402,6 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                 separatorBuilder: (_, __) => SizedBox(height: width * 0.04),
                 itemBuilder: (context, i) {
                   final booking = bookings[i];
-                  final boardingStatus = booking['boardingStatus'] ?? 'pending';
 
                   return Dismissible(
                     key: Key(booking['id'] ?? i.toString()),
@@ -486,11 +507,11 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                                         padding: EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor(booking['status'] ?? 'pending_payment', boardingStatus),
+                                          color: _getStatusColor(booking['status'] ?? 'pending_payment'),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          _getStatusText(booking['status'] ?? 'pending_payment', boardingStatus),
+                                          _getStatusText(booking['status'] ?? 'pending_payment'),
                                           style: GoogleFonts.outfit(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -498,25 +519,6 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                                           ),
                                         ),
                                       ),
-                                      if (boardingStatus == 'boarded') ...[
-                                        SizedBox(width: 8),
-                                        Container(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue[100],
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            'BOARDED',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.blue[700],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ],
                                   ),
                                 ],
@@ -550,6 +552,10 @@ class BookingDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use the stored qrData from Firebase, which contains the proper JSON format
     final qrData = booking['qrData'] ?? '{}';
+    final status = booking['status'] ?? 'paid';
+    final isBoarded = status == 'boarded';
+    final isAccomplished = status == 'accomplished';
+    final isCancelled = status == 'cancelled';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -572,32 +578,46 @@ class BookingDetailsPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Success Icon
+              // Status Icon
               Container(
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Colors.green[100],
+                  color: isCancelled ? Colors.red[100] :
+                         isAccomplished ? Colors.purple[100] : 
+                         isBoarded ? Colors.blue[100] : Colors.green[100],
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.check_circle,
-                  color: Colors.green[600],
+                  isCancelled ? Icons.cancel :
+                  isAccomplished ? Icons.flag_circle :
+                  isBoarded ? Icons.directions_bus : Icons.check_circle,
+                  color: isCancelled ? Colors.red[600] :
+                         isAccomplished ? Colors.purple[600] :
+                         isBoarded ? Colors.blue[600] : Colors.green[600],
                   size: 50,
                 ),
               ),
               SizedBox(height: 16),
               Text(
-                'Reservation Confirmed!',
+                isCancelled ? 'Reservation Cancelled' :
+                isAccomplished ? 'Journey Completed!' :
+                isBoarded ? 'Successfully Boarded!' : 'Reservation Confirmed!',
                 style: GoogleFonts.outfit(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green[700],
+                  color: isCancelled ? Colors.red[700] :
+                         isAccomplished ? Colors.purple[700] :
+                         isBoarded ? Colors.blue[700] : Colors.green[700],
                 ),
               ),
               SizedBox(height: 8),
               Text(
-                'Your pre-booking has been paid and confirmed',
+                isCancelled ? ''
+                : isAccomplished ? 'You have successfully completed your journey'
+                : isBoarded 
+                  ? 'You have successfully boarded the bus'
+                  : 'Your pre-booking has been paid and confirmed',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -611,27 +631,41 @@ class BookingDetailsPage extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: isCancelled ? Colors.red[50] :
+                         isAccomplished ? Colors.purple[50] :
+                         isBoarded ? Colors.blue[50] : Colors.grey[50],
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(color: isCancelled ? Colors.red[200]! :
+                                    isAccomplished ? Colors.purple[200]! :
+                                    isBoarded ? Colors.blue[200]! : Colors.grey[300]!),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Boarding QR Code',
+                      isCancelled ? 'Reservation Cancelled' :
+                      isAccomplished ? 'Journey Completed' :
+                      isBoarded ? 'Boarding Confirmed' : 'Boarding QR Code',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: isCancelled ? Colors.red[700] :
+                               isAccomplished ? Colors.purple[700] :
+                               isBoarded ? Colors.blue[700] : Colors.black87,
                       ),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      'Show this to the conductor when boarding',
+                      isCancelled ? 'This reservation was cancelled because the trip ended and you did not board the bus'
+                      : isAccomplished ? 'Your journey has been completed successfully'
+                      : isBoarded 
+                        ? 'This QR code has been scanned and validated'
+                        : 'Show this to the conductor when boarding',
                       style: GoogleFonts.outfit(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: isCancelled ? Colors.red[600] :
+                               isAccomplished ? Colors.purple[600] :
+                               isBoarded ? Colors.blue[600] : Colors.grey[600],
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -643,14 +677,134 @@ class BookingDetailsPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: isBoarded ? Colors.blue[200]! : Colors.grey[300]!),
                         ),
-                        child: QrImageView(
-                          data: qrData, // Use the stored qrData from Firebase
-                          version: QrVersions.auto,
-                          size: 218.0,
-                          backgroundColor: Colors.white,
-                        ),
+                        child: isCancelled
+                          ? Stack(
+                              children: [
+                                QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 350.0,
+                                  backgroundColor: Colors.white,
+                                ),
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.8),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.cancel,
+                                            color: Colors.white,
+                                            size: 60,
+                                          ),
+                                          SizedBox(height: 8),
+                                          Text(
+                                            'CANCELLED',
+                                            style: GoogleFonts.outfit(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : isAccomplished 
+                            ? Stack(
+                                children: [
+                                  QrImageView(
+                                    data: qrData,
+                                    version: QrVersions.auto,
+                                    size: 350.0,
+                                    backgroundColor: Colors.white,
+                                  ),
+                                  Positioned.fill(
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.purple.withOpacity(0.8),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Center(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.flag_circle,
+                                              color: Colors.white,
+                                              size: 60,
+                                            ),
+                                            SizedBox(height: 8),
+                                            Text(
+                                              'COMPLETED',
+                                              style: GoogleFonts.outfit(
+                                                color: Colors.white,
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : isBoarded 
+                              ? Stack(
+                                  children: [
+                                    QrImageView(
+                                      data: qrData,
+                                      version: QrVersions.auto,
+                                      size: 350.0,
+                                      backgroundColor: Colors.white,
+                                    ),
+                                    Positioned.fill(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.withOpacity(0.8),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.check_circle,
+                                                color: Colors.white,
+                                                size: 60,
+                                              ),
+                                              SizedBox(height: 8),
+                                              Text(
+                                                'SCANNED',
+                                                style: GoogleFonts.outfit(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 350.0,
+                                  backgroundColor: Colors.white,
+                                ),
                       ),
                     ),
                   ],
@@ -688,9 +842,26 @@ class BookingDetailsPage extends StatelessWidget {
                     _buildDetailRow('Quantity:', '${booking['quantity']}'),
                     _buildDetailRow('Total Amount:',
                         '${booking['amount']?.toStringAsFixed(2) ?? '0.00'} PHP'),
-                    _buildDetailRow('Status:', 'PAID'),
-                    // Show paid date if status is paid, or created date if pending
-                    if (booking['status'] == 'paid' && booking['paidDate'] != null)
+                    _buildDetailRow('Status:', isCancelled ? 'CANCELLED' :
+                                           isAccomplished ? 'ACCOMPLISHED' : 
+                                           isBoarded ? 'BOARDED' : 'PAID'),
+                    // Show different dates based on status
+                    if (isCancelled) ...[
+                      if (booking['cancelledAt'] != null)
+                        _buildDetailRow('Cancelled Date:', _formatDate(booking['cancelledAt'])),
+                      if (booking['cancelledReason'] != null)
+                        _buildDetailRow('Cancellation Reason:', booking['cancelledReason']),
+                    ] else if (isAccomplished) ...[
+                      if (booking['dropOffTimestamp'] != null)
+                        _buildDetailRow('Completed Date:', _formatDate(booking['dropOffTimestamp'])),
+                      if (booking['dropOffLocation'] != null)
+                        _buildDetailRow('Drop-off Location:', 'Recorded'),
+                    ] else if (isBoarded) ...[
+                      if (booking['boardedAt'] != null)
+                        _buildDetailRow('Boarded Date:', _formatDate(booking['boardedAt'])),
+                      if (booking['scannedBy'] != null)
+                        _buildDetailRow('Scanned By:', 'Conductor'),
+                    ] else if (booking['status'] == 'paid' && booking['paidDate'] != null)
                       _buildDetailRow('Paid Date:', _formatDate(booking['paidDate']))
                     else if (booking['status'] == 'pending_payment' && booking['createdAt'] != null)
                       _buildDetailRow('Created Date:', _formatDate(booking['createdAt'])),
@@ -725,43 +896,109 @@ class BookingDetailsPage extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: isCancelled ? Colors.red[50] :
+                         isAccomplished ? Colors.purple[50] :
+                         isBoarded ? Colors.green[50] : Colors.blue[50],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: isCancelled ? Colors.red[200]! :
+                                    isAccomplished ? Colors.purple[200]! :
+                                    isBoarded ? Colors.green[200]! : Colors.blue[200]!),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info, color: Colors.blue[700], size: 20),
+                        Icon(
+                          isCancelled ? Icons.cancel :
+                          isAccomplished ? Icons.flag_circle :
+                          isBoarded ? Icons.check_circle : Icons.info, 
+                          color: isCancelled ? Colors.red[700] :
+                                 isAccomplished ? Colors.purple[700] :
+                                 isBoarded ? Colors.green[700] : Colors.blue[700], 
+                          size: 20
+                        ),
                         SizedBox(width: 8),
                         Text(
-                          'Important Notes',
+                          isCancelled ? 'Reservation Cancelled' :
+                          isAccomplished ? 'Journey Completed' :
+                          isBoarded ? 'Boarding Complete' : 'Important Notes',
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.blue[700],
+                            color: isCancelled ? Colors.red[700] :
+                                   isAccomplished ? Colors.purple[700] :
+                                   isBoarded ? Colors.green[700] : Colors.blue[700],
                           ),
                         ),
                       ],
                     ),
                     SizedBox(height: 12),
-                    Text(
-                      '• The conductor will see your booking on their map',
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, color: Colors.blue[700]),
-                    ),
-                    Text(
-                      '• Your seats are guaranteed for this trip',
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, color: Colors.blue[700]),
-                    ),
-                    Text(
-                      '• Keep this confirmation for your records',
-                      style: GoogleFonts.outfit(
-                          fontSize: 14, color: Colors.blue[700]),
-                    ),
+                    if (isCancelled) ...[
+                      Text(
+                        '• This reservation was cancelled because the trip ended',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.red[700]),
+                      ),
+                      Text(
+                        '• You did not board the bus before the trip ended',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.red[700]),
+                      ),
+                      Text(
+                        '• Please make a new reservation for your next trip',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.red[700]),
+                      ),
+                    ] else if (isAccomplished) ...[
+                      Text(
+                        '• You have successfully completed your journey',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.purple[700]),
+                      ),
+                      Text(
+                        '• Thank you for using our service',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.purple[700]),
+                      ),
+                      Text(
+                        '• We hope you had a pleasant trip!',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.purple[700]),
+                      ),
+                    ] else if (isBoarded) ...[
+                      Text(
+                        '• You have successfully boarded the bus',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.green[700]),
+                      ),
+                      Text(
+                        '• Your seat is confirmed and reserved',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.green[700]),
+                      ),
+                      Text(
+                        '• Enjoy your journey!',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.green[700]),
+                      ),
+                    ] else ...[
+                      Text(
+                        '• The conductor will see your booking on their map',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.blue[700]),
+                      ),
+                      Text(
+                        '• Your seats are guaranteed for this trip',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.blue[700]),
+                      ),
+                      Text(
+                        '• Keep this confirmation for your records',
+                        style: GoogleFonts.outfit(
+                            fontSize: 14, color: Colors.blue[700]),
+                      ),
+                    ],
                   ],
                 ),
               ),

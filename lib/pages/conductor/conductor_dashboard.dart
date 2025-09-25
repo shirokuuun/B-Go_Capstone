@@ -21,7 +21,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   bool _isTracking = false;
   String _statusMessage = 'Location tracking is off';
   String _conductorName = '';
-  String? _conductorDocId;
 
   @override
   void initState() {
@@ -48,7 +47,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           setState(() {
             _isTracking = isOnlineInDatabase;
             _conductorName = conductorName;
-            _conductorDocId = query.docs.first.id;
           });
         }
       }
@@ -362,9 +360,48 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   Widget _buildPreBookedPassengersList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
-          .collectionGroup('preBookings')
+          .collection('conductors')
+          .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+          .limit(1)
           .snapshots(),
-      builder: (context, snapshot) {
+      builder: (context, conductorSnapshot) {
+        if (conductorSnapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (conductorSnapshot.hasError) {
+          return Text(
+            'Error loading conductor data: ${conductorSnapshot.error}',
+            style: GoogleFonts.outfit(color: Colors.red),
+          );
+        }
+
+        final conductorDocs = conductorSnapshot.data?.docs ?? [];
+        if (conductorDocs.isEmpty) {
+          return Text(
+            'No conductor data found',
+            style: GoogleFonts.outfit(color: Colors.grey),
+          );
+        }
+
+        final conductorData = conductorDocs.first.data() as Map<String, dynamic>;
+        final conductorDocId = conductorDocs.first.id;
+
+        final activeTripId = conductorData['activeTrip']?['tripId'];
+        return StreamBuilder<QuerySnapshot>(
+          stream: activeTripId != null
+              ? FirebaseFirestore.instance
+                  .collection('conductors')
+                  .doc(conductorDocId)
+                  .collection('preBookings')
+                  .where('tripId', isEqualTo: activeTripId)
+                  .snapshots()
+              : FirebaseFirestore.instance
+                  .collection('conductors')
+                  .doc(conductorDocId)
+                  .collection('preBookings')
+                  .snapshots(),
+          builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         }
@@ -382,9 +419,15 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         final preBookings = allPreBookings
             .where((doc) {
               final data = doc.data() as Map<String, dynamic>;
+              // If there's an active trip, only show pre-bookings for that trip
+              // If no active trip, show all pre-bookings for this conductor
+              final isForCurrentTrip = activeTripId == null || 
+                  data['tripId'] == activeTripId || 
+                  data['tripId'] == null; // Include pre-bookings without tripId
               return data['route'] == widget.route && 
                      data['status'] == 'paid' && 
-                     data['boardingStatus'] != 'boarded';
+                     data['boardingStatus'] != 'boarded' &&
+                     isForCurrentTrip;
             })
             .toList();
 
@@ -468,7 +511,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                             ),
                           ),
                           Text(
-                            '${data['quantity']} passenger${data['quantity'] == 1 ? '' : 's'} • ${data['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
+                            '${data['quantity']} passenger${data['quantity'] == 1 ? '' : 's'} • ${data['totalFare']?.toString() ?? '0.00'} PHP',
                             style: GoogleFonts.outfit(
                               fontSize: 12,
                               color: Colors.grey[600],
@@ -497,6 +540,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
               );
             }).toList(),
           ],
+        );
+          },
         );
       },
     );
@@ -632,7 +677,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                 ),
                               ),
                               Text(
-                                '${qrData['quantity'] ?? 1} passenger${(qrData['quantity'] ?? 1) == 1 ? '' : 's'} • ${qrData['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
+                                '${qrData['data']?['quantity'] ?? 1} passenger${(qrData['data']?['quantity'] ?? 1) == 1 ? '' : 's'} • ${qrData['data']?['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
                                 style: GoogleFonts.outfit(
                                   fontSize: 12,
                                   color: Colors.grey[600],
@@ -681,7 +726,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
     
     // Responsive sizing
     final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
@@ -797,24 +841,48 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         }
 
                         final conductorData = docs.first.data() as Map<String, dynamic>;
+                        final conductorDocId = docs.first.id;
                         final boardedPassengers = conductorData['passengerCount'] ?? 0;
                         
                         // Get pre-booked passengers count
+                        final activeTripId = conductorData['activeTrip']?['tripId'];
+                        print('🔍 Dashboard: Active trip ID: $activeTripId');
+                        print('🔍 Dashboard: Conductor data: $conductorData');
                         return StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collectionGroup('preBookings')
-                              .snapshots(),
+                          stream: activeTripId != null
+                              ? FirebaseFirestore.instance
+                                  .collection('conductors')
+                                  .doc(conductorDocId)
+                                  .collection('preBookings')
+                                  .where('tripId', isEqualTo: activeTripId)
+                                  .snapshots()
+                              : FirebaseFirestore.instance
+                                  .collection('conductors')
+                                  .doc(conductorDocId)
+                                  .collection('preBookings')
+                                  .snapshots(),
                           builder: (context, preBookingSnapshot) {
                             int preBookedPassengers = 0;
                             
                             if (preBookingSnapshot.hasData) {
                               final allPreBookings = preBookingSnapshot.data!.docs;
-                                                             preBookedPassengers = allPreBookings
+                              print('🔍 Dashboard: Found ${allPreBookings.length} pre-bookings');
+                              for (var doc in allPreBookings) {
+                                final data = doc.data() as Map<String, dynamic>;
+                                print('🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, TripId: ${data['tripId']}');
+                              }
+                              preBookedPassengers = allPreBookings
                                    .where((doc) {
                                      final data = doc.data() as Map<String, dynamic>;
+                                     // If there's an active trip, only show pre-bookings for that trip
+                                     // If no active trip, show all pre-bookings for this conductor
+                                     final isForCurrentTrip = activeTripId == null || 
+                                         data['tripId'] == activeTripId || 
+                                         data['tripId'] == null; // Include pre-bookings without tripId
                                      return data['route'] == widget.route && 
                                             (data['status'] == 'paid' || data['status'] == 'pending_payment') &&
-                                            data['boardingStatus'] != 'boarded';
+                                            data['boardingStatus'] != 'boarded' &&
+                                            isForCurrentTrip;
                                    })
                                    .fold<int>(0, (sum, doc) {
                                      final data = doc.data() as Map<String, dynamic>;

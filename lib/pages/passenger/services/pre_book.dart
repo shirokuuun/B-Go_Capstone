@@ -13,6 +13,7 @@ import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'package:b_go/services/payment_service.dart';
 import 'package:b_go/services/realtime_location_service.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 class PreBook extends StatefulWidget {
   final Map<String, dynamic>? selectedConductor;
@@ -20,6 +21,291 @@ class PreBook extends StatefulWidget {
 
   @override
   State<PreBook> createState() => _PreBookState();
+
+  // Static method to handle trip end processing for pre-bookings
+  static Future<void> processTripEndForPreBookings(String conductorId, String date, String? tripId) async {
+    try {
+      print('🔄 PreBook: Processing trip end for pre-bookings - Conductor: $conductorId, Date: $date, Trip: $tripId');
+
+      // Get all pre-bookings for this conductor's active trip
+      QuerySnapshot preBookingsSnapshot;
+      if (tripId != null) {
+        // Get pre-bookings for specific trip
+        preBookingsSnapshot = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('preBookings')
+            .where('tripId', isEqualTo: tripId)
+            .get();
+      } else {
+        // Fallback: get all pre-bookings for this conductor and date
+        preBookingsSnapshot = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('preBookings')
+            .where('createdAt', isGreaterThanOrEqualTo: DateTime.parse('$date 00:00:00'))
+            .where('createdAt', isLessThan: DateTime.parse('$date 23:59:59'))
+            .get();
+      }
+
+      print('🔄 PreBook: Found ${preBookingsSnapshot.docs.length} pre-bookings to process');
+
+      for (var preBookingDoc in preBookingsSnapshot.docs) {
+        final preBookingData = preBookingDoc.data();
+        final preBookingId = preBookingDoc.id;
+        final originalUserId = (preBookingData as Map<String, dynamic>?)?['userId'] as String?;
+        final status = preBookingData?['status'] as String?;
+
+        // Check if this is a boarded pre-booking that should be moved to remittance
+        if (status == 'boarded') {
+          // Move boarded pre-booking to remittance collection
+          await _moveBoardedPreBookingToRemittance(
+            conductorId,
+            date,
+            preBookingId,
+            preBookingData as Map<String, dynamic>,
+          );
+        } else {
+          // Mark as cancelled in conductor's preBookings collection
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('preBookings')
+              .doc(preBookingId)
+              .update({
+            'status': 'cancelled',
+            'cancelledAt': FieldValue.serverTimestamp(),
+            'cancelledReason': 'Trip ended - no show',
+            'tripEnded': true,
+          });
+
+          // Update passenger's pre-booking to cancelled status
+          if (originalUserId != null) {
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(originalUserId)
+                  .collection('preBookings')
+                  .doc(preBookingId)
+                  .update({
+                'status': 'cancelled',
+                'cancelledAt': FieldValue.serverTimestamp(),
+                'cancelledReason': 'Trip ended - no show',
+                'tripEnded': true,
+              });
+              print('✅ PreBook: Updated passenger pre-booking to cancelled');
+            } catch (e) {
+              print('⚠️ PreBook: Could not update passenger pre-booking: $e');
+            }
+          }
+
+          // Move to dailyTrips and remittance collections with cancelled status
+          await _movePreBookingToTripEndCollections(
+            conductorId,
+            date,
+            preBookingId,
+            preBookingData as Map<String, dynamic>,
+            isCancelled: true,
+          );
+        }
+      }
+
+      print('✅ PreBook: Successfully processed trip end for pre-bookings');
+    } catch (e) {
+      print('❌ PreBook: Error processing trip end for pre-bookings: $e');
+    }
+  }
+
+  // Helper method to move boarded pre-booking to remittance collection
+  static Future<void> _moveBoardedPreBookingToRemittance(
+      String conductorId,
+      String date,
+      String preBookingId,
+      Map<String, dynamic> preBookingData) async {
+    try {
+      // Get the next ticket number for this date
+      final ticketNumber = await _getNextTicketNumberStatic(conductorId, date);
+      final ticketDocId = 'ticket $ticketNumber';
+
+      // Prepare remittance data in the same format as pre-tickets
+      final remittanceData = {
+        'active': true,
+        'discountAmount': '0.00', // Default for pre-bookings
+        'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
+        'documentId': preBookingId,
+        'documentType': 'preBooking',
+        'endKm': preBookingData['toKm'],
+        'farePerPassenger': preBookingData['passengerFares'] ?? [],
+        'from': preBookingData['from'],
+        'quantity': preBookingData['quantity'],
+        'scannedBy': preBookingData['scannedBy'] ?? conductorId,
+        'startKm': preBookingData['fromKm'],
+        'status': 'boarded', // Keep as boarded since passenger was on the bus
+        'ticketType': 'preBooking',
+        'timestamp': FieldValue.serverTimestamp(),
+        'to': preBookingData['to'],
+        'totalFare': preBookingData['totalFare'],
+        'totalKm': (preBookingData['toKm'] as num) - (preBookingData['fromKm'] as num),
+        // Additional fields for consistency
+        'route': preBookingData['route'],
+        'direction': preBookingData['direction'],
+        'conductorId': conductorId,
+        'conductorName': preBookingData['conductorName'],
+        'busNumber': preBookingData['busNumber'],
+        'tripId': preBookingData['tripId'],
+        'createdAt': preBookingData['createdAt'],
+        'boardedAt': preBookingData['boardedAt'],
+        'scannedAt': preBookingData['scannedAt'],
+      };
+
+      // Save pre-booking data to tickets subcollection
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(date)
+          .collection('tickets')
+          .doc(ticketDocId)
+          .set(remittanceData);
+
+      // Update lastUpdated on date document
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(date)
+          .update({
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      // Remove from active preBookings collection
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('preBookings')
+          .doc(preBookingId)
+          .delete();
+
+      print('✅ PreBook: Moved boarded pre-booking $preBookingId to tickets subcollection as $ticketDocId');
+    } catch (e) {
+      print('❌ PreBook: Error moving boarded pre-booking to remittance: $e');
+    }
+  }
+
+  // Static helper method to get next ticket number for a date
+  static Future<int> _getNextTicketNumberStatic(String conductorId, String formattedDate) async {
+    try {
+      final ticketsSnapshot = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .get();
+
+      return ticketsSnapshot.docs.length + 1;
+    } catch (e) {
+      print('❌ PreBook: Error getting next ticket number: $e');
+      return 1; // Default to 1 if error
+    }
+  }
+
+  // Helper method to move pre-booking to trip end collections
+  static Future<void> _movePreBookingToTripEndCollections(
+      String conductorId,
+      String date,
+      String preBookingId,
+      Map<String, dynamic> preBookingData,
+      {bool isCancelled = false}) async {
+    try {
+      // Prepare ticket data for trip end collections
+      final ticketData = {
+        'from': preBookingData['from'],
+        'to': preBookingData['to'],
+        'fromKm': preBookingData['fromKm'],
+        'toKm': preBookingData['toKm'],
+        'totalKm': preBookingData['toKm'] - preBookingData['fromKm'],
+        'timestamp': FieldValue.serverTimestamp(),
+        'active': false, // Trip has ended
+        'quantity': preBookingData['quantity'],
+        'farePerPassenger': preBookingData['farePerPassenger'],
+        'totalFare': preBookingData['totalFare'],
+        'discountBreakdown': preBookingData['discountBreakdown'],
+        'status': isCancelled ? 'cancelled' : preBookingData['status'],
+        'ticketType': 'preBooking',
+        'preBookingId': preBookingId,
+        'userId': preBookingData['userId'],
+        'conductorId': conductorId,
+        'conductorName': preBookingData['conductorName'],
+        'busNumber': preBookingData['busNumber'],
+        'route': preBookingData['route'],
+        'direction': preBookingData['direction'],
+        'passengerLatitude': preBookingData['passengerLatitude'],
+        'passengerLongitude': preBookingData['passengerLongitude'],
+        'qrData': preBookingData['qrData'],
+        'createdAt': preBookingData['createdAt'],
+        'tripEndedAt': FieldValue.serverTimestamp(),
+        if (isCancelled) ...{
+          'cancelledAt': FieldValue.serverTimestamp(),
+          'cancelledReason': 'Trip ended - no show',
+          'tripEnded': true,
+        },
+      };
+
+      // Move to dailyTrips tickets collection
+      await _moveToDailyTripsTickets(conductorId, date, preBookingId, ticketData);
+
+      // Remove from active preBookings collection
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('preBookings')
+          .doc(preBookingId)
+          .delete();
+
+      print('✅ PreBook: Moved pre-booking $preBookingId to trip end collections');
+    } catch (e) {
+      print('❌ PreBook: Error moving pre-booking to trip end collections: $e');
+    }
+  }
+
+  // Helper method to move pre-booking to dailyTrips tickets collection
+  static Future<void> _moveToDailyTripsTickets(
+      String conductorId,
+      String date,
+      String preBookingId,
+      Map<String, dynamic> ticketData) async {
+    try {
+      final dailyTripDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('dailyTrips')
+          .doc(date)
+          .get();
+
+      if (dailyTripDoc.exists) {
+        final dailyTripData = dailyTripDoc.data();
+        final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+        final tripCollection = 'trip$currentTrip';
+
+        // Remove from dailyTrips preBookings collection
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(date)
+            .collection(tripCollection)
+            .doc('preBookings')
+            .collection('preBookings')
+            .doc(preBookingId)
+            .delete();
+
+        print('✅ PreBook: Moved pre-booking to dailyTrips tickets collection');
+      }
+    } catch (e) {
+      print('❌ PreBook: Error moving to dailyTrips tickets: $e');
+    }
+  }
 }
 
 class _PreBookState extends State<PreBook> {
@@ -1541,6 +1827,7 @@ class _ReceiptModal extends StatelessWidget {
       'conductorId': selectedConductor?['id'],
       'conductorName': selectedConductor?['name'],
       'busNumber': selectedConductor?['busNumber'],
+      'tripId': selectedConductor?['activeTrip']?['tripId'],
     };
 
     final data = {
@@ -1574,17 +1861,22 @@ class _ReceiptModal extends StatelessWidget {
       'conductorId': selectedConductor?['id'],
       'conductorName': selectedConductor?['name'],
       'busNumber': selectedConductor?['busNumber'],
+      // Add trip information
+      'tripId': selectedConductor?['activeTrip']?['tripId'],
       // Add QR data for conductor scanning
       'qrData': jsonEncode(qrData),
     };
 
     print('💾 PreBook: Complete booking data: $data');
+    print('💾 PreBook: Selected conductor: $selectedConductor');
+    print('💾 PreBook: Trip ID: ${selectedConductor?['activeTrip']?['tripId']}');
 
     try {
       print('💾 PreBook: Attempting to save booking to Firebase...');
       print('💾 PreBook: User ID: ${user.uid}');
       print('💾 PreBook: Data keys: ${data.keys.toList()}');
 
+      // Save to user's preBookings collection
       final docRef = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -1595,6 +1887,11 @@ class _ReceiptModal extends StatelessWidget {
           '✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
       print(
           '✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
+
+      // If conductor is selected, also save to conductor's collections
+      if (selectedConductor != null && selectedConductor!['id'] != null) {
+        await _saveToConductorCollections(docRef.id, data, baseFare, totalAmount);
+      }
 
       // Verify the booking was actually saved by reading it back
       final savedDoc = await docRef.get();
@@ -1612,6 +1909,205 @@ class _ReceiptModal extends StatelessWidget {
       throw e;
     }
   }
+
+  // Helper method to save pre-booking to conductor's collections
+  Future<void> _saveToConductorCollections(
+      String bookingId,
+      Map<String, dynamic> data,
+      double baseFare,
+      double totalAmount) async {
+    if (selectedConductor == null || selectedConductor!['id'] == null) {
+      print('⚠️ PreBook: No conductor selected, skipping conductor collections');
+      return;
+    }
+
+    final conductorId = selectedConductor!['id'];
+    final now = DateTime.now();
+    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+    try {
+      print('💾 PreBook: Saving to conductor collections for conductor: $conductorId');
+
+      // Prepare ticket data for conductor collections
+      final ticketData = {
+        'from': data['from'],
+        'to': data['to'],
+        'fromKm': data['fromKm'],
+        'toKm': data['toKm'],
+        'totalKm': data['toKm'] - data['fromKm'],
+        'timestamp': FieldValue.serverTimestamp(),
+        'active': true,
+        'quantity': data['quantity'],
+        'farePerPassenger': data['passengerFares'],
+        'totalFare': totalAmount.toStringAsFixed(2),
+        'discountBreakdown': data['discountBreakdown'],
+        'status': 'pending_payment', // Will be updated to 'boarded' when scanned
+        'ticketType': 'preBooking', // Distinguish from manual tickets
+        'preBookingId': bookingId,
+        'userId': data['userId'],
+        'conductorId': conductorId,
+        'conductorName': data['conductorName'],
+        'busNumber': data['busNumber'],
+        'route': data['route'],
+        'direction': data['direction'],
+        'passengerLatitude': data['passengerLatitude'],
+        'passengerLongitude': data['passengerLongitude'],
+        'qrData': data['qrData'],
+        'createdAt': data['createdAt'],
+        'paymentDeadline': data['paymentDeadline'],
+        'tripId': data['tripId'],
+      };
+
+      // 1. Save to conductor's active trip (preBookings collection)
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('preBookings')
+          .doc(bookingId)
+          .set(ticketData);
+
+      print('✅ PreBook: Saved to conductor preBookings collection');
+
+      // 2. Save to dailyTrips collection
+      await _saveToDailyTrips(conductorId, formattedDate, bookingId, ticketData);
+
+      // 3. Save to remittance collection
+      await _saveToRemittance(conductorId, formattedDate, bookingId, ticketData);
+
+      print('✅ PreBook: Successfully saved to all conductor collections');
+
+    } catch (e) {
+      print('❌ PreBook: Error saving to conductor collections: $e');
+      // Don't throw error here to avoid breaking the main save process
+    }
+  }
+
+  // Helper method to save to dailyTrips collection
+  Future<void> _saveToDailyTrips(
+      String conductorId,
+      String formattedDate,
+      String bookingId,
+      Map<String, dynamic> ticketData) async {
+    try {
+      // Get current trip number from dailyTrips document
+      final dailyTripDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('dailyTrips')
+          .doc(formattedDate)
+          .get();
+
+      if (dailyTripDoc.exists) {
+        final dailyTripData = dailyTripDoc.data();
+        final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+        final tripCollection = 'trip$currentTrip';
+
+        // Save to dailyTrips structure
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(formattedDate)
+            .collection(tripCollection)
+            .doc('preBookings')
+            .collection('preBookings')
+            .doc(bookingId)
+            .set(ticketData);
+
+        print('✅ PreBook: Saved to dailyTrips collection (trip$currentTrip)');
+      } else {
+        print('⚠️ PreBook: Daily trip document not found for date: $formattedDate');
+      }
+    } catch (e) {
+      print('❌ PreBook: Error saving to dailyTrips: $e');
+    }
+  }
+
+  // Helper method to save to remittance collection
+  Future<void> _saveToRemittance(
+      String conductorId,
+      String formattedDate,
+      String bookingId,
+      Map<String, dynamic> ticketData) async {
+    try {
+      // Get the next ticket number for this date
+      final ticketNumber = await _getNextTicketNumber(conductorId, formattedDate);
+      final ticketDocId = 'ticket $ticketNumber';
+
+      // Prepare pre-booking data in the same format as pre-tickets
+      final preBookingData = {
+        'active': true,
+        'discountAmount': '0.00', // Default for pre-bookings
+        'discountBreakdown': ticketData['discountBreakdown'] ?? [],
+        'documentId': bookingId,
+        'documentType': 'preBooking',
+        'endKm': ticketData['toKm'],
+        'farePerPassenger': ticketData['passengerFares'] ?? [],
+        'from': ticketData['from'],
+        'quantity': ticketData['quantity'],
+        'scannedBy': conductorId,
+        'startKm': ticketData['fromKm'],
+        'status': 'pending_payment', // Will be updated to 'boarded' when scanned
+        'ticketType': 'preBooking',
+        'timestamp': FieldValue.serverTimestamp(),
+        'to': ticketData['to'],
+        'totalFare': ticketData['totalFare'],
+        'totalKm': (ticketData['toKm'] as num) - (ticketData['fromKm'] as num),
+        // Additional fields for consistency
+        'route': ticketData['route'],
+        'direction': ticketData['direction'],
+        'conductorId': conductorId,
+        'conductorName': ticketData['conductorName'],
+        'busNumber': ticketData['busNumber'],
+        'tripId': ticketData['tripId'],
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Save pre-booking data to tickets subcollection
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .doc(ticketDocId)
+          .set(preBookingData);
+
+      // Ensure date document exists with basic fields
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .set({
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ PreBook: Saved pre-booking data to tickets subcollection as $ticketDocId');
+    } catch (e) {
+      print('❌ PreBook: Error saving to remittance: $e');
+    }
+  }
+
+  // Helper method to get next ticket number for a date
+  Future<int> _getNextTicketNumber(String conductorId, String formattedDate) async {
+    try {
+      final ticketsSnapshot = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .get();
+
+      return ticketsSnapshot.docs.length + 1;
+    } catch (e) {
+      print('❌ PreBook: Error getting next ticket number: $e');
+      return 1; // Default to 1 if error
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -1824,7 +2320,7 @@ class PreBookSummaryPage extends StatefulWidget {
   State<PreBookSummaryPage> createState() => _PreBookSummaryPageState();
 }
 
-class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
+class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBindingObserver {
   late Timer _timer;
   late Timer _paymentStatusTimer;
   late DateTime _deadline;
@@ -1838,6 +2334,9 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
     _deadline = widget.paymentDeadline ?? DateTime.now().add(Duration(minutes: 10));
     _startTimer();
     _startPaymentStatusCheck();
+    
+    // Add app lifecycle observer for background/foreground handling
+    WidgetsBinding.instance.addObserver(this);
   }
 
   void _startTimer() {
@@ -1891,9 +2390,36 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // App is going to background - switch to background tracking
+        _locationService.handleAppBackgrounded();
+        break;
+      case AppLifecycleState.resumed:
+        // App is coming to foreground - switch back to foreground tracking
+        _locationService.handleAppForegrounded();
+        break;
+      case AppLifecycleState.detached:
+        // App is being terminated - stop all tracking
+        _locationService.stopTracking();
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
   void dispose() {
     _timer.cancel();
     _paymentStatusTimer.cancel();
+    
+    // Remove app lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+    
     // Don't stop real-time location tracking when page is disposed
     // The location service should continue running for the conductor to see real-time updates
     // It will be stopped when the passenger is scanned by the conductor
@@ -2187,6 +2713,9 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
             await PaymentService.simulatePaymentCompletion(widget.bookingId);
 
         if (success) {
+          // Update pre-booking status to 'paid' in all collections
+          await _updatePreBookingStatusToPaid();
+
           // Start real-time location tracking for the paid booking
           print('🚀 Starting real-time location tracking for booking: ${widget.bookingId}');
           final trackingStarted = await _locationService.startTracking(widget.bookingId);
@@ -2218,6 +2747,128 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> {
           '❌ Error simulating payment. Please try again.', 'error');
     }
   }
+
+  // Helper method to update pre-booking status to 'paid' in all collections
+  Future<void> _updatePreBookingStatusToPaid() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      print('💾 PreBook: Updating pre-booking status to paid for booking: ${widget.bookingId}');
+
+      // Update in user's preBookings collection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preBookings')
+          .doc(widget.bookingId)
+          .update({
+        'status': 'paid',
+        'paidAt': FieldValue.serverTimestamp(),
+        'paymentMethod': 'simulated',
+      });
+
+      // Update in conductor's collections if conductor is selected
+      if (widget.route.isNotEmpty) {
+        // Find conductor by route to update their collections
+        final conductorQuery = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('route', isEqualTo: widget.route)
+            .limit(1)
+            .get();
+
+        if (conductorQuery.docs.isNotEmpty) {
+          final conductorId = conductorQuery.docs.first.id;
+          final now = DateTime.now();
+          final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+          // Update in conductor's preBookings collection
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('preBookings')
+              .doc(widget.bookingId)
+              .update({
+            'status': 'paid',
+            'paidAt': FieldValue.serverTimestamp(),
+            'paymentMethod': 'simulated',
+          });
+
+          // Update in dailyTrips collection
+          await _updateDailyTripsStatus(conductorId, formattedDate, 'paid');
+
+          // Update in remittance collection
+          await _updateRemittanceStatus(conductorId, formattedDate, 'paid');
+
+          print('✅ PreBook: Successfully updated all conductor collections to paid status');
+        }
+      }
+
+      print('✅ PreBook: Pre-booking status updated to paid successfully');
+    } catch (e) {
+      print('❌ PreBook: Error updating pre-booking status to paid: $e');
+    }
+  }
+
+  // Helper method to update status in dailyTrips collection
+  Future<void> _updateDailyTripsStatus(String conductorId, String formattedDate, String status) async {
+    try {
+      final dailyTripDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('dailyTrips')
+          .doc(formattedDate)
+          .get();
+
+      if (dailyTripDoc.exists) {
+        final dailyTripData = dailyTripDoc.data();
+        final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+        final tripCollection = 'trip$currentTrip';
+
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorId)
+            .collection('dailyTrips')
+            .doc(formattedDate)
+            .collection(tripCollection)
+            .doc('preBookings')
+            .collection('preBookings')
+            .doc(widget.bookingId)
+            .update({
+          'status': status,
+          'paidAt': FieldValue.serverTimestamp(),
+          'paymentMethod': 'simulated',
+        });
+
+        print('✅ PreBook: Updated dailyTrips status to $status');
+      }
+    } catch (e) {
+      print('❌ PreBook: Error updating dailyTrips status: $e');
+    }
+  }
+
+  // Helper method to update status in remittance collection
+  Future<void> _updateRemittanceStatus(String conductorId, String formattedDate, String status) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('preBookings')
+          .doc(widget.bookingId)
+          .update({
+        'status': status,
+        'paidAt': FieldValue.serverTimestamp(),
+        'paymentMethod': 'simulated',
+      });
+
+      print('✅ PreBook: Updated remittance status to $status');
+    } catch (e) {
+      print('❌ PreBook: Error updating remittance status: $e');
+    }
+  }
+
 
   void _showCustomSnackBar(String message, String type) {
     Color backgroundColor;

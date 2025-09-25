@@ -7,7 +7,9 @@ import 'dart:convert';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/remittance_service.dart';
+import 'package:b_go/services/direction_validation_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:b_go/pages/passenger/services/pre_book.dart';
 
 class ConductorDeparture extends StatefulWidget {
   final String route;
@@ -248,13 +250,12 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                  selectedPlaceCollection = oppositePlaceCollection;
                });
              } else if (dailyTripData?['trip$currentTrip']?['isComplete'] == false) {
-               // Current trip is in progress, continue with it
-               final currentTripPlaceCollection = dailyTripData?['trip$currentTrip']?['placeCollection'] ?? 'Place';
-               final currentTripDirection = dailyTripData?['trip$currentTrip']?['direction'] ?? 'Place to Place 2';
-               
-               setState(() {
-                 selectedPlaceCollection = currentTripPlaceCollection;
-               });
+              // Current trip is in progress, continue with it
+              final currentTripPlaceCollection = dailyTripData?['trip$currentTrip']?['placeCollection'] ?? 'Place';
+              
+              setState(() {
+                selectedPlaceCollection = currentTripPlaceCollection;
+              });
                
                // No need to update dailyTrips document since the current trip is already set up
              } else if (dailyTripData?['isRoundTripComplete'] == true) {
@@ -371,7 +372,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         final activeTrip = conductorData['activeTrip'];
         
         if (activeTrip != null) {
-          final currentDirection = activeTrip['direction'];
           final currentPlaceCollection = activeTrip['placeCollection'];
           final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
           
@@ -418,6 +418,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('Error moving tickets to remittance: $e');
           }
           
+          // Process pre-bookings for trip end - mark as cancelled
+          try {
+            await PreBook.processTripEndForPreBookings(conductorDocId, today, currentTripId);
+            print('✅ Pre-bookings processed for trip end');
+          } catch (e) {
+            print('❌ Error processing pre-bookings for trip end: $e');
+          }
+
           // Check if this is trip1 or trip2 and handle accordingly
           try {
             final dailyTripDoc = await FirebaseFirestore.instance
@@ -1240,6 +1248,30 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   
   if (conductorRoute != route) {
     throw Exception('Invalid route. You are a $conductorRoute conductor but trying to scan a $route $type. Only $conductorRoute $type can be scanned.');
+  }
+
+  // Validate direction compatibility for pre-tickets
+  if (type == 'preTicket') {
+    final passengerDirection = data['direction'];
+    final passengerPlaceCollection = data['placeCollection'];
+    
+    if (passengerDirection != null && passengerPlaceCollection != null) {
+      final isDirectionCompatible = await DirectionValidationService.validateDirectionCompatibilityByCollection(
+        passengerRoute: route,
+        passengerPlaceCollection: passengerPlaceCollection,
+        conductorUid: user.uid,
+      );
+      
+      if (!isDirectionCompatible) {
+        // Get conductor's active trip direction for better error message
+        final activeTrip = conductorData['activeTrip'];
+        final conductorDirection = activeTrip?['direction'] ?? 'Unknown';
+        
+        throw Exception(
+          'Direction mismatch! Your ticket is for "$passengerDirection" but the conductor is currently on "$conductorDirection" trip. Please wait for the correct direction or contact the conductor.'
+        );
+      }
+    }
   }
   
   final currentPassengerCount = conductorData['passengerCount'] ?? 0;

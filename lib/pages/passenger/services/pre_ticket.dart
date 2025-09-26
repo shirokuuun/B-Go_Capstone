@@ -53,7 +53,7 @@ class _PreTicketState extends State<PreTicket> {
     ],
   };
 
-  String selectedRoute = 'Batangas';
+  String selectedRoute = 'Rosario';
   String selectedPlaceCollection = 'Place';
   int directionIndex = 0; // 0: Place, 1: Place 2
   late Future<List<Map<String, dynamic>>> placesFuture;
@@ -349,6 +349,8 @@ class _PreTicketState extends State<PreTicket> {
         toPlace: toPlace,
         quantity: quantity,
         fareTypes: fareTypes,
+        directionIndex: directionIndex,
+        selectedPlaceCollection: selectedPlaceCollection,
       ),
     );
   }
@@ -514,7 +516,7 @@ class _PreTicketState extends State<PreTicket> {
                     Padding(
                       padding: EdgeInsets.only(left: isMobile ? 10 : 12),
                       child: Text(
-                        "Select Location:",
+                        "Select Pick-up:",
                         style: GoogleFonts.outfit(
                           fontSize: locationTitleFontSize,
                           color: Colors.black87,
@@ -794,12 +796,45 @@ class _ReceiptModal extends StatelessWidget {
   final Map<String, dynamic> toPlace;
   final int quantity;
   final List<String> fareTypes;
+  final int directionIndex;
+  final String selectedPlaceCollection;
+  
+  // Map route to display names
+  final Map<String, List<String>> routeLabels = {
+    'Batangas': [
+      'SM Lipa to Batangas City',
+      'Batangas City to SM Lipa',
+    ],
+    'Rosario': [
+      'SM Lipa to Rosario',
+      'Rosario to SM Lipa',
+    ],
+    'Mataas na Kahoy': [
+      'SM Lipa to Mataas na Kahoy',
+      'Mataas na Kahoy to SM Lipa',
+    ],
+    'Mataas Na Kahoy Palengke': [
+      'Lipa Palengke to Mataas na Kahoy',
+      'Mataas na Kahoy to Lipa Palengke',
+    ],
+    'Tiaong': [
+      'SM Lipa to Tiaong',
+      'Tiaong to SM Lipa',
+    ],
+    'San Juan': [
+      'SM Lipa to San Juan',
+      'San Juan to SM Lipa',
+    ],
+  };
+  
   _ReceiptModal(
       {required this.route,
       required this.fromPlace,
       required this.toPlace,
       required this.quantity,
-      required this.fareTypes});
+      required this.fareTypes,
+      required this.directionIndex,
+      required this.selectedPlaceCollection});
 
   double computeFare(num startKm, num endKm) {
     final totalKm = endKm - startKm;
@@ -851,6 +886,8 @@ class _ReceiptModal extends StatelessWidget {
     final qrData = {
       'type': 'preTicket', // Add type field for scanning compatibility
       'route': route,
+      'direction': routeLabels[route]![directionIndex], // Add direction for validation
+      'placeCollection': selectedPlaceCollection, // Add place collection for validation
       'date': formattedDate,
       'time': formattedTime,
       'from': fromPlace['name'],
@@ -1297,6 +1334,8 @@ class QRCodeFullScreenPage extends StatelessWidget {
       'status': 'pending', // Add status field
       'createdAt': FieldValue.serverTimestamp(), // Use Firestore server timestamp
       'route': route, // Route from the pre-ticket creation
+      'direction': jsonDecode(qrData)['direction'], // Add direction for validation
+      'placeCollection': jsonDecode(qrData)['placeCollection'], // Add place collection for validation
     };
     
     print('🔍 savePreTicket - Data to save: $data');

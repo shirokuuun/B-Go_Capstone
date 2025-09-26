@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class IDVerificationInstructionPage extends StatefulWidget {
   final VoidCallback? onNext;
@@ -154,12 +155,34 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
       );
     }
 
-    final width = MediaQuery.of(context).size.width;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final bodyFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final cardRadius = 12.0;
+
     final cyan = const Color(0xFF0091AD);
-    final paddingH = width * 0.07;
-    final fontSizeTitle = width * 0.05;
-    final fontSizeBody = width * 0.041;
-    final cardRadius = width * 0.03;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -174,13 +197,13 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: fontSizeTitle,
+            fontSize: appBarFontSize,
           ),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -190,17 +213,17 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
                   Text(
                     'Take a clear photo of your\nID for verifications',
                     style: GoogleFonts.outfit(
-                        fontSize: fontSizeBody, color: Colors.black87),
+                        fontSize: bodyFontSize, color: Colors.black87),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: width * 0.02),
+                  SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
                         child: Text('If you have questions, please visit our ',
-                            style: GoogleFonts.outfit(fontSize: fontSizeBody),
+                            style: GoogleFonts.outfit(fontSize: bodyFontSize),
                             softWrap: true,
                             maxLines: 2,
                             overflow: TextOverflow.visible,
@@ -214,7 +237,7 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
                           child: Text(
                             'Help Center',
                             style: GoogleFonts.outfit(
-                              fontSize: fontSizeBody,
+                              fontSize: bodyFontSize,
                               color: cyan,
                               decoration: TextDecoration.underline,
                             ),
@@ -230,26 +253,26 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
                 ],
               ),
             ),
-            SizedBox(height: width * 0.06),
-            _idSample('Front', width),
-            SizedBox(height: width * 0.03),
-            _idSample('Back', width),
-            SizedBox(height: width * 0.06),
+            SizedBox(height: 24),
+            _idSample('Front', isMobile, isTablet),
+            SizedBox(height: 12),
+            _idSample('Back', isMobile, isTablet),
+            SizedBox(height: 24),
             Text('ID Photo Standards:',
                 style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.w500, fontSize: fontSizeBody),
+                    fontWeight: FontWeight.w500, fontSize: bodyFontSize),
                 textAlign: TextAlign.left,
                 softWrap: true,
                 maxLines: 2,
                 overflow: TextOverflow.visible),
             SizedBox(height: 6),
-            _bullet('Government/school-issued and valid', fontSizeBody),
+            _bullet('Government/school-issued and valid', bodyFontSize),
             _bullet('Photo must be clear, well-lit, and show the entire ID',
-                fontSizeBody),
-            _bullet('No glare, blur, or obstructions', fontSizeBody),
+                bodyFontSize),
+            _bullet('No glare, blur, or obstructions', bodyFontSize),
             _bullet('Both front and back required for Student/PWD/Senior',
-                fontSizeBody),
-            _bullet('Name and photo must be readable', fontSizeBody),
+                bodyFontSize),
+            _bullet('Name and photo must be readable', bodyFontSize),
             SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
@@ -266,7 +289,7 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
                 onPressed: widget.onNext ?? () {
                   Navigator.pushNamed(context, '/id_verification_picture');
                 },
-                child: Text('Next', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                child: Text('Next', style: GoogleFonts.outfit(fontSize: bodyFontSize)),
               ),
             ),
           ],
@@ -275,22 +298,25 @@ class _IDVerificationInstructionPageState extends State<IDVerificationInstructio
     );
   }
 
-  Widget _idSample(String label, double width) {
+  Widget _idSample(String label, bool isMobile, bool isTablet) {
+    final iconSize = isMobile ? 40.0 : isTablet ? 50.0 : 60.0;
+    final containerHeight = isMobile ? 120.0 : isTablet ? 140.0 : 160.0;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
             style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w500, fontSize: width * 0.04)),
+                fontWeight: FontWeight.w500, fontSize: 16.0)),
         SizedBox(height: 6),
         Container(
           width: double.infinity,
-          height: width * 0.22,
+          height: containerHeight,
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.badge, size: width * 0.13, color: Colors.black38),
+          child: Icon(Icons.badge, size: iconSize, color: Colors.black38),
         ),
       ],
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class FAQPage extends StatefulWidget {
   const FAQPage({Key? key}) : super(key: key);
@@ -80,12 +81,43 @@ class _FAQPageState extends State<FAQPage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final questionFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final answerFontSize = isMobile
+        ? 13.0
+        : isTablet
+            ? 15.0
+            : 17.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final cardSpacing = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+
     final cyan = const Color(0xFF0091AD);
-    final paddingH = width * 0.05;
-    final fontSizeTitle = width * 0.05;
-    final fontSizeQ = width * 0.045;
-    final fontSizeA = width * 0.041;
 
     return Scaffold(
       backgroundColor: Colors.grey[100],
@@ -94,7 +126,7 @@ class _FAQPageState extends State<FAQPage> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back,
-              color: Colors.white, size: fontSizeTitle + 2),
+              color: Colors.white, size: appBarFontSize + 2),
           onPressed: () => Navigator.pop(context),
         ),
         centerTitle: true,
@@ -103,21 +135,21 @@ class _FAQPageState extends State<FAQPage> {
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: fontSizeTitle,
+            fontSize: appBarFontSize,
           ),
         ),
       ),
       body: ListView.separated(
         padding:
-            EdgeInsets.symmetric(vertical: width * 0.04, horizontal: paddingH),
+            EdgeInsets.symmetric(vertical: verticalPadding, horizontal: horizontalPadding),
         itemCount: _faqs.length,
-        separatorBuilder: (_, __) => SizedBox(height: width * 0.03),
+        separatorBuilder: (_, __) => SizedBox(height: cardSpacing),
         itemBuilder: (context, i) {
           final faq = _faqs[i];
           return Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(width * 0.03),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black12,
@@ -129,7 +161,7 @@ class _FAQPageState extends State<FAQPage> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                borderRadius: BorderRadius.circular(width * 0.03),
+                borderRadius: BorderRadius.circular(12),
                 onTap: () {
                   setState(() {
                     _expanded[i] = !_expanded[i];
@@ -137,7 +169,7 @@ class _FAQPageState extends State<FAQPage> {
                 },
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                      vertical: width * 0.045, horizontal: width * 0.04),
+                      vertical: verticalPadding, horizontal: horizontalPadding),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -148,7 +180,7 @@ class _FAQPageState extends State<FAQPage> {
                               faq['question']!,
                               style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w500,
-                                fontSize: fontSizeQ,
+                                fontSize: questionFontSize,
                                 color: Colors.black,
                               ),
                             ),
@@ -158,16 +190,16 @@ class _FAQPageState extends State<FAQPage> {
                                 ? Icons.expand_less
                                 : Icons.expand_more,
                             color: Colors.grey,
-                            size: fontSizeQ + 4,
+                            size: questionFontSize + 4,
                           ),
                         ],
                       ),
                       if (_expanded[i]) ...[
-                        SizedBox(height: width * 0.025),
+                        SizedBox(height: 8),
                         Text(
                           faq['answer']!,
                           style: GoogleFonts.outfit(
-                            fontSize: fontSizeA,
+                            fontSize: answerFontSize,
                             color: Colors.black87,
                           ),
                         ),

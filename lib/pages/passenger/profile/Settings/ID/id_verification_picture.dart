@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:responsive_framework/responsive_framework.dart';
 
 class IDVerificationPicturePage extends StatefulWidget {
   const IDVerificationPicturePage({Key? key}) : super(key: key);
@@ -247,13 +248,34 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final bodyFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final cardRadius = 12.0;
+
     final cyan = const Color(0xFF0091AD);
-    final paddingH = width * 0.07;
-    final fontSizeTitle = width * 0.05;
-    final fontSizeBody = width * 0.041;
-    final cardRadius = width * 0.03;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -268,33 +290,33 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: fontSizeTitle,
+            fontSize: appBarFontSize,
           ),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: height - MediaQuery.of(context).padding.top - kToolbarHeight - width * 0.08,
+              minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 80,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(
                   'Please make sure there is enough lighting and the ID lettering is clear before continuing',
-                  style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Colors.black87),
+                  style: GoogleFonts.outfit(fontSize: bodyFontSize, color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: width * 0.04),
-                _imageCard('Front', _frontImage, () => _pickImage(true), width),
-                SizedBox(height: width * 0.03),
-                _imageCard('Back', _backImage, () => _pickImage(false), width),
-                SizedBox(height: width * 0.04),
-                _buildIDTypeDropdown(width, fontSizeBody),
-                SizedBox(height: width * 0.04),
+                SizedBox(height: 16),
+                _imageCard('Front', _frontImage, () => _pickImage(true), isMobile, isTablet),
+                SizedBox(height: 12),
+                _imageCard('Back', _backImage, () => _pickImage(false), isMobile, isTablet),
+                SizedBox(height: 16),
+                _buildIDTypeDropdown(isMobile, isTablet, bodyFontSize),
+                SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -310,7 +332,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
                     onPressed: (_frontImage != null && _backImage != null && _selectedIDType != null && !_checking) ? _next : null,
                     child: _checking
                         ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text('Next', style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                        : Text('Next', style: GoogleFonts.outfit(fontSize: bodyFontSize)),
                   ),
                 ),
                 SizedBox(height: 8),
@@ -377,9 +399,9 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
                       }
                     }
                   },
-                  child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: fontSizeBody, color: Color(0xFF0091AD))),
+                  child: Text('Upload an Image', style: GoogleFonts.outfit(fontSize: bodyFontSize, color: Color(0xFF0091AD))),
                 ),
-                SizedBox(height: width * 0.04), // Add bottom padding for scroll safety
+                SizedBox(height: 16), // Add bottom padding for scroll safety
               ],
             ),
           ),
@@ -388,7 +410,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
     );
   }
 
-  Widget _buildIDTypeDropdown(double width, double fontSizeBody) {
+  Widget _buildIDTypeDropdown(bool isMobile, bool isTablet, double bodyFontSize) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -396,7 +418,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
           'ID Type:',
           style: GoogleFonts.outfit(
             fontWeight: FontWeight.w500,
-            fontSize: width * 0.04,
+            fontSize: 16.0,
           ),
         ),
         SizedBox(height: 6),
@@ -413,7 +435,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
               hint: Text(
                 'Select ID Type',
                 style: GoogleFonts.outfit(
-                  fontSize: fontSizeBody,
+                  fontSize: bodyFontSize,
                   color: Colors.grey[600],
                 ),
               ),
@@ -424,7 +446,7 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
                   value: type,
                   child: Text(
                     type,
-                    style: GoogleFonts.outfit(fontSize: fontSizeBody),
+                    style: GoogleFonts.outfit(fontSize: bodyFontSize),
                   ),
                 );
               }).toList(),
@@ -440,26 +462,26 @@ class _IDVerificationPicturePageState extends State<IDVerificationPicturePage> {
     );
   }
 
-  Widget _imageCard(String label, File? image, VoidCallback onTap, double width) {
-    final height = MediaQuery.of(context).size.height;
-    final imageHeight = height * 0.21; // More responsive height calculation 
+  Widget _imageCard(String label, File? image, VoidCallback onTap, bool isMobile, bool isTablet) {
+    final imageHeight = isMobile ? 160.0 : isTablet ? 140.0 : 160.0;
+    final iconSize = isMobile ? 40.0 : isTablet ? 50.0 : 60.0;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: width * 0.04)),
+        Text(label, style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 16.0)),
         SizedBox(height: 6),
         GestureDetector(
           onTap: onTap,
           child: Container(
             width: double.infinity,
-            height: imageHeight, // Use responsive height
+            height: imageHeight,
             decoration: BoxDecoration(
               color: Colors.grey[300],
               borderRadius: BorderRadius.circular(12),
             ),
             child: image == null
-                ? Icon(Icons.camera_alt, size: width * 0.13, color: Colors.black38)
+                ? Icon(Icons.camera_alt, size: iconSize, color: Colors.black38)
                 : ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.file(image, fit: BoxFit.cover),

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/pre_book.dart';
 
 class ReservationConfirm extends StatefulWidget {
@@ -307,7 +308,32 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final tabFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+    final cardPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF0091AD),
@@ -322,7 +348,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: 20,
+            fontSize: appBarFontSize,
           ),
         ),
         bottom: TabBar(
@@ -332,6 +358,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
           unselectedLabelColor: Colors.white70,
           isScrollable: true,
           tabAlignment: TabAlignment.center,
+          labelStyle: GoogleFonts.outfit(fontSize: tabFontSize),
+          unselectedLabelStyle: GoogleFonts.outfit(fontSize: tabFontSize),
           tabs: [
             Tab(text: 'All'),
             Tab(text: 'Pending'),
@@ -397,9 +425,9 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
               }
               
               return ListView.separated(
-                padding: EdgeInsets.all(width * 0.05),
+                padding: EdgeInsets.all(horizontalPadding),
                 itemCount: bookings.length,
-                separatorBuilder: (_, __) => SizedBox(height: width * 0.04),
+                separatorBuilder: (_, __) => SizedBox(height: cardPadding),
                 itemBuilder: (context, i) {
                   final booking = bookings[i];
 
@@ -459,19 +487,19 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                             ),
                           ],
                         ),
-                        padding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                        padding: EdgeInsets.symmetric(vertical: cardPadding, horizontal: cardPadding),
                         child: Row(
                           children: [
                             Container(
-                              width: width * 0.18,
-                              height: width * 0.18,
+                              width: isMobile ? 60.0 : isTablet ? 70.0 : 80.0,
+                              height: isMobile ? 60.0 : isTablet ? 70.0 : 80.0,
                               decoration: BoxDecoration(
                                 color: Colors.grey[100],
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.confirmation_number,
-                                size: width * 0.08,
+                                size: isMobile ? 24.0 : isTablet ? 28.0 : 32.0,
                                 color: Colors.grey[600],
                               ),
                             ),

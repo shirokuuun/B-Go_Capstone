@@ -59,7 +59,7 @@ class TripSchedPage extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.directions_bus),
+              leading: Icon(Icons.swap_horiz),
               title: Text(
                 'Role Selection',
                 style: GoogleFonts.outfit(

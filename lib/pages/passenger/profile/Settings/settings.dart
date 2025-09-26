@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:b_go/auth/auth_services.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({Key? key}) : super(key: key);
@@ -9,8 +10,6 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // App color palette
     final primaryTeal = const Color(0xFF0091AD);
-    final secondaryTeal = const Color(0xFF007A8F);
-    final lightTeal = const Color(0xFFE0F7FA);
     
     final options = [
       _SettingsOption('Pre-Ticket QRs', Icons.confirmation_num),
@@ -19,6 +18,7 @@ class SettingsPage extends StatelessWidget {
       _SettingsOption('Privacy Policy', Icons.groups),
       _SettingsOption('About', Icons.info_outline),
       _SettingsOption('ID Verification', Icons.badge),
+      _SettingsOption('Log Out', Icons.logout, isLogout: true),
     ];
 
     // Get responsive breakpoints
@@ -88,10 +88,9 @@ class SettingsPage extends StatelessWidget {
         itemCount: options.length,
         itemBuilder: (context, i) {
           final opt = options[i];
-          final isFirstItem = i == 0;
           
           return Container(
-            color: isFirstItem ? lightTeal : Colors.white,
+            color: Colors.white,
             child: ListTile(
               contentPadding: EdgeInsets.symmetric(
                 horizontal: horizontalPadding,
@@ -99,7 +98,7 @@ class SettingsPage extends StatelessWidget {
               ),
               leading: Icon(
                 opt.icon,
-                color: primaryTeal,
+                color: opt.isLogout ? Colors.red : primaryTeal,
                 size: iconSize,
               ),
               title: Text(
@@ -107,15 +106,15 @@ class SettingsPage extends StatelessWidget {
                 style: GoogleFonts.outfit(
                   fontSize: titleFontSize,
                   fontWeight: FontWeight.w500,
-                  color: Colors.black87,
+                  color: opt.isLogout ? Colors.red : Colors.black87,
                 ),
               ),
               trailing: Icon(
                 Icons.chevron_right,
-                color: primaryTeal,
+                color: opt.isLogout ? Colors.red : primaryTeal,
                 size: trailingIconSize,
               ),
-              onTap: () {
+              onTap: () async {
                 if (opt.title == 'Pre-Ticket QRs') {
                   Navigator.pushNamed(context, '/pre_ticket_qr');
                 } else if (opt.title == 'Reservation Confirmations') {
@@ -128,6 +127,56 @@ class SettingsPage extends StatelessWidget {
                   Navigator.pushNamed(context, '/about');
                 } else if (opt.title == 'ID Verification') {
                   Navigator.pushNamed(context, '/id_verification');
+                } else if (opt.title == 'Log Out') {
+                  // Show confirmation dialog
+                  final shouldLogout = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text(
+                        'Log Out',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w600,
+                          fontSize: titleFontSize + 2,
+                        ),
+                      ),
+                      content: Text(
+                        'Are you sure you want to log out?',
+                        style: GoogleFonts.outfit(fontSize: titleFontSize),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.outfit(
+                              fontSize: titleFontSize,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: Text(
+                            'Log Out',
+                            style: GoogleFonts.outfit(
+                              fontSize: titleFontSize,
+                              color: Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                  
+                  if (shouldLogout == true) {
+                    final authServices = AuthServices();
+                    await authServices.signOut();
+                    if (context.mounted) {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (route) => false);
+                    }
+                  }
                 }
               },
             ),
@@ -141,6 +190,7 @@ class SettingsPage extends StatelessWidget {
 class _SettingsOption {
   final String title;
   final IconData icon;
-  const _SettingsOption(this.title, this.icon);
+  final bool isLogout;
+  const _SettingsOption(this.title, this.icon, {this.isLogout = false});
 }
 

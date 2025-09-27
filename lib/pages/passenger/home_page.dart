@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:b_go/pages/passenger/services/passenger_service.dart';
 import 'package:b_go/pages/passenger/services/bus_location_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,54 +33,116 @@ class _HomePageState extends State<HomePage> {
 
   // Custom bus icons
   Map<String, BitmapDescriptor> _busIcons = {};
+  bool _iconsLoaded = false;
+
+  // Filter container animation
+  bool _isFilterVisible = false;
 
   @override
   void initState() {
     super.initState();
     _loadAvailableRoutes();
     _startBusTracking();
-    _createCustomBusIcons();
+    // Delay icon loading to ensure context is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _createCustomBusIcons();
+    });
   }
 
   Future<void> _createCustomBusIcons() async {
-    // Create custom bus icons with different colors for each route
-    // Use the same colors as defined in _getColorForRoute method
-    _busIcons = {
-      'batangas': await _createCustomBusIcon(Colors.red),
-      'mataas na kahoy': await _createCustomBusIcon(Colors.purple),
-      'mataas na kahoy palengke': await _createCustomBusIcon(Colors.orange),
-      'rosario':
-          await _createCustomBusIcon(Colors.blue), // Changed from pink to blue
-      'tiaong': await _createCustomBusIcon(Colors.green),
-      'san juan': await _createCustomBusIcon(Colors.yellow),
-      'default': await _createCustomBusIcon(Colors.cyan),
-    };
+    try {
+      print('Starting to load custom bus icons...');
+      
+      // Use proper ImageConfiguration with appropriate size for map markers
+      final ImageConfiguration config = ImageConfiguration(
+        size: Size(24, 24), // Smaller size that scales better with map zoom
+        devicePixelRatio: 2.0,
+      );
+      
+      // Load custom bus icons with proper error handling
+      _busIcons = {
+        'batangas': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_red.png',
+        ),
+        'mataas na kahoy': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_purple.png',
+        ),
+        'mataas na kahoy palengke': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_orange.png',
+        ),
+        'rosario': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_blue.png',
+        ),
+        'tiaong': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_green.png',
+        ),
+        'san juan': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus_yellow.png',
+        ),
+        'default': await BitmapDescriptor.fromAssetImage(
+          config,
+          'assets/bus.png',
+        ),
+      };
+      
+      print('Successfully loaded ${_busIcons.length} bus icons');
+      print('Icon keys: ${_busIcons.keys.toList()}');
+      
+      if (mounted) {
+        setState(() {
+          _iconsLoaded = true;
+          _updateMarkers();
+        });
+      }
+    } catch (e) {
+      print('Error creating custom bus icons: $e');
+      // Fallback: create simple colored markers
+      _createFallbackMarkers();
+    }
   }
 
-  Future<BitmapDescriptor> _createCustomBusIcon(Color color) async {
-    // Create a custom bus icon with the specified color
-    // For now, we'll use a colored marker, but you can replace this with actual bus icon
-    return BitmapDescriptor.defaultMarkerWithHue(_colorToHue(color));
-  }
+   // Add this fallback method with smaller markers
+   void _createFallbackMarkers() {
+     print('Creating fallback markers with default colors...');
+     _busIcons = {
+       'batangas': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+       'mataas na kahoy': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+       'mataas na kahoy palengke': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+       'rosario': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+       'tiaong': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+       'san juan': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+       'default': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+     };
+     
+     if (mounted) {
+       setState(() {
+         _iconsLoaded = true;
+         _updateMarkers();
+       });
+     }
+   }
 
-  double _colorToHue(Color color) {
-    // Convert Color to HSV hue value for BitmapDescriptor
-    final hsl = HSLColor.fromColor(color);
-    return hsl.hue;
-  }
 
   Future<void> _loadAvailableRoutes() async {
     try {
       final routes = await _busLocationService.getAvailableRoutes();
-      setState(() {
-        // Clean up routes by trimming spaces and removing duplicates
-        _availableRoutes = routes
-            .map((route) => route.trim())
-            .where((route) => route.isNotEmpty)
-            .toSet()
-            .toList()
-          ..sort(); // Sort alphabetically
-      });
+      if (mounted) {
+        setState(() {
+          // Clean up routes by trimming spaces and removing duplicates
+          _availableRoutes = routes
+              .map((route) => route.trim())
+              .where((route) => route.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort(); // Sort alphabetically
+        });
+      }
     } catch (e) {
       print('Error loading routes: $e');
     }
@@ -90,36 +151,84 @@ class _HomePageState extends State<HomePage> {
   void _startBusTracking() {
     // Listen to all online buses
     _busLocationService.getOnlineBuses().listen((buses) {
-      setState(() {
-        _buses = buses;
-        _updateMarkers();
-      });
+      if (mounted) {
+        setState(() {
+          _buses = buses;
+          _debugBusData(); // Add debug output
+          _updateMarkers();
+        });
+      }
     });
   }
 
+  void _debugBusData() {
+    print('=== BUS DATA DEBUG ===');
+    print('Number of buses: ${_buses.length}');
+    for (int i = 0; i < _buses.length; i++) {
+      final bus = _buses[i];
+      print('Bus $i:');
+      print('  ID: ${bus.conductorId}');
+      print('  Route: "${bus.route}"');
+      print('  Location: ${bus.location}');
+      print('  Name: ${bus.conductorName}');
+    }
+    print('=== END DEBUG ===');
+  }
+
+  // Updated _updateMarkers method with better debugging
   void _updateMarkers() {
+    if (!mounted) return;
+    
     _markers.clear();
+    
+    print('=== UPDATING MARKERS ===');
+    print('Total buses: ${_buses.length}');
+    print('Icons loaded: $_iconsLoaded');
+    print('Selected route filter: $_selectedRoute');
+    print('Available bus icons: ${_busIcons.keys.toList()}');
+
+    if (_buses.isEmpty) {
+      print('No buses available to show on map');
+      return;
+    }
 
     for (final bus in _buses) {
+      print('Processing bus: ${bus.conductorId}');
+      print('  Route: "${bus.route}"');
+      print('  Location: ${bus.location}');
+      print('  Conductor: ${bus.conductorName}');
+      
       // Skip if route filter is applied and bus doesn't match
-      if (_selectedRoute != null &&
-          !_matchesRoute(bus.route, _selectedRoute!)) {
+      if (_selectedRoute != null && !_matchesRoute(bus.route, _selectedRoute!)) {
+        print('  Skipped: Route filter mismatch');
         continue;
       }
 
-      final marker = Marker(
-        markerId: MarkerId(bus.conductorId),
-        position: bus.location,
-        onTap: () => _showBusInfoPopup(bus),
-        icon: _getBusIcon(bus.route),
-        rotation: bus.heading,
-        flat: true, // Makes the marker flat on the map
-        anchor: Offset(0.5, 0.5), // Centers the marker
-        zIndex: 1000, // Ensures bus markers appear above other markers
-      );
+      try {
+         final marker = Marker(
+           markerId: MarkerId(bus.conductorId),
+           position: bus.location,
+           onTap: () => _showBusInfoPopup(bus),
+           icon: _getBusIcon(bus.route),
+           rotation: bus.heading, // Use heading directly
+           flat: true, // Keep markers flat on the map
+           anchor: const Offset(0.5, 0.5), // Center the marker
+           zIndex: 1000, // Keep above other markers
+           infoWindow: InfoWindow(
+             title: bus.route.trim(),
+             snippet: bus.conductorName,
+           ),
+         );
 
-      _markers.add(marker);
+        _markers.add(marker);
+        print('  ✓ Added marker successfully');
+      } catch (e) {
+        print('  ✗ Error creating marker: $e');
+      }
     }
+    
+    print('Final marker count: ${_markers.length}');
+    print('=== END MARKER UPDATE ===');
   }
 
   void _showBusInfoPopup(BusLocation bus) {
@@ -274,18 +383,51 @@ class _HomePageState extends State<HomePage> {
     return normalizedBusRoute == normalizedSelectedRoute;
   }
 
+  // Updated _getBusIcon with better fallback logic
   BitmapDescriptor _getBusIcon(String route) {
     final routeKey = route.trim().toLowerCase();
+    
+    print('Getting bus icon for route: "$route" (normalized: "$routeKey")');
 
-    // Return default marker if icons are not ready yet
-    if (_busIcons.isEmpty) {
-      return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    // If icons are not loaded yet, use default colored markers immediately
+    if (!_iconsLoaded || _busIcons.isEmpty) {
+      print('Icons not ready, using fallback color marker');
+      switch (routeKey) {
+        case 'batangas':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+        case 'rosario':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+        case 'tiaong':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+        case 'san juan':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+        case 'mataas na kahoy':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+        case 'mataas na kahoy palengke':
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+        default:
+          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+      }
     }
 
-    final icon = _busIcons[routeKey] ??
-        _busIcons['default'] ??
-        BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
-    return icon;
+    // Try exact match first
+    if (_busIcons.containsKey(routeKey)) {
+      print('Found exact match for route: $routeKey');
+      return _busIcons[routeKey]!;
+    }
+
+    // Try partial matches
+    for (String key in _busIcons.keys) {
+      if (key != 'default' && (routeKey.contains(key) || key.contains(routeKey))) {
+        print('Found partial match: $key for route: $routeKey');
+        return _busIcons[key]!;
+      }
+    }
+
+    // Fallback to default
+    print('Using default bus icon for route: $routeKey');
+    return _busIcons['default'] ?? 
+           BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -303,88 +445,24 @@ class _HomePageState extends State<HomePage> {
           MaterialPageRoute(builder: (context) => PassengerService()),
         );
         break;
-
       case 2:
         Navigator.pushNamed(context, '/profile');
         break;
     }
   }
 
-  void _showRouteFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Filter by Route', style: GoogleFonts.outfit()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('Show All Routes', style: GoogleFonts.outfit()),
-              leading: Radio<String?>(
-                value: null,
-                groupValue: _selectedRoute,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedRoute = value;
-                    _updateMarkers();
-                  });
-                  Navigator.pop(context);
-                },
-              ),
-            ),
-            ..._availableRoutes.map((route) => ListTile(
-                  title: Text(route, style: GoogleFonts.outfit()),
-                  leading: Radio<String?>(
-                    value: route,
-                    groupValue: _selectedRoute,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedRoute = value;
-                        _updateMarkers();
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                )),
-          ],
-        ),
-      ),
-    );
+  void _toggleFilterContainer() {
+    setState(() {
+      _isFilterVisible = !_isFilterVisible;
+    });
   }
 
-  void _centerOnBuses() {
-    if (_buses.isNotEmpty) {
-      final bounds = _calculateBounds();
-      mapController.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 50.0),
-      );
-    }
-  }
-
-  LatLngBounds _calculateBounds() {
-    if (_buses.isEmpty) {
-      return LatLngBounds(
-        southwest: LatLng(_center.latitude - 0.01, _center.longitude - 0.01),
-        northeast: LatLng(_center.latitude + 0.01, _center.longitude + 0.01),
-      );
-    }
-
-    double minLat = _buses.first.location.latitude;
-    double maxLat = _buses.first.location.latitude;
-    double minLng = _buses.first.location.longitude;
-    double maxLng = _buses.first.location.longitude;
-
-    for (final bus in _buses) {
-      minLat = min(minLat, bus.location.latitude);
-      maxLat = max(maxLat, bus.location.latitude);
-      minLng = min(minLng, bus.location.longitude);
-      maxLng = max(maxLng, bus.location.longitude);
-    }
-
-    return LatLngBounds(
-      southwest: LatLng(minLat, minLng),
-      northeast: LatLng(maxLat, maxLng),
-    );
+  void _selectRoute(String? route) {
+    setState(() {
+      _selectedRoute = route;
+      _updateMarkers();
+      _isFilterVisible = false; // Close filter after selection
+    });
   }
 
   @override
@@ -392,7 +470,6 @@ class _HomePageState extends State<HomePage> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
 
     // Responsive sizing
     final titleFontSize = isMobile
@@ -420,21 +497,6 @@ class _HomePageState extends State<HomePage> {
         : isTablet
             ? 14.0
             : 16.0;
-    final routeFilterFontSize = isMobile
-        ? 14.0
-        : isTablet
-            ? 16.0
-            : 18.0;
-    final legendTitleFontSize = isMobile
-        ? 14.0
-        : isTablet
-            ? 16.0
-            : 18.0;
-    final legendRouteFontSize = isMobile
-        ? 12.0
-        : isTablet
-            ? 14.0
-            : 16.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -457,13 +519,8 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             icon: Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _showRouteFilterDialog,
+            onPressed: _toggleFilterContainer,
             tooltip: 'Filter by Route',
-          ),
-          IconButton(
-            icon: Icon(Icons.center_focus_strong, color: Colors.white),
-            onPressed: _centerOnBuses,
-            tooltip: 'Center on Buses',
           ),
         ],
       ),
@@ -590,7 +647,7 @@ class _HomePageState extends State<HomePage> {
                           ),
                         ),
                         Text(
-                          'buses online',
+                          'buses online${_iconsLoaded ? ' ✓' : ' (loading...)'}',
                           style: GoogleFonts.outfit(
                             fontSize: busCountSubFontSize,
                             fontWeight: FontWeight.w500,
@@ -604,143 +661,188 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          // Route filter indicator with enhanced styling
-          if (_selectedRoute != null)
+          // Backdrop overlay
+          if (_isFilterVisible)
             Positioned(
-              top: isMobile ? 16 : 20,
-              right: isMobile ? 16 : 20,
-              child: Container(
-                constraints: BoxConstraints(
-                  minWidth: isMobile ? 100 : 120,
-                  maxWidth: isMobile ? 250 : 300,
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: GestureDetector(
+                onTap: _toggleFilterContainer,
+                child: Container(
+                  color: Colors.black.withOpacity(0.3),
                 ),
-                padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 16 : 20,
-                    vertical: isMobile ? 12 : 16),
-                decoration: BoxDecoration(
-                  color: Color(0xFF0091AD),
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
+              ),
+            ),
+          // Sliding Filter Container
+          AnimatedPositioned(
+            duration: Duration(milliseconds: 400),
+            curve: Curves.easeOutCubic,
+            bottom: _isFilterVisible ? 0 : -MediaQuery.of(context).size.height * 0.6,
+            left: 0,
+            right: 0,
+            child: Container(
+              height: MediaQuery.of(context).size.height * 0.6,
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  // Allow swiping down to close
+                  if (details.delta.dy > 0) {
+                    _toggleFilterContainer();
+                  }
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(25),
+                      topRight: Radius.circular(25),
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.filter_list,
-                        color: Colors.white, size: isMobile ? 20 : 24),
-                    SizedBox(width: isMobile ? 8 : 12),
-                    Flexible(
-                      child: Text(
-                        _selectedRoute!,
-                        style: GoogleFonts.outfit(
-                          fontSize: routeFilterFontSize,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                        overflow: TextOverflow.ellipsis,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 15,
+                        offset: Offset(0, -5),
                       ),
-                    ),
-                    SizedBox(width: isMobile ? 8 : 12),
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedRoute = null;
-                          _updateMarkers();
-                        });
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(isMobile ? 4 : 6),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Handle bar
+                      Container(
+                        margin: EdgeInsets.only(top: 12),
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        child: Icon(Icons.close,
-                            color: Colors.white, size: isMobile ? 16 : 20),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          // Legend for bus colors - show all routes
-          if (_busIcons.isNotEmpty)
-            Positioned(
-              bottom: isMobile ? 100 : 120,
-              left: isMobile ? 16 : 20,
-              child: Container(
-                constraints: BoxConstraints(
-                  maxWidth: isMobile ? 200 : 250,
-                  maxHeight: isMobile ? 200 : 250,
-                ),
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Route Colors',
-                      style: GoogleFonts.outfit(
-                        fontSize: legendTitleFontSize,
-                        fontWeight: FontWeight.bold,
+                      // Header
+                      Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              color: Color(0xFF0091AD),
+                              size: 24,
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Filter by Route',
+                              style: GoogleFonts.outfit(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            Spacer(),
+                            GestureDetector(
+                              onTap: _toggleFilterContainer,
+                              child: Container(
+                                padding: EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(Icons.close, color: Colors.grey[600], size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    SizedBox(height: isMobile ? 8 : 12),
-                    Flexible(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: _getUniqueRoutes()
-                              .map((route) => Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: isMobile ? 2 : 4),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: isMobile ? 12 : 16,
-                                          height: isMobile ? 12 : 16,
-                                          decoration: BoxDecoration(
-                                            color: _getColorForRoute(route),
-                                            shape: BoxShape.circle,
-                                          ),
-                                        ),
-                                        SizedBox(width: isMobile ? 8 : 12),
-                                        Flexible(
-                                          child: Text(
-                                            route.toUpperCase(),
-                                            style: GoogleFonts.outfit(
-                                                fontSize: legendRouteFontSize),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
+                      // Filter options
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.symmetric(horizontal: 20),
+                          child: Column(
+                            children: [
+                              // Show All Routes option
+                              Container(
+                                width: double.infinity,
+                                margin: EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: _selectedRoute == null 
+                                      ? Color(0xFF0091AD).withOpacity(0.1)
+                                      : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: _selectedRoute == null 
+                                        ? Color(0xFF0091AD)
+                                        : Colors.grey[300]!,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    'Show All Routes',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: _selectedRoute == null 
+                                          ? Color(0xFF0091AD)
+                                          : Colors.black87,
                                     ),
-                                  ))
-                              .toList(),
+                                  ),
+                                  leading: Radio<String?>(
+                                    value: null,
+                                    groupValue: _selectedRoute,
+                                    onChanged: _selectRoute,
+                                    activeColor: Color(0xFF0091AD),
+                                  ),
+                                  onTap: () => _selectRoute(null),
+                                ),
+                              ),
+                              // Individual route options
+                              ..._availableRoutes.map((route) => Container(
+                                    width: double.infinity,
+                                    margin: EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: _selectedRoute == route 
+                                          ? Color(0xFF0091AD).withOpacity(0.1)
+                                          : Colors.grey[50],
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _selectedRoute == route 
+                                            ? Color(0xFF0091AD)
+                                            : Colors.grey[300]!,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      title: Text(
+                                        route,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: _selectedRoute == route 
+                                              ? Color(0xFF0091AD)
+                                              : Colors.black87,
+                                        ),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      leading: Radio<String?>(
+                                        value: route,
+                                        groupValue: _selectedRoute,
+                                        onChanged: _selectRoute,
+                                        activeColor: Color(0xFF0091AD),
+                                      ),
+                                      onTap: () => _selectRoute(route),
+                                    ),
+                                  )),
+                              SizedBox(height: 20), // Extra space at bottom
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -763,23 +865,6 @@ class _HomePageState extends State<HomePage> {
         onTap: _onItemTapped,
       ),
     );
-  }
-
-  List<String> _getUniqueRoutes() {
-    Set<String> uniqueRoutes = {};
-
-    // Add routes from available routes
-    uniqueRoutes.addAll(_availableRoutes);
-
-    // Add routes from online buses
-    for (final bus in _buses) {
-      if (bus.isOnline && bus.route.trim().isNotEmpty) {
-        uniqueRoutes.add(bus.route.trim());
-      }
-    }
-
-    // Convert to list and sort
-    return uniqueRoutes.toList()..sort();
   }
 
   Color _getColorForRoute(String route) {

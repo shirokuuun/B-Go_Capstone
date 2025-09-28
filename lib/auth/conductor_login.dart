@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:b_go/responsiveness/responsive_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'dart:math' as math;
 
 class ConductorLogin extends StatefulWidget {
@@ -14,12 +14,10 @@ class ConductorLogin extends StatefulWidget {
 }
 
 class _ConductorLoginState extends State<ConductorLogin> {
-  final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   String? _errorMessage;
-
-
+  bool _obscurePassword = true;
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
@@ -52,11 +50,12 @@ class _ConductorLoginState extends State<ConductorLogin> {
 
       if (query.docs.isEmpty) {
         setState(() {
-          _errorMessage = 'No conductor record found. This conductor must be created via the admin website.';
+          _errorMessage =
+              'No conductor record found. This conductor must be created via the admin website.';
         });
         return;
       }
-      
+
       final doc = query.docs.first;
       final data = doc.data();
       final route = data['route'] ?? '';
@@ -87,9 +86,27 @@ class _ConductorLoginState extends State<ConductorLogin> {
 
   @override
   Widget build(BuildContext context) {
-    Responsive responsive = Responsive(context);
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    
+    // Responsive sizing
+    final logoSize = isMobile ? 120.0 : isTablet ? 140.0 : 150.0;
+    final titleFontSize = isMobile ? 35.0 : isTablet ? 40.0 : 45.0;
+    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 19.0 : 20.0;
+    final textFieldFontSize = isMobile ? 14.0 : isTablet ? 15.0 : 16.0;
+    final hintFontSize = isMobile ? 12.0 : isTablet ? 13.0 : 14.0;
+    final registerFontSize = isMobile ? 13.0 : isTablet ? 13.0 : 14.0;
+    
+    // Responsive padding and spacing
+    final horizontalPadding = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final fieldSpacing = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
+    final buttonPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final containerPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    
     return Scaffold(
-      backgroundColor: const Color(0xFFE5E9F0),
+      backgroundColor: Color(0xFFE5E9F0),
       body: Stack(
         children: [
           Container(
@@ -99,9 +116,10 @@ class _ConductorLoginState extends State<ConductorLogin> {
             ),
             child: LayoutBuilder(
               builder: (context, constraints) {
-                double maxLogoWidth = 400.0;
-                double logoWidth = 150;
+                double maxLogoWidth = 400.0; // Adjust this value as needed
+                double logoWidth = logoSize;
                 math.min(constraints.maxWidth * 0.4, maxLogoWidth);
+                // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
                   offset: Offset(0, -20),
                   child: Center(
@@ -124,21 +142,22 @@ class _ConductorLoginState extends State<ConductorLogin> {
                 margin: EdgeInsets.only(
                     top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.only(left: 28, right: 28, top: 50, bottom: 150),
+                padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: isMobile
+                        ? 32.0
+                        : isTablet
+                            ? 36.0
+                            : 40.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    SizedBox(
+                        height: isMobile
+                            ? 20.0
+                            : isTablet
+                                ? 25.0
+                                : 30.0),
                     // --- LOGIN BOX ---
                     Center(
                       child: Column(
@@ -148,13 +167,13 @@ class _ConductorLoginState extends State<ConductorLogin> {
                           Text(
                             "Login",
                             style: GoogleFonts.outfit(
-                              fontSize: 45,
+                              fontSize: titleFontSize,
                             ),
                           ),
                           Text(
                             "Welcome Back, Conductor!",
                             style: GoogleFonts.outfit(
-                              fontSize: 20,
+                              fontSize: subtitleFontSize,
                               color: const Color.fromARGB(255, 0, 0, 0),
                             ),
                           ),
@@ -162,27 +181,36 @@ class _ConductorLoginState extends State<ConductorLogin> {
                       ),
                     ),
 
-                    SizedBox(height: 40),
+                    SizedBox(height: fieldSpacing),
 
                     // Email
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE5E9F0),
+                          color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
+                          padding: EdgeInsets.only(left: containerPadding),
                           child: TextField(
                             controller: _emailController,
-                            style: GoogleFonts.outfit(color: Colors.black),
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontSize: textFieldFontSize,
+                            ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Email",
                               hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize),
                             ),
                           ),
                         ),
@@ -190,26 +218,48 @@ class _ConductorLoginState extends State<ConductorLogin> {
                     ),
 
                     // Password
-                    SizedBox(height: 30),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE5E9F0),
+                          color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
+                          padding: EdgeInsets.only(left: containerPadding),
                           child: TextField(
                             controller: _passwordController,
-                            obscureText: true,
-                            style: GoogleFonts.outfit(color: Colors.black),
+                            obscureText: _obscurePassword,
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontSize: textFieldFontSize,
+                            ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Password",
                               hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize),
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.black54,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -229,15 +279,16 @@ class _ConductorLoginState extends State<ConductorLogin> {
                     ],
 
                     // Sign in button
-                    SizedBox(height: 40),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0091AD),
-                            padding: EdgeInsets.all(20),
+                            padding: EdgeInsets.all(buttonPadding),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -249,34 +300,43 @@ class _ConductorLoginState extends State<ConductorLogin> {
                             'Login',
                             style: GoogleFonts.outfit(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: buttonFontSize,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
+                    SizedBox(height: isMobile ? 280.0 : isTablet ? 290.0 : 295.0),
 
                     // Register section
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Not a conductor?',
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w500)),
+                        Text(
+                          "Not a conductor? ",
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
+                            fontSize: registerFontSize,
+                          ),
+                        ),
                         TextButton(
                           onPressed: () {
                             Navigator.pushNamed(context, '/login');
                           },
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-                            minimumSize: Size(0, 0),
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 4), // Increase tap area
+                            minimumSize:
+                                Size(0, 0), // Remove min size if needed
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: Text(
                             "Sign In",
                             style: GoogleFonts.outfit(
-                              color: Color(0xFF2397f3),
+                              color: Color(0xFF0091AD),
+                              fontWeight: FontWeight.w500,
+                              fontSize: registerFontSize,
                             ),
                           ),
                         ),

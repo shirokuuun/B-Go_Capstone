@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:b_go/auth/conductor_login.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback showRegisterPage;
@@ -21,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   final AuthServices _authServices = AuthServices();
+  bool _obscurePassword = true;
 
   Future signIn() async {
     try {
@@ -33,10 +35,16 @@ class _LoginPageState extends State<LoginPage> {
 
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && user.emailVerified) {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         final firestoreEmail = doc.data()?['email'];
         if (firestoreEmail != user.email) {
-          await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
             'email': user.email,
           });
         }
@@ -63,7 +71,8 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+            builder: (context) =>
+                ConductorFrom(role: 'Conductor', route: route),
           ),
         );
         // Only clear after navigation
@@ -126,8 +135,71 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final logoSize = isMobile
+        ? 120.0
+        : isTablet
+            ? 140.0
+            : 150.0;
+    final titleFontSize = isMobile
+        ? 35.0
+        : isTablet
+            ? 40.0
+            : 45.0;
+    final subtitleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final buttonFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 19.0
+            : 20.0;
+    final textFieldFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 15.0
+            : 16.0;
+    final hintFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 13.0
+            : 14.0;
+    final registerFontSize = isMobile
+        ? 13.0
+        : isTablet
+            ? 13.0
+            : 14.0;
+
+    // Responsive padding and spacing
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final fieldSpacing = isMobile
+        ? 20.0
+        : isTablet
+            ? 25.0
+            : 30.0;
+    final buttonPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final containerPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFE5E9F0),
       body: Stack(
         children: [
           Container(
@@ -138,7 +210,7 @@ class _LoginPageState extends State<LoginPage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = 150;
+                double logoWidth = logoSize;
                 math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
@@ -163,23 +235,22 @@ class _LoginPageState extends State<LoginPage> {
                 margin: EdgeInsets.only(
                     top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: isMobile
+                        ? 32.0
+                        : isTablet
+                            ? 36.0
+                            : 40.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 20),
+                    SizedBox(
+                        height: isMobile
+                            ? 20.0
+                            : isTablet
+                                ? 25.0
+                                : 30.0),
                     // --- LOGIN BOX ---
                     Center(
                       child: Column(
@@ -189,13 +260,13 @@ class _LoginPageState extends State<LoginPage> {
                           Text(
                             "Login",
                             style: GoogleFonts.outfit(
-                              fontSize: 45,
+                              fontSize: titleFontSize,
                             ),
                           ),
                           Text(
                             "Welcome Back!",
                             style: GoogleFonts.outfit(
-                              fontSize: 20,
+                              fontSize: subtitleFontSize,
                               color: const Color.fromARGB(255, 0, 0, 0),
                             ),
                           ),
@@ -203,27 +274,36 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
 
-                    SizedBox(height: 40),
+                    SizedBox(height: fieldSpacing),
 
                     // Email
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
+                          padding: EdgeInsets.only(left: containerPadding),
                           child: TextField(
                             controller: emailController,
-                            style: GoogleFonts.outfit(color: Colors.black),
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontSize: textFieldFontSize,
+                            ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Email",
                               hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize),
                             ),
                           ),
                         ),
@@ -231,26 +311,48 @@ class _LoginPageState extends State<LoginPage> {
                     ),
 
                     // Password
-                    SizedBox(height: 30),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 20.0),
+                          padding: EdgeInsets.only(left: containerPadding),
                           child: TextField(
                             controller: passwordController,
-                            obscureText: true,
-                            style: GoogleFonts.outfit(color: Colors.black),
+                            obscureText: _obscurePassword,
+                            style: GoogleFonts.outfit(
+                              color: Colors.black,
+                              fontSize: textFieldFontSize,
+                            ),
                             decoration: InputDecoration(
                               border: InputBorder.none,
                               hintText: "Password",
                               hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
-                                  fontWeight: FontWeight.w700),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize),
+                              suffixIcon: IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.black54,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -260,7 +362,8 @@ class _LoginPageState extends State<LoginPage> {
 
                     // Forgot Password
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
@@ -278,6 +381,7 @@ class _LoginPageState extends State<LoginPage> {
                               style: GoogleFonts.outfit(
                                 color: Colors.black,
                                 fontWeight: FontWeight.w500,
+                                fontSize: hintFontSize,
                               ),
                             ),
                           ),
@@ -286,15 +390,16 @@ class _LoginPageState extends State<LoginPage> {
                     ),
 
                     // Sign in button
-                    SizedBox(height: 20),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
                       child: SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF0091AD),
-                            padding: EdgeInsets.all(20),
+                            padding: EdgeInsets.all(buttonPadding),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -304,123 +409,248 @@ class _LoginPageState extends State<LoginPage> {
                             'Sign In',
                             style: GoogleFonts.outfit(
                               color: Colors.white,
-                              fontSize: 20,
+                              fontSize: buttonFontSize,
                             ),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
-
-                    // --- OUTSIDE THE BOX ---
+                    SizedBox(height: 25),
 
                     // Or divider
                     Row(
                       children: [
                         const Expanded(
                             child: Divider(
-                                thickness: 2, color: Color(0xFFE7E7E7))),
+                                thickness: 1, color: Color(0xFF9B9B9B))),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text("Or",
+                          padding: EdgeInsets.symmetric(
+                              horizontal: isMobile
+                                  ? 12.0
+                                  : isTablet
+                                      ? 14.0
+                                      : 16.0),
+                          child: Text("Or login with",
                               style: GoogleFonts.outfit(
-                                  fontSize: 20,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500)),
+                                  fontSize: isMobile
+                                      ? 14.0
+                                      : isTablet
+                                          ? 15.0
+                                          : 16.0,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w400)),
                         ),
                         const Expanded(
                             child: Divider(
-                                thickness: 1.5, color: Color(0xFFE7E7E7))),
+                                thickness: 1, color: Color(0xFF9B9B9B))),
                       ],
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(
+                        height: isMobile
+                            ? 20.0
+                            : isTablet
+                                ? 22.0
+                                : 25.0),
 
-                    // sign in with Google
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        GestureDetector(
-                          onTap: () async {
-                            try {
-                              final userCredential =
-                                  await _authServices.SignInWithGoogle();
-                              if (userCredential == null) return;
-                              
-                              // Handle successful Google Sign-In
-                              if (!mounted) return;
-                              
-                              final user = userCredential.user;
-                              if (user != null) {
-                                // Check if user is a conductor
-                                String email = user.email!;
-                                String username = email.split('@').first;
-                                String conductorDocId = username[0].toUpperCase() + username.substring(1);
+                    // Social login buttons
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: isMobile
+                              ? 80.0
+                              : isTablet
+                                  ? 90.0
+                                  : 100.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Google Sign-In Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                try {
+                                  final userCredential =
+                                      await _authServices.SignInWithGoogle();
+                                  if (userCredential == null) return;
 
-                                final conductorDoc = await FirebaseFirestore.instance
-                                    .collection('conductors')
-                                    .doc(conductorDocId)
-                                    .get();
+                                  // Handle successful Google Sign-In
+                                  if (!mounted) return;
 
-                                if (!mounted) return;
+                                  final user = userCredential.user;
+                                  if (user != null) {
+                                    // Check if user is a conductor
+                                    String email = user.email!;
+                                    String username = email.split('@').first;
+                                    String conductorDocId =
+                                        username[0].toUpperCase() +
+                                            username.substring(1);
 
-                                if (conductorDoc.exists) {
-                                  final route = conductorDoc.data()?['route'] ?? '';
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ConductorFrom(role: 'Conductor', route: route),
+                                    final conductorDoc = await FirebaseFirestore
+                                        .instance
+                                        .collection('conductors')
+                                        .doc(conductorDocId)
+                                        .get();
+
+                                    if (!mounted) return;
+
+                                    if (conductorDoc.exists) {
+                                      final route =
+                                          conductorDoc.data()?['route'] ?? '';
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ConductorFrom(
+                                              role: 'Conductor', route: route),
+                                        ),
+                                      );
+                                    } else {
+                                      // Not a conductor, navigate as a normal user
+                                      Navigator.pushReplacementNamed(
+                                          context, '/user_selection');
+                                    }
+                                  }
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text("Google Sign-In Failed"),
+                                      content: Text(e.toString()),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.of(context).pop(),
+                                          child: Text("OK"),
+                                        ),
+                                      ],
                                     ),
                                   );
-                                } else {
-                                  // Not a conductor, navigate as a normal user
-                                  Navigator.pushReplacementNamed(context, '/user_selection');
                                 }
-                              }
-                            } catch (e) {
-                              if (!mounted) return;
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text("Google Sign-In Failed"),
-                                  content: Text(e.toString()),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: Text("OK"),
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 1),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: isMobile
+                                          ? 45.0
+                                          : isTablet
+                                              ? 48.0
+                                              : 50.0,
+                                      height: isMobile
+                                          ? 45.0
+                                          : isTablet
+                                              ? 48.0
+                                              : 50.0,
+                                      decoration: BoxDecoration(
+                                        color: Color(0x579B9B9B),
+                                        borderRadius:
+                                            BorderRadius.circular(isMobile
+                                                ? 22.5
+                                                : isTablet
+                                                    ? 24.0
+                                                    : 25.0),
+                                      ),
+                                      child: Center(
+                                        child: Image.asset(
+                                          'assets/google-icon.png',
+                                          width: isMobile
+                                              ? 25.0
+                                              : isTablet
+                                                  ? 28.0
+                                                  : 30.0,
+                                          height: isMobile
+                                              ? 25.0
+                                              : isTablet
+                                                  ? 28.0
+                                                  : 30.0,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
-                              );
-                            }
-                          },
-                          child: Image.asset(
-                            'assets/google-icon.png',
-                            height: 40,
-                            width: 40,
+                              ),
+                            ),
                           ),
-                        ),
 
-                        SizedBox(width: 5),
-
-                        // Phone Sign-In Icon
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(context,
-                                '/phone_login'); 
-                          },
-                          child: Image.asset(
-                            'assets/phone-call.png',
-                            height: 40,
-                            width: 40,
+                          // Twitter Sign-In Button
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                Navigator.pushNamed(context, '/phone_login');
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(vertical: 1),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: isMobile
+                                          ? 45.0
+                                          : isTablet
+                                              ? 48.0
+                                              : 50.0,
+                                      height: isMobile
+                                          ? 45.0
+                                          : isTablet
+                                              ? 48.0
+                                              : 50.0,
+                                      decoration: BoxDecoration(
+                                        color: Color(0x579B9B9B),
+                                        borderRadius:
+                                            BorderRadius.circular(isMobile
+                                                ? 22.5
+                                                : isTablet
+                                                    ? 24.0
+                                                    : 25.0),
+                                      ),
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.phone,
+                                          size: isMobile
+                                              ? 25.0
+                                              : isTablet
+                                                  ? 28.0
+                                                  : 30.0,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
+                      ),
+                    ),
 
-                        SizedBox(width: 5),
+                    SizedBox(
+                        height: isMobile
+                            ? 20.0
+                            : isTablet
+                                ? 22.0
+                                : 25.0),
 
-                        // Conductor Login Icon
-                        GestureDetector(
-                          onTap: () {
+                    // Conductor Login Button
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding * 0.9),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Color(0xFFE5E9F0),
+                            padding: EdgeInsets.all(isMobile
+                                ? 10.0
+                                : isTablet
+                                    ? 11.0
+                                    : 12.0),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -428,24 +658,48 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             );
                           },
-                          child: Container(
-                            height: 40,
-                            width: 40,
-                            decoration: BoxDecoration(
-                              color: Color(0xFFE5E9F0),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.directions_bus,
-                              color: Color(0xFF0091AD),
-                              size: 28,
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.directions_bus,
+                                color: Color(0xFF0091AD),
+                                size: isMobile
+                                    ? 18.0
+                                    : isTablet
+                                        ? 19.0
+                                        : 20.0,
+                              ),
+                              SizedBox(
+                                  width: isMobile
+                                      ? 6.0
+                                      : isTablet
+                                          ? 7.0
+                                          : 8.0),
+                              Text(
+                                'Conductor Login',
+                                style: GoogleFonts.outfit(
+                                  color: Color(0xFF0091AD),
+                                  fontSize: isMobile
+                                      ? 14.0
+                                      : isTablet
+                                          ? 15.0
+                                          : 16.0,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
+                      ),
                     ),
 
-                    SizedBox(height: 25),
+                    SizedBox(
+                        height: isMobile
+                            ? 20.0
+                            : isTablet
+                                ? 22.0
+                                : 25.0),
 
                     // Register section
                     Row(
@@ -453,15 +707,21 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         Text(
                           "Don't have an account? ",
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.w500,),
+                          style: GoogleFonts.outfit(
+                            fontWeight: FontWeight.w500,
+                            fontSize: registerFontSize,
+                          ),
                         ),
                         TextButton(
                           onPressed: () {
                             Navigator.pushNamed(context, '/register');
                           },
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4), // Increase tap area
-                            minimumSize: Size(0, 0), // Remove min size if needed
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 4), // Increase tap area
+                            minimumSize:
+                                Size(0, 0), // Remove min size if needed
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: Text(
@@ -469,6 +729,7 @@ class _LoginPageState extends State<LoginPage> {
                             style: GoogleFonts.outfit(
                               color: Color(0xFF0091AD),
                               fontWeight: FontWeight.w500,
+                              fontSize: registerFontSize,
                             ),
                           ),
                         ),

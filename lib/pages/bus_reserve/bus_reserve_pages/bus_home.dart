@@ -17,28 +17,221 @@ class _BusHomeState extends State<BusHome> {
   List<Map<String, dynamic>> _availableBuses = [];
   Set<String> _selectedBusIds = {};
   DateTime? _selectedDate;
+  String _availabilityFilter = 'all'; // 'all', 'available', 'unavailable'
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
-    _fetchAvailableBuses();
+    _fetchConductorBuses();
   }
 
-  Future<void> _fetchAvailableBuses() async {
-    final buses = await ReservationService.getAvailableBuses();
-
-    final filtered = _selectedDate == null
-        ? buses
-        : buses.where((bus) {
-            final List<dynamic> codingDays = bus['codingDays'] ?? [];
-            final selectedWeekday = DateFormat('EEEE').format(_selectedDate!);
-            return codingDays.contains(selectedWeekday);
-          }).toList();
-
+  Future<void> _fetchConductorBuses() async {
+    // Fetch all conductors formatted as bus data
+    final buses = await ReservationService.getAllConductorsAsBuses();
     setState(() {
-      _availableBuses = filtered;
+      _availableBuses = buses;
     });
+  }
+
+  List<Map<String, dynamic>> _getFilteredBuses() {
+    List<Map<String, dynamic>> filtered = List.from(_availableBuses);
+
+    // Apply availability filter
+    if (_availabilityFilter != 'all') {
+      filtered = filtered.where((bus) {
+        final conductor = bus['conductorData'] as Map<String, dynamic>?;
+        final plateNumber = bus['plateNumber'] as String? ?? '';
+        
+        // Check if bus is on its coding day (available for reservation)
+        final isOnCodingDay = ReservationService.isBusAvailableForReservation(
+          plateNumber, 
+          _selectedDate ?? DateTime.now()
+        );
+        
+        if (conductor == null) {
+          // No conductor data - bus is only available if it's on coding day
+          print('🔍 Filter - Bus: ${bus['name']}, No conductor data, IsOnCodingDay: $isOnCodingDay');
+          return _availabilityFilter == 'available' ? isOnCodingDay : !isOnCodingDay;
+        }
+        
+        // Get conductor availability status
+        final busAvailabilityStatus = ReservationService.getBusAvailabilityStatus(conductor);
+        
+        print('🔍 Filter - Bus: ${bus['name']}, Plate: $plateNumber');
+        print('🔍 Filter - IsOnCodingDay: $isOnCodingDay, BusAvailabilityStatus: $busAvailabilityStatus');
+        
+        // Bus is available if it's on its coding day AND conductor status is available
+        final isAvailable = isOnCodingDay && busAvailabilityStatus == 'available';
+        print('🔍 Filter - Final isAvailable: $isAvailable');
+        
+        if (_availabilityFilter == 'available') {
+          return isAvailable;
+        } else if (_availabilityFilter == 'unavailable') {
+          return !isAvailable;
+        }
+        
+        return true;
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  Widget _buildFilterChip(String label, String value) {
+    final isSelected = _availabilityFilter == value;
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _availabilityFilter = value;
+        });
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Color(0xFF0091AD) : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Color(0xFF0091AD) : Colors.grey.shade400,
+            width: 1,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.outfit(
+            color: isSelected ? Colors.white : Colors.black87,
+            fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConductorInfo(Map<String, dynamic> bus) {
+    final conductor = bus['conductorData'] as Map<String, dynamic>?;
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final plateNumber = bus['plateNumber'] as String? ?? '';
+    final isGrayedOut = ReservationService.isBusGrayedOutDueToCoding(plateNumber, _selectedDate);
+
+    if (conductor == null || conductor.isEmpty) {
+      final isOnCodingDay = ReservationService.isBusAvailableForReservation(
+        plateNumber, 
+        _selectedDate ?? DateTime.now()
+      );
+      
+      return RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: 'Status: ',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+              ),
+            ),
+            TextSpan(
+              text: isOnCodingDay ? 'Available - Coding Day' : 'Not on Coding Day',
+              style: GoogleFonts.outfit(
+                color: isOnCodingDay ? Colors.green : Colors.red,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final isOnCodingDay = ReservationService.isBusAvailableForReservation(
+      plateNumber, 
+      _selectedDate ?? DateTime.now()
+    );
+    final busAvailabilityStatus = ReservationService.getBusAvailabilityStatus(conductor);
+    
+    print('🔍 Bus: ${bus['name']}, Plate: $plateNumber');
+    print('🔍 Selected Date: ${_selectedDate ?? DateTime.now()}');
+    print('🔍 IsOnCodingDay: $isOnCodingDay');
+    print('🔍 BusAvailabilityStatus: $busAvailabilityStatus');
+    
+    // Bus is available if it's on its coding day AND conductor status is available
+    final isAvailable = isOnCodingDay && busAvailabilityStatus == 'available';
+    print('🔍 Final isAvailable: $isAvailable');
+    
+    final statusColor = isAvailable ? Colors.green : Colors.red;
+    final statusText = isAvailable ? 'Available' : 'Unavailable';
+    final statusReason = !isOnCodingDay ? ' (Not coding day)' : 
+                       busAvailabilityStatus != 'available' ? ' (Conductor busy)' : '';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Conductor: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                ),
+              ),
+              TextSpan(
+                text: conductor['name'] ?? 'Unknown',
+                style: GoogleFonts.outfit(
+                  color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+        ),
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Status: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                ),
+              ),
+              TextSpan(
+                text: '$statusText$statusReason',
+                style: GoogleFonts.outfit(
+                  color: statusColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (conductor['codingDay'] != null)
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: 'Coding Day: ',
+                  style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold,
+                    color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                  ),
+                ),
+                TextSpan(
+                  text: conductor['codingDay'] ?? 'Unknown',
+                  style: GoogleFonts.outfit(
+                    color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
+                    fontSize: isMobile ? 11 : isTablet ? 12 : 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
   }
 
   Future<void> _selectDate() async {
@@ -53,7 +246,7 @@ class _BusHomeState extends State<BusHome> {
       setState(() {
         _selectedDate = picked;
       });
-      _fetchAvailableBuses();
+      _fetchConductorBuses();
     }
   }
 
@@ -62,7 +255,6 @@ class _BusHomeState extends State<BusHome> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
     
     // Responsive sizing
     final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
@@ -211,6 +403,7 @@ class _BusHomeState extends State<BusHome> {
               padding: EdgeInsets.all(containerPadding),
               child: Column(
                 children: [
+                  // Date filter
                   if (_selectedDate != null)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -234,29 +427,62 @@ class _BusHomeState extends State<BusHome> {
                             setState(() {
                               _selectedDate = null;
                             });
-                            _fetchAvailableBuses();
+                            _fetchConductorBuses();
                           },
                         )
                       ],
+                    ),
+                  
+                  // Availability filter
+                  Container(
+                    margin: EdgeInsets.only(top: 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Filter:',
+                          style: GoogleFonts.outfit(
+                            fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              _buildFilterChip('All', 'all'),
+                              SizedBox(width: 8),
+                              _buildFilterChip('Available', 'available'),
+                              SizedBox(width: 8),
+                              _buildFilterChip('Unavailable', 'unavailable'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     ),
                 ],
               ),
             ),
           ),
-          _availableBuses.isEmpty
+          _getFilteredBuses().isEmpty
               ? const SliverFillRemaining(
                   child: Center(child: Text("No buses available.")),
                 )
               : SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
-                      final bus = _availableBuses[index];
+                      final bus = _getFilteredBuses()[index];
+                      final plateNumber = bus['plateNumber'] as String? ?? '';
+                      final effectiveDate = _selectedDate ?? DateTime.now();
+                      final isGrayedOut = ReservationService.isBusGrayedOutDueToCoding(plateNumber, effectiveDate);
+                      final isSelected = _selectedBusIds.contains(bus['id']);
+                      
                       return Container(
                         margin: EdgeInsets.symmetric(
                             vertical: marginSpacing, horizontal: horizontalMargin),
                         padding: EdgeInsets.all(containerPadding),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isGrayedOut ? Colors.grey.shade100 : Colors.white,
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
@@ -266,9 +492,11 @@ class _BusHomeState extends State<BusHome> {
                             ),
                           ],
                           border: Border.all(
-                            color: _selectedBusIds.contains(bus['id'])
+                            color: isSelected
                                 ? Colors.green
-                                : const Color(0xFF0091AD).withOpacity(0.7),
+                                : isGrayedOut
+                                    ? Colors.grey.shade400
+                                    : const Color(0xFF0091AD).withOpacity(0.7),
                             width: 2,
                           ),
                         ),
@@ -280,7 +508,7 @@ class _BusHomeState extends State<BusHome> {
                               child: Icon(
                                 Icons.directions_bus,
                                 size: iconSize,
-                                color: Color(0xFF0091AD),
+                                color: isGrayedOut ? Colors.grey.shade500 : Color(0xFF0091AD),
                               ),
                             ),
                             SizedBox(width: isMobile ? 12 : 16),
@@ -291,7 +519,7 @@ class _BusHomeState extends State<BusHome> {
                                 style: GoogleFonts.outfit(
                                   fontSize: busNameFontSize,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0091AD),
+                                  color: isGrayedOut ? Colors.grey.shade600 : Color(0xFF0091AD),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -308,16 +536,14 @@ class _BusHomeState extends State<BusHome> {
                                           text: 'Plate: ',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors
-                                                .black, // or your desired color
+                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
                                           ),
                                         ),
                                         TextSpan(
                                           text: '${bus['plateNumber']}',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.normal,
-                                            color: Colors.grey[
-                                                800], // or any style you want
+                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
                                           ),
                                         ),
                                       ],
@@ -330,7 +556,7 @@ class _BusHomeState extends State<BusHome> {
                                           text: 'Available: ',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black,
+                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
                                           ),
                                         ),
                                         TextSpan(
@@ -338,7 +564,7 @@ class _BusHomeState extends State<BusHome> {
                                                   bus['codingDays'])
                                               .join(', '),
                                           style: GoogleFonts.outfit(
-                                            color: Colors.grey[800],
+                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
                                           ),
                                         ),
                                       ],
@@ -351,18 +577,20 @@ class _BusHomeState extends State<BusHome> {
                                           text: 'Price: ',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black,
+                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
                                           ),
                                         ),
                                         TextSpan(
                                           text: '${bus['Price']}',
                                           style: GoogleFonts.outfit(
-                                            color: Colors.grey[800],
+                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
+                                  // Conductor information
+                                  _buildConductorInfo(bus),
                                 ],
                               ),
                             ),
@@ -371,7 +599,26 @@ class _BusHomeState extends State<BusHome> {
                               child: Checkbox(
                                 activeColor: Color(0xFF0091AD),
                                 value: _selectedBusIds.contains(bus['id']),
-                                onChanged: (bool? selected) {
+                                onChanged: isGrayedOut ? null : (bool? selected) {
+                                  // Double check if bus is available for the current/selected date
+                                  final conductor = bus['conductorData'] as Map<String, dynamic>?;
+                                  final effectiveDate = _selectedDate ?? DateTime.now();
+                                  final isOnCodingDay = ReservationService.isBusAvailableForReservation(plateNumber, effectiveDate);
+                                  final busAvailabilityStatus = conductor != null ? ReservationService.getBusAvailabilityStatus(conductor) : 'available';
+                                  final isBusActuallyAvailable = isOnCodingDay && busAvailabilityStatus == 'available';
+                                  
+                                  if (!isBusActuallyAvailable) {
+                                    // Show a snackbar or toast to inform user why they can't select
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Bus is not available ${!isOnCodingDay ? '(not on coding day)' : '(conductor busy)'}'),
+                                        duration: Duration(seconds: 2),
+                                        backgroundColor: Colors.red.shade400,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  
                                   setState(() {
                                     final id = bus['id'];
                                     if (selected == true) {
@@ -387,7 +634,7 @@ class _BusHomeState extends State<BusHome> {
                         ),
                       );
                     },
-                    childCount: _availableBuses.length,
+                    childCount: _getFilteredBuses().length,
                   ),
                 ),
         ],

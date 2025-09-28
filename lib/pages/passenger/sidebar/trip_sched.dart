@@ -59,7 +59,7 @@ class TripSchedPage extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: Icon(Icons.directions_bus),
+              leading: Icon(Icons.swap_horiz),
               title: Text(
                 'Role Selection',
                 style: GoogleFonts.outfit(
@@ -76,19 +76,6 @@ class TripSchedPage extends StatelessWidget {
               leading: Icon(Icons.schedule),
               title: Text(
                 'Trip Schedules',
-                style: GoogleFonts.outfit(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.map),
-              title: Text(
-                'Batrasco Routes',
                 style: GoogleFonts.outfit(
                   fontSize: 18,
                   fontWeight: FontWeight.w500,

@@ -3,8 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
-import 'package:b_go/responsiveness/responsive_page.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/auth/auth_services.dart';
+import 'package:b_go/auth/otp_verification_page.dart';
+import 'package:b_go/auth/custom_phone_auth.dart';
 
 class RegisterPhonePage extends StatefulWidget {
   const RegisterPhonePage({super.key});
@@ -15,11 +17,9 @@ class RegisterPhonePage extends StatefulWidget {
 
 class _RegisterPhonePageState extends State<RegisterPhonePage> {
   final TextEditingController phoneController = TextEditingController();
-  final TextEditingController otpController = TextEditingController();
   final AuthServices _authServices = AuthServices();
+  final CustomPhoneAuth _customPhoneAuth = CustomPhoneAuth();
 
-  String? _verificationId;
-  bool _otpSent = false;
   bool _isLoading = false;
   bool agreedToTerms = false;
 
@@ -36,30 +36,92 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
   @override
   void dispose() {
     phoneController.dispose();
-    otpController.dispose();
     super.dispose();
+  }
+
+  // Custom snackbar widget
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
   }
 
   Future<void> _sendOTP() async {
     if (!agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content:
-              Text('You must agree to the Terms and Conditions to sign up.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('You must agree to the Terms and Conditions to sign up.', 'warning');
       return;
     }
 
     String phone = phoneController.text.trim();
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter a phone number.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Please enter a phone number.', 'warning');
       return;
     }
 
@@ -70,21 +132,19 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     // Check if phone number already exists
     bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
     if (isRegistered) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('This phone number is already registered. Please login instead.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('This phone number is already registered. Please login instead.', 'error');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
+      // Use the custom phone auth service that bypasses reCAPTCHA
+      await _customPhoneAuth.sendOTPWithoutCaptcha(
         phoneNumber: fullPhone,
-        verificationCompleted: (PhoneAuthCredential credential) async {
+        onVerificationCompleted: (PhoneAuthCredential credential) async {
+          // This will be called if verification completes automatically
+          // Usually happens on Android when SMS is auto-retrieved
           try {
             UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
             final user = userCredential.user;
@@ -99,112 +159,103 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             }
           } catch (e) {
             setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Registration failed. Please try again.'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            _showCustomSnackBar('Registration failed. Please try again.', 'error');
           }
         },
-        verificationFailed: (FirebaseAuthException e) {
+        onVerificationFailed: (FirebaseAuthException e) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.message ?? 'Verification failed'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          String errorMessage = 'Verification failed';
+          
+          // Handle specific error cases
+          switch (e.code) {
+            case 'invalid-phone-number':
+              errorMessage = 'Invalid phone number format';
+              break;
+            case 'too-many-requests':
+              errorMessage = 'Too many attempts. Please try again later.';
+              break;
+            case 'quota-exceeded':
+              errorMessage = 'SMS quota exceeded. Please try again later.';
+              break;
+            case 'app-not-authorized':
+              errorMessage = 'App not authorized. Please try again.';
+              break;
+            case 'captcha-check-failed':
+              errorMessage = 'Verification failed. Please try again.';
+              break;
+            case 'platform-error':
+              errorMessage = 'Platform error. Please try again.';
+              break;
+            case 'unknown-error':
+              errorMessage = 'Failed to send OTP. Please try again.';
+              break;
+            default:
+              errorMessage = e.message ?? 'Verification failed';
+          }
+          
+          _showCustomSnackBar(errorMessage, 'error');
         },
-        codeSent: (String verificationId, int? resendToken) {
+        onCodeSent: (String verificationId, int? resendToken) {
           setState(() {
-            _verificationId = verificationId;
-            _otpSent = true;
             _isLoading = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('OTP sent to $fullPhone'),
-              backgroundColor: Colors.green,
+          
+          // Show success message
+          _showCustomSnackBar('OTP sent successfully to $fullPhone', 'success');
+          
+          // Navigate to OTP verification page
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OTPVerificationPage(
+                phoneNumber: fullPhone,
+                verificationId: verificationId,
+                isRegistration: true,
+                onVerificationSuccess: () async {
+                  // After successful OTP verification and user creation, navigate to user selection
+                  print('OTP verification successful, navigating to user selection');
+                  Navigator.pushReplacementNamed(context, '/user_selection');
+                },
+              ),
             ),
           );
         },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          setState(() => _verificationId = verificationId);
+        onCodeAutoRetrievalTimeout: (String verificationId) {
+          // Show timeout message
+          _showCustomSnackBar('OTP auto-retrieval timed out. Please enter the code manually.', 'warning');
         },
       );
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send OTP. Please try again.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showCustomSnackBar('Failed to send OTP. Please try again.', 'error');
     }
   }
 
-  Future<void> _verifyOTP() async {
-    if (_verificationId == null) return;
-    
-    String otp = otpController.text.trim();
-    if (otp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Please enter the OTP.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
 
-    setState(() => _isLoading = true);
-    
-    try {
-      String phone = phoneController.text.trim();
-      if (phone.startsWith('0')) phone = phone.substring(1);
-      String fullPhone = selectedCountryCode + phone;
-
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
-      );
-
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-
-      final user = userCredential.user;
-      if (user != null) {
-        // Save user to Firestore
-        await _authServices.savePhoneUserToFirestore(
-          uid: user.uid,
-          phoneNumber: fullPhone,
-        );
-        
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Registration successful!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pushReplacementNamed(context, '/user_selection');
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invalid OTP or verification failed'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-        Responsive responsive = Responsive(context);
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    
+    // Responsive sizing
+    final logoSize = isMobile ? 120.0 : isTablet ? 140.0 : 150.0;
+    final titleFontSize = isMobile ? 35.0 : isTablet ? 40.0 : 45.0;
+    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 19.0 : 20.0;
+    final textFieldFontSize = isMobile ? 14.0 : isTablet ? 15.0 : 16.0;
+    final hintFontSize = isMobile ? 12.0 : isTablet ? 13.0 : 14.0;
+    final registerFontSize = isMobile ? 13.0 : isTablet ? 13.0 : 14.0;
+    
+    // Responsive padding and spacing
+    final horizontalPadding = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final fieldSpacing = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
+    final containerPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Color(0xFFE5E9F0),
       body: Stack(
         children: [
           Container(
@@ -215,7 +266,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = 150;
+                double logoWidth = logoSize;
                 math.min(constraints.maxWidth * 0.4, maxLogoWidth);
                 // Use Center to make sure the logo always stays in the middle, even if alignment changes
                 return Transform.translate(
@@ -238,27 +289,14 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                 margin: EdgeInsets.only(
                     top: MediaQuery.of(context).size.height * 0.24),
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12,
-                      blurRadius: 16,
-                      offset: Offset(0, -4),
-                    ),
-                  ],
-                ),
-                  padding: EdgeInsets.only(
-                    top: responsive.height * 0.05,
-                    left: responsive.width * 0.07,
-                    right: responsive.width * 0.07,
-                    bottom: responsive.height * 0.25,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding, 
+                    vertical: isMobile ? 32.0 : isTablet ? 36.0 : 40.0,
                   ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(height: 20),
+                    SizedBox(height: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
                     Center(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -267,13 +305,13 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           Text(
                             "Hello!",
                             style: GoogleFonts.outfit(
-                              fontSize: 45,
+                              fontSize: titleFontSize,
                             ),
                           ),
                           Text(
                             "Register Your Phone Number!",
                             style: GoogleFonts.outfit(
-                              fontSize: 18,
+                              fontSize: subtitleFontSize,
                               fontWeight: FontWeight.w500,
                               color: Colors.black,
                             ),
@@ -281,21 +319,24 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: fieldSpacing),
                     // --- All the rest of the registration content goes here, directly in this Column ---
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                       child: Container(
                         decoration: BoxDecoration(
                           color: Color(0xFFE5E9F0),
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade400,
+                            width: 1.0,
+                          ),
                         ),
                         child: Row(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.only(
-                                  left: 14.0, right: 4.0),
+                              padding: EdgeInsets.only(
+                                  left: containerPadding * 0.8, right: containerPadding * 0.2),
                               child: DropdownButtonHideUnderline(
                                 child: DropdownButton<String>(
                                   value: selectedCountryCode,
@@ -304,17 +345,15 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                       value: country['code'],
                                       child: Text(country['code']!,
                                           style: GoogleFonts.outfit(
-                                              fontWeight:
-                                                  FontWeight.w500)),
+                                              fontWeight: FontWeight.w500,
+                                              fontSize: textFieldFontSize)),
                                     );
                                   }).toList(),
-                                  onChanged: !_otpSent
-                                      ? (value) {
-                                          setState(() {
-                                            selectedCountryCode = value!;
-                                          });
-                                        }
-                                      : null,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      selectedCountryCode = value!;
+                                    });
+                                  },
                                 ),
                               ),
                             ),
@@ -322,9 +361,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                               child: TextField(
                                 controller: phoneController,
                                 keyboardType: TextInputType.phone,
-                                enabled: !_otpSent,
+                                enabled: true,
                                 style: GoogleFonts.outfit(
                                   color: Colors.black,
+                                  fontSize: textFieldFontSize,
                                 ),
                                 decoration: InputDecoration(
                                   border: InputBorder.none,
@@ -332,6 +372,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                   hintStyle: GoogleFonts.outfit(
                                     color: Colors.black54,
                                     fontWeight: FontWeight.w700,
+                                    fontSize: hintFontSize,
                                   ),
                                 ),
                               ),
@@ -340,39 +381,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
-                    if (_otpSent)
-                      Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 25.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Color(0xFFE5E9F0),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 20.0),
-                            child: TextField(
-                              controller: otpController,
-                              keyboardType: TextInputType.number,
-                              style: GoogleFonts.outfit(
-                                color: Colors.black,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: "Enter OTP",
-                                hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                    SizedBox(height: fieldSpacing),
+
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                       child: Row(
                         children: [
                           Checkbox(
@@ -387,7 +399,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                             child: RichText(
                               text: TextSpan(
                                 style: GoogleFonts.outfit(
-                                    color: Colors.black),
+                                    color: Colors.black,
+                                    fontSize: hintFontSize),
                                 children: [
                                   TextSpan(
                                     text: 'I agree to the ',
@@ -406,8 +419,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                         'Terms and Conditions',
                                         style: GoogleFonts.outfit(
                                           color: Colors.blue,
-                                          decoration: TextDecoration.underline,
                                           fontWeight: FontWeight.w500,
+                                          fontSize: hintFontSize,
                                         ),
                                       ),
                                     ),
@@ -419,10 +432,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 20),
+                    SizedBox(height: fieldSpacing),
                     Padding(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 25.0),
+                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                       child: _isLoading
                           ? const Center(
                               child: CircularProgressIndicator())
@@ -431,25 +443,25 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                 backgroundColor: phoneController.text.trim().isNotEmpty 
                                     ? Color(0xFF0091AD) 
                                     : Colors.grey,
-                                minimumSize: Size(double.infinity, 60),
+                                minimumSize: Size(double.infinity, buttonHeight),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
                               onPressed: agreedToTerms
-                                  ? (_otpSent ? _verifyOTP : _sendOTP)
+                                  ? _sendOTP
                                   : null,
                               child: Text(
-                                _otpSent ? 'Verify OTP' : 'Send OTP',
+                                'Send OTP',
                                 style: GoogleFonts.outfit(
                                   color: Colors.white,
-                                  fontSize: 20,
+                                  fontSize: buttonFontSize,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
                     ),
-                    SizedBox(height: 30),
+                    SizedBox(height: isMobile ? 290.0 : isTablet ? 300.0 : 305.0),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -457,6 +469,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           'Already have an account?',
                           style: GoogleFonts.outfit(
                             fontWeight: FontWeight.w500,
+                            fontSize: registerFontSize,
                           ),
                         ),
                         GestureDetector(
@@ -468,6 +481,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                             style: GoogleFonts.outfit(
                               color: Colors.blue,
                               fontWeight: FontWeight.w500,
+                              fontSize: registerFontSize,
                             ),
                           ),
                         )

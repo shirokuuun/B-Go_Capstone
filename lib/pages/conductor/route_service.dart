@@ -468,11 +468,9 @@ static Future<void> updateManualTicketStatus(
 
       // Update remittance summary
       try {
-        Map<String, dynamic>? remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
-        if (remittanceSummary != null) {
-          await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
-          print('✅ Remittance summary updated for $date');
-        }
+        Map<String, dynamic> remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
+        await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
+        print('✅ Remittance summary updated for $date');
       } catch (e) {
         print('Error updating remittance summary: $e');
       }
@@ -623,11 +621,9 @@ static Future<void> updateQRTicketStatus(
 
       // Update remittance summary
       try {
-        Map<String, dynamic>? remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
-        if (remittanceSummary != null) {
-          await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
-          print('✅ Remittance summary updated for $date');
-        }
+        Map<String, dynamic> remittanceSummary = await RemittanceService.calculateDailyRemittance(conductorId, date);
+        await RemittanceService.saveRemittanceSummary(conductorId, date, remittanceSummary);
+        print('✅ Remittance summary updated for $date');
       } catch (e) {
         print('Error updating remittance summary: $e');
       }
@@ -709,38 +705,29 @@ static Future<List<Map<String, dynamic>>> fetchTickets({
   try {
     print('🔍 Fetching tickets for conductor: $conductorId, date: $date');
     
-    // First, get the dailyTrips document for the date
-    final dailyTripsDoc = await FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorId)
-        .collection('dailyTrips')
-        .doc(date)
-        .get();
-
-    if (!dailyTripsDoc.exists) {
-      print('⚠️ No dailyTrips document found for date: $date');
-      return [];
-    }
-
-    // Since listCollections() is not available, we'll use a different approach
-    // We'll check for common trip collection names and get tickets from them
+    // Only fetch from remittance collection since that's where status is updated
     List<Map<String, dynamic>> allTickets = [];
     
-    // Check for trip1, trip2, trip3 collections
-    for (int i = 1; i <= 10; i++) { // Check up to 5 trips
-      try {
-        final tripCollection = dailyTripsDoc.reference.collection('trip$i');
-        final ticketsDoc = tripCollection.doc('tickets');
-        final ticketsCollection = ticketsDoc.collection('tickets');
-        
-        final ticketsSnapshot = await ticketsCollection.get();
-        
-        if (ticketsSnapshot.docs.isNotEmpty) {
-          print('🔍 Found tickets in trip$i: ${ticketsSnapshot.docs.length}');
+    try {
+      final remittanceDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(date)
+          .get();
+
+      if (remittanceDoc.exists) {
+        // Check tickets collection in remittance
+        final remittanceTicketsSnapshot = await remittanceDoc.reference
+            .collection('tickets')
+            .get();
+
+        if (remittanceTicketsSnapshot.docs.isNotEmpty) {
+          print('🔍 Found tickets in remittance: ${remittanceTicketsSnapshot.docs.length}');
           
-          for (var ticketDoc in ticketsSnapshot.docs) {
+          for (var ticketDoc in remittanceTicketsSnapshot.docs) {
             final data = ticketDoc.data();
-            print('🔍 Found ticket: ${ticketDoc.id} with data: $data');
+            print('🔍 Found remittance ticket: ${ticketDoc.id} with data: $data');
             
             allTickets.add({
               'id': ticketDoc.id,
@@ -754,14 +741,19 @@ static Future<List<Map<String, dynamic>>> fetchTickets({
               'startKm': data['startKm'],
               'endKm': data['endKm'],
               'timestamp': data['timestamp'],
+              'status': data['status'] ?? 'boarded',
+              'ticketType': data['ticketType'] ?? 'manual',
+              'dropOffTimestamp': data['dropOffTimestamp'],
+              'dropOffLocation': data['dropOffLocation'],
+              'geofenceStatus': data['geofenceStatus'],
             });
           }
         }
-      } catch (e) {
-        // If trip collection doesn't exist, continue to next
-        print('🔍 Trip $i not found or error: $e');
-        continue;
+      } else {
+        print('⚠️ No remittance document found for date: $date');
       }
+    } catch (e) {
+      print('🔍 Remittance collection not found or error: $e');
     }
 
     print('✅ Total tickets found: ${allTickets.length}');

@@ -184,6 +184,34 @@ class AuthServices {
     );
   }
 
+  // Phone Authentication - Send OTP (Bypass reCAPTCHA)
+  Future<void> sendOTPWithoutCaptcha({
+    required String phoneNumber,
+    required PhoneCodeSent onCodeSent,
+    required PhoneVerificationFailed onVerificationFailed,
+    required PhoneVerificationCompleted onVerificationCompleted,
+  }) async {
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        timeout: const Duration(seconds: 60),
+        forceResendingToken: null,
+        verificationCompleted: onVerificationCompleted,
+        verificationFailed: onVerificationFailed,
+        codeSent: onCodeSent,
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Handle timeout
+        },
+      );
+    } catch (e) {
+      // Handle any unexpected errors
+      onVerificationFailed(FirebaseAuthException(
+        code: 'unknown-error',
+        message: 'Failed to send OTP. Please try again.',
+      ));
+    }
+  }
+
   // Phone Authentication - Verify OTP
   Future<UserCredential> verifyOTP({
     required String verificationId,

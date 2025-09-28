@@ -7,7 +7,9 @@ import 'dart:convert';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
 import 'package:b_go/pages/conductor/remittance_service.dart';
+import 'package:b_go/services/direction_validation_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:b_go/pages/passenger/services/pre_book.dart';
 
 class ConductorDeparture extends StatefulWidget {
   final String route;
@@ -120,6 +122,41 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
       if (conductorDoc.docs.isNotEmpty) {
         final conductorDocId = conductorDoc.docs.first.id;
+        
+        // Check if location tracking is active
+        final conductorData = conductorDoc.docs.first.data();
+        final isLocationTrackingActive = conductorData['isOnline'] ?? false;
+        
+        if (!isLocationTrackingActive) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Location tracking must be active before starting a trip. Please enable location tracking in the Dashboard first.',
+                style: GoogleFonts.outfit(fontSize: 14),
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+              action: SnackBarAction(
+                label: 'Go to Dashboard',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (context) => ConductorHome(
+                        route: widget.route,
+                        role: widget.role,
+                        placeCollection: selectedPlaceCollection,
+                        selectedIndex: 0, // Dashboard tab
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+          return;
+        }
+        
         final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
         
         // Check if there's an incomplete round trip for today
@@ -213,13 +250,12 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                  selectedPlaceCollection = oppositePlaceCollection;
                });
              } else if (dailyTripData?['trip$currentTrip']?['isComplete'] == false) {
-               // Current trip is in progress, continue with it
-               final currentTripPlaceCollection = dailyTripData?['trip$currentTrip']?['placeCollection'] ?? 'Place';
-               final currentTripDirection = dailyTripData?['trip$currentTrip']?['direction'] ?? 'Place to Place 2';
-               
-               setState(() {
-                 selectedPlaceCollection = currentTripPlaceCollection;
-               });
+              // Current trip is in progress, continue with it
+              final currentTripPlaceCollection = dailyTripData?['trip$currentTrip']?['placeCollection'] ?? 'Place';
+              
+              setState(() {
+                selectedPlaceCollection = currentTripPlaceCollection;
+              });
                
                // No need to update dailyTrips document since the current trip is already set up
              } else if (dailyTripData?['isRoundTripComplete'] == true) {
@@ -336,7 +372,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         final activeTrip = conductorData['activeTrip'];
         
         if (activeTrip != null) {
-          final currentDirection = activeTrip['direction'];
           final currentPlaceCollection = activeTrip['placeCollection'];
           final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
           
@@ -383,6 +418,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('Error moving tickets to remittance: $e');
           }
           
+          // Process pre-bookings for trip end - mark as cancelled
+          try {
+            await PreBook.processTripEndForPreBookings(conductorDocId, today, currentTripId);
+            print('✅ Pre-bookings processed for trip end');
+          } catch (e) {
+            print('❌ Error processing pre-bookings for trip end: $e');
+          }
+
           // Check if this is trip1 or trip2 and handle accordingly
           try {
             final dailyTripDoc = await FirebaseFirestore.instance
@@ -844,6 +887,48 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
                   SizedBox(height: 32),
 
+                  // Location Tracking Requirement Notice
+                  if (!isTripActive) ...[
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.blue[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue[200]!),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Before Starting Your Trip',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            '• Location tracking must be enabled in the Dashboard\n'
+                            '• This ensures passengers can see your bus location\n'
+                            '• Enable tracking before selecting your trip direction',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              color: Colors.blue[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 24),
+                  ],
+
                   // Action Buttons
                   if (isTripActive) ...[
                     // Continue Trip Button
@@ -892,27 +977,89 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                       ),
                     ),
                   ] else ...[
-                    // Start New Trip Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF02A11A),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: _startNewTrip,
-                        child: Text(
-                          'Start Trip',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
+                    // Location Tracking Status Check
+                    StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('conductors')
+                          .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                          .limit(1)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        }
+
+                        final docs = snapshot.data?.docs ?? [];
+                        if (docs.isEmpty) {
+                          return SizedBox.shrink();
+                        }
+
+                        final conductorData = docs.first.data() as Map<String, dynamic>;
+                        final isLocationTrackingActive = conductorData['isOnline'] ?? false;
+
+                        return Column(
+                          children: [
+                            // Location tracking status indicator
+                            Container(
+                              padding: EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isLocationTrackingActive ? Colors.green[50] : Colors.red[50],
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isLocationTrackingActive ? Colors.green[200]! : Colors.red[200]!,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isLocationTrackingActive ? Icons.location_on : Icons.location_off,
+                                    color: isLocationTrackingActive ? Colors.green[700] : Colors.red[700],
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      isLocationTrackingActive 
+                                          ? 'Location tracking is active - You can start your trip'
+                                          : 'Location tracking is required - Please enable it in Dashboard first',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 14,
+                                        color: isLocationTrackingActive ? Colors.green[700] : Colors.red[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            // Start New Trip Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: isLocationTrackingActive 
+                                      ? const Color(0xFF02A11A) 
+                                      : Colors.grey[400],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                onPressed: isLocationTrackingActive ? _startNewTrip : null,
+                                child: Text(
+                                  'Start Trip',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ],
@@ -1101,6 +1248,30 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   
   if (conductorRoute != route) {
     throw Exception('Invalid route. You are a $conductorRoute conductor but trying to scan a $route $type. Only $conductorRoute $type can be scanned.');
+  }
+
+  // Validate direction compatibility for pre-tickets
+  if (type == 'preTicket') {
+    final passengerDirection = data['direction'];
+    final passengerPlaceCollection = data['placeCollection'];
+    
+    if (passengerDirection != null && passengerPlaceCollection != null) {
+      final isDirectionCompatible = await DirectionValidationService.validateDirectionCompatibilityByCollection(
+        passengerRoute: route,
+        passengerPlaceCollection: passengerPlaceCollection,
+        conductorUid: user.uid,
+      );
+      
+      if (!isDirectionCompatible) {
+        // Get conductor's active trip direction for better error message
+        final activeTrip = conductorData['activeTrip'];
+        final conductorDirection = activeTrip?['direction'] ?? 'Unknown';
+        
+        throw Exception(
+          'Direction mismatch! Your ticket is for "$passengerDirection" but the conductor is currently on "$conductorDirection" trip. Please wait for the correct direction or contact the conductor.'
+        );
+      }
+    }
   }
   
   final currentPassengerCount = conductorData['passengerCount'] ?? 0;

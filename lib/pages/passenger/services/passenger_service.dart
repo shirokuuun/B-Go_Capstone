@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:b_go/pages/passenger/services/bus_picker.dart';
 
 class PassengerService extends StatelessWidget {
   const PassengerService({super.key});
@@ -10,7 +11,6 @@ class PassengerService extends StatelessWidget {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
     
     // Responsive sizing
     final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
@@ -115,13 +115,12 @@ class PassengerService extends StatelessWidget {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: Text('Pre-Booking Notice'),
+                        title: Text('Pre-Booking Notice', style: GoogleFonts.outfit(fontSize: isMobile ? 16 : 18)),
                         content: Text(
                           'By using Pre-Booking, you are reserving a guaranteed seat for the entire trip (from the starting point to the last stop). The payment is fixed for the full route. Do you want to continue?',
                           style: GoogleFonts.outfit(
                             fontSize: isMobile ? 14 : 16,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF555555),
                           ),
                         ),
                         actions: [
@@ -130,7 +129,7 @@ class PassengerService extends StatelessWidget {
                             child: Text(
                               'Cancel',
                               style: GoogleFonts.outfit(
-                                fontSize: isMobile ? 16 : 18,
+                                fontSize: isMobile ? 14 : 18,
                                 color: Colors.red,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -142,12 +141,17 @@ class PassengerService extends StatelessWidget {
                             ),
                             onPressed: () {
                               Navigator.of(context).pop();
-                              Navigator.pushNamed(context, '/pre_book');
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const BusPicker(),
+                                ),
+                              );
                             },
                             child: Text(
                               'Continue',
                               style: GoogleFonts.outfit(
-                                fontSize: isMobile ? 16 : 18,
+                                fontSize: isMobile ? 14 : 18,
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
                               ),

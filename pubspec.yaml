@@ -52,6 +52,11 @@ dependencies:
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   responsive_framework: ^1.5.1
+  url_launcher: ^6.3.2
+  http: ^1.5.0
+  shared_preferences: ^2.5.3
+  flutter_background_service: ^5.1.0
+  flutter_local_notifications: ^19.4.2
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +78,12 @@ flutter:
 
   assets:
     - .env
+    - assets/bus_red.png
+    - assets/bus_blue.png
+    - assets/bus_green.png
+    - assets/bus_yellow.png
+    - assets/bus_purple.png
+    - assets/bus_orange.png
     - assets/bus.png
     - assets/bus2.png
     - assets/ticket.png
@@ -90,6 +101,7 @@ flutter:
     - assets/photo-camera.png
     - assets/phone-call.png
     - assets/batrasco_bus.jpg
+    - assets/payment-qr.jpg
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
 
 class RemittanceService {
   static Future<Map<String, dynamic>> calculateDailyRemittance(String conductorId, String date) async {
@@ -11,6 +10,16 @@ class RemittanceService {
           .collection('remittance')
           .doc(date)
           .collection('tickets')
+          .get();
+
+      // Get all pre-bookings from remittance tickets collection for the day
+      final preBookingsSnapshot = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(date)
+          .collection('tickets')
+          .where('documentType', isEqualTo: 'preBooking')
           .get();
 
       int totalPassengers = 0;
@@ -43,7 +52,38 @@ class RemittanceService {
           'quantity': quantity,
           'totalFare': fare,
           'timestamp': ticketData['timestamp'],
-          'documentType': ticketData['documentType'] ?? 'ticket',
+          'documentType': ticketData['documentType'] ?? 'preTicket',
+          'source': 'remittance',
+        });
+      }
+
+      // Process pre-bookings from remittance tickets collection
+      for (var preBooking in preBookingsSnapshot.docs) {
+        final preBookingData = preBooking.data();
+        
+        // Extract passenger count
+        final quantity = preBookingData['quantity'] ?? 1;
+        totalPassengers += (quantity is int) ? quantity : (quantity as num).toInt();
+        
+        // Extract total fare
+        final fare = preBookingData['totalFare'];
+        if (fare != null) {
+          if (fare is String) {
+            totalFare += double.tryParse(fare) ?? 0.0;
+          } else if (fare is num) {
+            totalFare += fare.toDouble();
+          }
+        }
+        
+        // Store pre-booking details for breakdown
+        ticketDetails.add({
+          'ticketId': preBooking.id,
+          'from': preBookingData['from'] ?? '',
+          'to': preBookingData['to'] ?? '',
+          'quantity': quantity,
+          'totalFare': fare,
+          'timestamp': preBookingData['timestamp'],
+          'documentType': 'preBooking',
           'source': 'remittance',
         });
       }
@@ -138,7 +178,7 @@ class RemittanceService {
         'totalPassengers': totalPassengers,
         'totalFare': totalFare,
         'totalFareFormatted': '₱${totalFare.toStringAsFixed(2)}',
-        'ticketCount': remittanceSnapshot.docs.length,
+        'ticketCount': remittanceSnapshot.docs.length + preBookingsSnapshot.docs.length,
         'ticketDetails': ticketDetails,
         'dailyTripInfo': dailyTripInfo,
         'calculatedAt': FieldValue.serverTimestamp(),

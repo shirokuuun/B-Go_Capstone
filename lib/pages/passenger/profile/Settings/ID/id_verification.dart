@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:responsive_framework/responsive_framework.dart';
 
 class IDVerificationReviewPage extends StatefulWidget {
   const IDVerificationReviewPage({Key? key}) : super(key: key);
@@ -92,13 +93,34 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final height = MediaQuery.of(context).size.height;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final bodyFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final cardRadius = 12.0;
+
     final cyan = const Color(0xFF0091AD);
-    final paddingH = width * 0.07;
-    final fontSizeTitle = width * 0.05;
-    final fontSizeBody = width * 0.041;
-    final cardRadius = width * 0.03;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -113,17 +135,17 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
           style: GoogleFonts.outfit(
             color: Colors.white,
             fontWeight: FontWeight.w500,
-            fontSize: fontSizeTitle,
+            fontSize: appBarFontSize,
           ),
         ),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: width * 0.04),
+          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: height - MediaQuery.of(context).padding.top - kToolbarHeight - width * 0.08,
+              minHeight: MediaQuery.of(context).size.height - MediaQuery.of(context).padding.top - kToolbarHeight - 80,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -132,7 +154,7 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                   Text(
                     'ID Type: $idType',
                     style: GoogleFonts.outfit(
-                        fontSize: fontSizeBody, fontWeight: FontWeight.w600, color: cyan),
+                        fontSize: bodyFontSize, fontWeight: FontWeight.w600, color: cyan),
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 8),
@@ -140,20 +162,20 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                 Text(
                   'Please make sure there is enough lighting and the ID lettering is clear before continuing',
                   style: GoogleFonts.outfit(
-                      fontSize: fontSizeBody, color: Colors.black87),
+                      fontSize: bodyFontSize, color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: width * 0.04),
-                _imageCard('Front', frontImage, width),
-                SizedBox(height: width * 0.03),
-                _imageCard('Back', backImage, width),
+                SizedBox(height: 16),
+                _imageCard('Front', frontImage, isMobile, isTablet),
+                SizedBox(height: 12),
+                _imageCard('Back', backImage, isMobile, isTablet),
                 if (error != null) ...[
                   SizedBox(height: 12),
                   Text(error!,
                       style: GoogleFonts.outfit(
-                          color: Colors.red, fontSize: fontSizeBody)),
+                          color: Colors.red, fontSize: bodyFontSize)),
                 ],
-                SizedBox(height: width * 0.04),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -172,7 +194,7 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                           Navigator.pop(context);
                         },
                         child: Text('Retake',
-                            style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                            style: GoogleFonts.outfit(fontSize: bodyFontSize)),
                       ),
                     ),
                     SizedBox(width: 12),
@@ -194,12 +216,12 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2))
                             : Text('Use this photo',
-                                style: GoogleFonts.outfit(fontSize: fontSizeBody)),
+                                style: GoogleFonts.outfit(fontSize: bodyFontSize)),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: width * 0.04), // Add bottom padding for scroll safety
+                SizedBox(height: 16), // Add bottom padding for scroll safety
               ],
             ),
           ),
@@ -208,26 +230,26 @@ class _IDVerificationReviewPageState extends State<IDVerificationReviewPage> {
     );
   }
 
-  Widget _imageCard(String label, File? image, double width) {
-    final height = MediaQuery.of(context).size.height;
-    final imageHeight = height * 0.21; // Responsive height calculation
+  Widget _imageCard(String label, File? image, bool isMobile, bool isTablet) {
+    final imageHeight = isMobile ? 120.0 : isTablet ? 140.0 : 160.0;
+    final iconSize = isMobile ? 40.0 : isTablet ? 50.0 : 60.0;
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
             style: GoogleFonts.outfit(
-                fontWeight: FontWeight.w500, fontSize: width * 0.04)),
+                fontWeight: FontWeight.w500, fontSize: 16.0)),
         SizedBox(height: 6),
         Container(
           width: double.infinity,
-          height: imageHeight, // Use responsive height
+          height: imageHeight,
           decoration: BoxDecoration(
             color: Colors.grey[300],
             borderRadius: BorderRadius.circular(12),
           ),
           child: image == null
-              ? Icon(Icons.badge, size: width * 0.13, color: Colors.black38)
+              ? Icon(Icons.badge, size: iconSize, color: Colors.black38)
               : ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: Image.file(image, fit: BoxFit.cover),

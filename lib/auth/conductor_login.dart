@@ -107,247 +107,214 @@ class _ConductorLoginState extends State<ConductorLogin> {
     
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height * 0.38,
-            decoration: BoxDecoration(
-              color: Color(0xFFE5E9F0),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = logoSize;
-                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
-                // Use Center to make sure the logo always stays in the middle, even if alignment changes
-                return Transform.translate(
-                  offset: Offset(0, -20),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/batrasco-logo.png',
-                      width: logoWidth,
-                      fit: BoxFit.contain,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo section - now scrollable
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+              Image.asset(
+                'assets/batrasco-logo.png',
+                width: logoSize,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+
+              // Login form content
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Login title
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Login",
+                          style: GoogleFonts.outfit(
+                            fontSize: titleFontSize,
+                          ),
+                        ),
+                        Text(
+                          "Welcome Back, Conductor!",
+                          style: GoogleFonts.outfit(
+                            fontSize: subtitleFontSize,
+                            color: const Color.fromARGB(255, 0, 0, 0),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
 
-          // --- LOGIN BOX ---
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.24),
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: isMobile
-                        ? 32.0
-                        : isTablet
-                            ? 36.0
-                            : 40.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                        height: isMobile
-                            ? 20.0
-                            : isTablet
-                                ? 25.0
-                                : 30.0),
-                    // --- LOGIN BOX ---
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Login",
-                            style: GoogleFonts.outfit(
-                              fontSize: titleFontSize,
-                            ),
-                          ),
-                          Text(
-                            "Welcome Back, Conductor!",
-                            style: GoogleFonts.outfit(
-                              fontSize: subtitleFontSize,
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  SizedBox(height: fieldSpacing),
 
-                    SizedBox(height: fieldSpacing),
-
-                    // Email
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
+                  // Email field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: _emailController,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Email",
-                              hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: hintFontSize),
-                            ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: _emailController,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Email",
+                            hintStyle: GoogleFonts.outfit(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w700,
+                                fontSize: hintFontSize),
                           ),
                         ),
                       ),
                     ),
+                  ),
 
-                    // Password
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
+                  // Password field
+                  SizedBox(height: fieldSpacing),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: _passwordController,
-                            obscureText: _obscurePassword,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Password",
-                              hintStyle: GoogleFonts.outfit(
-                                  color: Colors.black54,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: hintFontSize),
-                              suffixIcon: IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                                icon: Icon(
-                                  _obscurePassword
-                                      ? Icons.visibility_off
-                                      : Icons.visibility,
-                                  color: Colors.black54,
-                                ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Password",
+                            hintStyle: GoogleFonts.outfit(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w700,
+                                fontSize: hintFontSize),
+                            suffixIcon: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: Colors.black54,
                               ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: 10),
+                  ),
+                  SizedBox(height: 10),
 
-                    // Error message
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
+                  // Error message
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
                       ),
-                    ],
+                    ),
+                  ],
 
-                    // Sign in button
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: horizontalPadding * 0.9),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0091AD),
-                            padding: EdgeInsets.all(buttonPadding),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
+                  // Login button
+                  SizedBox(height: fieldSpacing),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0091AD),
+                          padding: EdgeInsets.all(buttonPadding),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          onPressed: () {
-                            _login();
-                          },
-                          child: Text(
-                            'Login',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: buttonFontSize,
-                            ),
+                        ),
+                        onPressed: () {
+                          _login();
+                        },
+                        child: Text(
+                          'Login',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: buttonFontSize,
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(height: isMobile ? 280.0 : isTablet ? 290.0 : 295.0),
+                  ),
+                  
+                  SizedBox(height: isMobile ? 50.0 : isTablet ? 60.0 : 70.0),
 
-                    // Register section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Not a conductor? ",
+                  // Register section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Not a conductor? ",
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w500,
+                          fontSize: registerFontSize,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/login');
+                        },
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                          minimumSize: Size(0, 0),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          "Sign In",
                           style: GoogleFonts.outfit(
+                            color: Color(0xFF0091AD),
                             fontWeight: FontWeight.w500,
                             fontSize: registerFontSize,
                           ),
                         ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/login');
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 2,
-                                vertical: 4), // Increase tap area
-                            minimumSize:
-                                Size(0, 0), // Remove min size if needed
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            "Sign In",
-                            style: GoogleFonts.outfit(
-                              color: Color(0xFF0091AD),
-                              fontWeight: FontWeight.w500,
-                              fontSize: registerFontSize,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                  
+                  // Add bottom padding
+                  SizedBox(height: isMobile ? 30.0 : 40.0),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

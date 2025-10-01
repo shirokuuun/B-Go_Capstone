@@ -207,360 +207,347 @@ class _RegisterPageState extends State<RegisterPage> {
     
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height * 0.38,
-            decoration: BoxDecoration(
-              color: Color(0xFFE5E9F0),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = logoSize;
-                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
-                // Use Center to make sure the logo always stays in the middle, even if alignment changes
-                return Transform.translate(
-                  offset: Offset(0, -20),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/batrasco-logo.png',
-                      width: logoWidth,
-                      fit: BoxFit.contain,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo section - now scrollable
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+              Image.asset(
+                'assets/batrasco-logo.png',
+                width: logoSize,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+
+              // Registration form content
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Hello!",
+                          style: GoogleFonts.outfit(
+                            fontSize: titleFontSize,
+                          ),
+                        ),
+                        Text(
+                          "Register Here!",
+                          style: GoogleFonts.outfit(
+                            fontSize: subtitleFontSize,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          // register form
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.24),
-                width: double.infinity,
-
-                padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding, 
-                    vertical: isMobile ? 32.0 : isTablet ? 36.0 : 40.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Hello!",
-                            style: GoogleFonts.outfit(
-                              fontSize: titleFontSize,
-                            ),
-                          ),
-                          Text(
-                            "Register Here!",
-                            style: GoogleFonts.outfit(
-                              fontSize: subtitleFontSize,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Name field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: nameController,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Enter your full name",
+                            hintStyle: GoogleFonts.outfit(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w700,
+                              fontSize: hintFontSize,
+                            ),
                           ),
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: nameController,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Email field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: emailController,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Email Address",
+                            hintStyle: GoogleFonts.outfit(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w700,
+                              fontSize: hintFontSize,
                             ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Enter your full name",
-                              hintStyle: GoogleFonts.outfit(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Password field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: passwordController,
+                          obscureText: _obscurePassword,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Password",
+                            hintStyle: GoogleFonts.outfit(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w700,
+                              fontSize: hintFontSize,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Confirm password field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(left: containerPadding),
+                        child: TextField(
+                          controller: confirmPasswordController,
+                          obscureText: _obscureConfirmPassword,
+                          style: GoogleFonts.outfit(
+                            color: Colors.black,
+                            fontSize: textFieldFontSize,
+                          ),
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            hintText: "Confirm your Password",
+                            hintStyle: GoogleFonts.outfit(
+                              color: Colors.black54,
+                              fontWeight: FontWeight.w700,
+                              fontSize: hintFontSize,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Terms and conditions checkbox
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: agreedToTerms,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              agreedToTerms = value ?? false;
+                            });
+                          },
+                        ),
+                        Flexible(
+                          child: RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.outfit(
+                                color: Colors.black,
                                 fontSize: hintFontSize,
                               ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: emailController,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Email Address",
-                              hintStyle: GoogleFonts.outfit(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w700,
-                                fontSize: hintFontSize,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: passwordController,
-                            obscureText: _obscurePassword,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Password",
-                              hintStyle: GoogleFonts.outfit(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w700,
-                                fontSize: hintFontSize,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscurePassword = !_obscurePassword;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.only(left: containerPadding),
-                          child: TextField(
-                            controller: confirmPasswordController,
-                            obscureText: _obscureConfirmPassword,
-                            style: GoogleFonts.outfit(
-                              color: Colors.black,
-                              fontSize: textFieldFontSize,
-                            ),
-                            decoration: InputDecoration(
-                              border: InputBorder.none,
-                              hintText: "Confirm your Password",
-                              hintStyle: GoogleFonts.outfit(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w700,
-                                fontSize: hintFontSize,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
-                                  color: Colors.grey,
-                                ),
-                                onPressed: () {
-                                  setState(() {
-                                    _obscureConfirmPassword = !_obscureConfirmPassword;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: agreedToTerms,
-                            onChanged: (bool? value) {
-                              setState(() {
-                                agreedToTerms = value ?? false;
-                              });
-                            },
-                          ),
-                          Flexible(
-                            child: RichText(
-                              text: TextSpan(
-                                style: GoogleFonts.outfit(
-                                  color: Colors.black,
-                                  fontSize: hintFontSize,
-                                ),
-                                children: [
-                                  TextSpan(
-                                    text: 'I agree to the ',
-                                  ),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                TermsAndConditionsPage(
-                                                    showRegisterPage: () {}),
-                                          ),
-                                        );
-                                      },
-                                      child: Text(
-                                        'Terms and Conditions',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.blue,
-                                          fontSize: hintFontSize,
+                              children: [
+                                TextSpan(text: 'I agree to the '),
+                                WidgetSpan(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              TermsAndConditionsPage(showRegisterPage: () {}),
                                         ),
+                                      );
+                                    },
+                                    child: Text(
+                                      'Terms and Conditions',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.blue,
+                                        fontSize: hintFontSize,
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
-
-                    // Add phone registration button
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.pushNamed(context, '/phone_register');
-                            },
-                            child: Text(
-                              'Use Phone Number',
-                              style: GoogleFonts.outfit(
-                                color: Color(0xFF1D2B53),
-                                fontWeight: FontWeight.w500,
-                                fontSize: hintFontSize,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
-
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF0091AD),
-                          minimumSize: Size(double.infinity, isMobile ? 50.0 : isTablet ? 55.0 : 60.0),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
                         ),
-                        onPressed: agreedToTerms
-                            ? () {
-                                signUp();
-                              }
-                            : null,
-                        child: Text(
-                          'Sign Up',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white,
-                            fontSize: buttonFontSize,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
-                    SizedBox(height: isMobile ? 25.0 : isTablet ? 28.0 : 30.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  ),
+
+                  SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
+
+                  // Phone registration link
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        Text(
-                          'Already have an account?',
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushNamed(context, '/phone_register');
+                          },
+                          child: Text(
+                            'Use Phone Number',
+                            style: GoogleFonts.outfit(
+                              color: Color(0xFF1D2B53),
+                              fontWeight: FontWeight.w500,
+                              fontSize: hintFontSize,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
+
+                  // Sign up button
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF0091AD),
+                        minimumSize: Size(double.infinity, isMobile ? 50.0 : isTablet ? 55.0 : 60.0),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: agreedToTerms ? () { signUp(); } : null,
+                      child: Text(
+                        'Sign Up',
+                        style: GoogleFonts.outfit(
+                          color: Colors.white,
+                          fontSize: buttonFontSize,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: isMobile ? 25.0 : isTablet ? 28.0 : 30.0),
+                  
+                  // Login link
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account?',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w500,
+                          fontSize: registerFontSize,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: widget.showLoginPage,
+                        child: Text(
+                          ' Login',
                           style: GoogleFonts.outfit(
+                            color: Colors.blue,
                             fontWeight: FontWeight.w500,
                             fontSize: registerFontSize,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: widget.showLoginPage,
-                          child: Text(
-                            ' Login',
-                            style: GoogleFonts.outfit(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.w500,
-                              fontSize: registerFontSize,
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                    SizedBox(height: 7),
-                  ],
-                ),
+                      )
+                    ],
+                  ),
+                  
+                  // Add bottom padding
+                  SizedBox(height: isMobile ? 30.0 : 40.0),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

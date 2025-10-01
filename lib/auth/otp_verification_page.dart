@@ -426,325 +426,309 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
-      body: Stack(
-        children: [
-          Container(
-            height: screenHeight * 0.38,
-            decoration: BoxDecoration(
-              color: Color(0xFFE5E9F0),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                double maxLogoWidth = 400.0;
-                double calculatedLogoWidth = math.min(constraints.maxWidth * 0.4, maxLogoWidth);
-                return Transform.translate(
-                  offset: Offset(0, -20),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/batrasco-logo.png',
-                      width: math.min(logoWidth, calculatedLogoWidth),
-                      fit: BoxFit.contain,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: screenWidth * 0.07,
+            vertical: screenHeight * 0.03,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo section - now scrollable
+              SizedBox(height: isMobile ? 40.0 : 60.0),
+              Image.asset(
+                'assets/batrasco-logo.png',
+                width: logoWidth,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: isMobile ? 40.0 : 60.0),
+
+              // OTP verification content
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Back button and title
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Icon(Icons.arrow_back, color: Colors.black),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "Verify account with OTP",
+                          style: GoogleFonts.outfit(
+                            fontSize: titleFontSize,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      SizedBox(width: 48), // Balance the back button
+                    ],
+                  ),
+                  
+                  SizedBox(height: 20),
+                  
+                  // Instruction text
+                  Center(
+                    child: Text(
+                      "We've sent 6 code to ${widget.phoneNumber}",
+                      style: GoogleFonts.outfit(
+                        fontSize: instructionFontSize,
+                        color: Colors.black54,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.only(top: screenHeight * 0.24),
-                width: double.infinity,
-                padding: EdgeInsets.only(
-                  top: screenHeight * 0.05,
-                  left: screenWidth * 0.07,
-                  right: screenWidth * 0.07,
-                  bottom: screenHeight * 0.25,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Back button and title
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context),
-                          icon: Icon(Icons.arrow_back, color: Colors.black),
-                        ),
-                        Expanded(
-                          child: Text(
-                            "Verify account with OTP",
-                            style: GoogleFonts.outfit(
-                              fontSize: titleFontSize,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        SizedBox(width: 48), // Balance the back button
-                      ],
+                  
+                  SizedBox(height: 30),
+                  
+                  // OTP input fields - Made responsive to prevent overflow
+                  Center(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Calculate available width for OTP fields
+                        final availableWidth = constraints.maxWidth;
+                        final totalFieldWidth = (otpFieldSize * 6) + (otpFieldMargin * 10); // 6 fields + margins
+                        
+                        // If total width exceeds available width, reduce field size and margins
+                        double finalFieldSize = otpFieldSize;
+                        double finalMargin = otpFieldMargin;
+                        
+                        if (totalFieldWidth > availableWidth) {
+                          finalMargin = math.max(2.0, (availableWidth - (otpFieldSize * 6)) / 10);
+                          if (finalMargin < 2.0) {
+                            finalFieldSize = (availableWidth - (2.0 * 10)) / 6;
+                            finalMargin = 2.0;
+                          }
+                        }
+                        
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(6, (index) {
+                            return Container(
+                              margin: EdgeInsets.symmetric(horizontal: finalMargin),
+                              width: finalFieldSize,
+                              height: finalFieldSize,
+                              child: TextField(
+                                controller: otpControllers[index],
+                                focusNode: focusNodes[index],
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                maxLength: 1,
+                                style: GoogleFonts.outfit(
+                                  fontSize: math.max(16, finalFieldSize * 0.4),
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  counterText: "",
+                                  hintText: "",
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: _errorMessage != null 
+                                          ? Colors.red 
+                                          : (otpControllers[index].text.isNotEmpty 
+                                              ? Color(0xFF0091AD) 
+                                              : Colors.grey.shade300),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: _errorMessage != null 
+                                          ? Colors.red 
+                                          : Colors.grey.shade300,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: Color(0xFF0091AD),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _errorMessage = null;
+                                  });
+                                  
+                                  // If field becomes empty and it's not the first field, move to previous
+                                  if (value.isEmpty && index > 0) {
+                                    // Small delay to ensure backspace completes
+                                    Future.delayed(Duration(milliseconds: 10), () {
+                                      if (mounted && otpControllers[index].text.isEmpty) {
+                                        focusNodes[index - 1].requestFocus();
+                                      }
+                                    });
+                                  }
+                                },
+                                onTap: () {
+                                  // Just focus the field, don't auto-select text
+                                  // User can manually select text if needed
+                                },
+                                onEditingComplete: () {
+                                  // Move to next field when editing is complete
+                                  if (index < 5) {
+                                    focusNodes[index + 1].requestFocus();
+                                  }
+                                },
+                                // Custom input formatter to handle backspace
+                                inputFormatters: [
+                                  otpFormatters[index],
+                                ],
+                                // Handle backspace key press for better navigation
+                                onSubmitted: (value) {
+                                  if (index < 5) {
+                                    focusNodes[index + 1].requestFocus();
+                                  }
+                                },
+                              ),
+                            );
+                          }),
+                        );
+                      },
                     ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Instruction text
+                  ),
+                  
+                  SizedBox(height: 20),
+                  
+                  // Error message or verification status
+                  if (_errorMessage != null)
                     Center(
                       child: Text(
-                        "We've sent 6 code to ${widget.phoneNumber}",
+                        _errorMessage!,
                         style: GoogleFonts.outfit(
-                          fontSize: instructionFontSize,
-                          color: Colors.black54,
+                          color: Colors.red,
+                          fontSize: isMobile ? 12.0 : 14.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else if (_isVerifying)
+                    Center(
+                      child: Text(
+                        "Verifying your OTP...",
+                        style: GoogleFonts.outfit(
+                          color: Colors.grey,
+                          fontSize: isMobile ? 12.0 : 14.0,
                         ),
                         textAlign: TextAlign.center,
                       ),
                     ),
-                    
-                    SizedBox(height: 30),
-                    
-                    // OTP input fields - Made responsive to prevent overflow
-                    Center(
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          // Calculate available width for OTP fields
-                          final availableWidth = constraints.maxWidth;
-                          final totalFieldWidth = (otpFieldSize * 6) + (otpFieldMargin * 10); // 6 fields + margins
-                          
-                          // If total width exceeds available width, reduce field size and margins
-                          double finalFieldSize = otpFieldSize;
-                          double finalMargin = otpFieldMargin;
-                          
-                          if (totalFieldWidth > availableWidth) {
-                            finalMargin = math.max(2.0, (availableWidth - (otpFieldSize * 6)) / 10);
-                            if (finalMargin < 2.0) {
-                              finalFieldSize = (availableWidth - (2.0 * 10)) / 6;
-                              finalMargin = 2.0;
-                            }
-                          }
-                          
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(6, (index) {
-                              return Container(
-                                margin: EdgeInsets.symmetric(horizontal: finalMargin),
-                                width: finalFieldSize,
-                                height: finalFieldSize,
-                                child: TextField(
-                                  controller: otpControllers[index],
-                                  focusNode: focusNodes[index],
-                                  keyboardType: TextInputType.number,
-                                  textAlign: TextAlign.center,
-                                  maxLength: 1,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: math.max(16, finalFieldSize * 0.4),
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.black,
-                                  ),
-                                  decoration: InputDecoration(
-                                    counterText: "",
-                                    hintText: "",
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: _errorMessage != null 
-                                            ? Colors.red 
-                                            : (otpControllers[index].text.isNotEmpty 
-                                                ? Color(0xFF0091AD) 
-                                                : Colors.grey.shade300),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: _errorMessage != null 
-                                            ? Colors.red 
-                                            : Colors.grey.shade300,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8),
-                                      borderSide: BorderSide(
-                                        color: Color(0xFF0091AD),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white,
-                                    contentPadding: EdgeInsets.zero,
-                                  ),
-                                                                     onChanged: (value) {
-                                     setState(() {
-                                       _errorMessage = null;
-                                     });
-                                     
-                                     // If field becomes empty and it's not the first field, move to previous
-                                     if (value.isEmpty && index > 0) {
-                                       // Small delay to ensure backspace completes
-                                       Future.delayed(Duration(milliseconds: 10), () {
-                                         if (mounted && otpControllers[index].text.isEmpty) {
-                                           focusNodes[index - 1].requestFocus();
-                                         }
-                                       });
-                                     }
-                                   },
-                                   onTap: () {
-                                     // Just focus the field, don't auto-select text
-                                     // User can manually select text if needed
-                                   },
-                                   onEditingComplete: () {
-                                     // Move to next field when editing is complete
-                                     if (index < 5) {
-                                       focusNodes[index + 1].requestFocus();
-                                     }
-                                   },
-                                   // Custom input formatter to handle backspace
-                                   inputFormatters: [
-                                     otpFormatters[index],
-                                   ],
-                                   // Handle backspace key press for better navigation
-                                   onSubmitted: (value) {
-                                     if (index < 5) {
-                                       focusNodes[index + 1].requestFocus();
-                                     }
-                                   },
-
-                                ),
-                              );
-                            }),
-                          );
-                        },
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Error message or verification status
-                    if (_errorMessage != null)
-                      Center(
-                        child: Text(
-                          _errorMessage!,
-                          style: GoogleFonts.outfit(
-                            color: Colors.red,
-                            fontSize: isMobile ? 12.0 : 14.0,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    else if (_isVerifying)
-                      Center(
-                        child: Text(
-                          "Verifying your OTP...",
-                          style: GoogleFonts.outfit(
-                            color: Colors.grey,
-                            fontSize: isMobile ? 12.0 : 14.0,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Resend code option
-                    Center(
-                      child: GestureDetector(
-                        onTap: _canResend ? _resendOTP : null,
-                        child: Text(
-                          _canResend 
-                              ? "Resend code" 
-                              : "Resend code in $_resendCountdown seconds",
-                          style: GoogleFonts.outfit(
-                            color: _canResend ? Color(0xFF0091AD) : Colors.grey,
-                            fontSize: isMobile ? 12.0 : 14.0,
-                            decoration: TextDecoration.underline,
-                          ),
+                  
+                  SizedBox(height: 20),
+                  
+                  // Resend code option
+                  Center(
+                    child: GestureDetector(
+                      onTap: _canResend ? _resendOTP : null,
+                      child: Text(
+                        _canResend 
+                            ? "Resend code" 
+                            : "Resend code in $_resendCountdown seconds",
+                        style: GoogleFonts.outfit(
+                          color: _canResend ? Color(0xFF0091AD) : Colors.grey,
+                          fontSize: isMobile ? 12.0 : 14.0,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                    
-                    SizedBox(height: 40),
-                    
-                    // Continue button
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 20.0 : 25.0,
-                      ),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF0091AD),
-                          minimumSize: Size(double.infinity, buttonHeight),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+                  ),
+                  
+                  SizedBox(height: 40),
+                  
+                  // Continue button
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 20.0 : 25.0,
+                    ),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF0091AD),
+                        minimumSize: Size(double.infinity, buttonHeight),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        onPressed: _isVerifying || _getOTP().isEmpty || _getOTP().length != 6 ? null : _verifyOTP,
-                        child: _isVerifying
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                'Continue',
-                                style: GoogleFonts.outfit(
-                                  color: Colors.white,
-                                  fontSize: isMobile ? 18.0 : 20.0,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                      ),
+                      onPressed: _isVerifying || _getOTP().isEmpty || _getOTP().length != 6 ? null : _verifyOTP,
+                      child: _isVerifying
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
-                      ),
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Terms and privacy policy
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TermsAndConditionsPage(
-                                showRegisterPage: () {
-                                  // This callback is required by the TermsAndConditionsPage
-                                  // but we don't need to use it here
-                                },
+                            )
+                          : Text(
+                              'Continue',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: isMobile ? 18.0 : 20.0,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          );
-                        },
-                        child: RichText(
-                          text: TextSpan(
-                            style: GoogleFonts.outfit(
-                              color: Colors.black54,
-                              fontSize: isMobile ? 10.0 : 12.0,
+                    ),
+                  ),
+                  
+                  SizedBox(height: 20),
+                  
+                  // Terms and privacy policy
+                  Center(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TermsAndConditionsPage(
+                              showRegisterPage: () {
+                                // This callback is required by the TermsAndConditionsPage
+                                // but we don't need to use it here
+                              },
                             ),
-                            children: [
-                              TextSpan(text: 'By entering your number you agree to our '),
-                              TextSpan(
-                                text: 'Terms & Privacy Policy',
-                                style: GoogleFonts.outfit(
-                                  color: Color(0xFF0091AD),
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
                           ),
-                          textAlign: TextAlign.center,
+                        );
+                      },
+                      child: RichText(
+                        text: TextSpan(
+                          style: GoogleFonts.outfit(
+                            color: Colors.black54,
+                            fontSize: isMobile ? 10.0 : 12.0,
+                          ),
+                          children: [
+                            TextSpan(text: 'By entering your number you agree to our '),
+                            TextSpan(
+                              text: 'Terms & Privacy Policy',
+                              style: GoogleFonts.outfit(
+                                color: Color(0xFF0091AD),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ],
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  
+                  // Add bottom padding
+                  SizedBox(height: isMobile ? 30.0 : 40.0),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

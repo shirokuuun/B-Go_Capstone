@@ -28,7 +28,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         builder: (context) {
           return AlertDialog(
             content: Text(
-                'If your email is registered, you’ll receive a password reset email. Thank you!'),
+              'If your email is registered, you’ll receive a password reset email. Thank you!',
+              style: GoogleFonts.outfit(
+                fontSize: 16.0,
+                color: Colors.grey.shade600,
+              ),
+            ),
           );
         },
       );
@@ -51,7 +56,13 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            content: Text(message),
+            content: Text(
+              message,
+              style: GoogleFonts.outfit(
+                fontSize: 16.0,
+                color: Colors.grey.shade600,
+              ),
+            ),
           );
         },
       );
@@ -133,7 +144,8 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
         appBar: AppBar(
           title: Text(
             'Forgot Password',
-            style: GoogleFonts.outfit(fontSize: appBarFontSize, color: Colors.white),
+            style: GoogleFonts.outfit(
+                fontSize: appBarFontSize, color: Colors.white),
           ),
           backgroundColor: Color(0xFF0091AD),
           elevation: 0,
@@ -184,7 +196,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
-                            SizedBox(height: isMobile ? 8.0 : isTablet ? 10.0 : 12.0),
+                            SizedBox(
+                                height: isMobile
+                                    ? 8.0
+                                    : isTablet
+                                        ? 10.0
+                                        : 12.0),
                             Center(
                               child: Text(
                                 'Make sure to enter the email you used to register',

@@ -55,7 +55,6 @@ class RouteService {
       // Fetch all documents in the places subcollection
       QuerySnapshot querySnapshot = await placesRef.get();
       
-      print('🔍 RouteService: Found ${querySnapshot.docs.length} documents for route "$route"');
       
       // Reduced debug logging for performance
       if (querySnapshot.docs.length > 10) {
@@ -64,7 +63,6 @@ class RouteService {
         // Only log details for small datasets
         for (var doc in querySnapshot.docs) {
           final data = doc.data() as Map<String, dynamic>;
-          print('🔍 RouteService: Document ${doc.id}: ${data}');
         }
       }
       
@@ -120,14 +118,6 @@ class RouteService {
         double distanceB = b['km'] ?? 0;
         return distanceA.compareTo(distanceB);
       });
-      
-      // Reduced logging for performance
-      if (places.length <= 10) {
-        print('🔍 RouteService: Returning ${places.length} sorted places: ${places.map((p) => '${p['name']} (${p['km']}km)').toList()}');
-      } else {
-        print('🔍 RouteService: Returning ${places.length} sorted places (showing first 5): ${places.take(5).map((p) => '${p['name']} (${p['km']}km)').toList()}...');
-      }
-      
       return places;
     } catch (e) {
       print('❌ RouteService: Error fetching places for route "$route": $e');
@@ -741,8 +731,12 @@ static Future<List<Map<String, dynamic>>> fetchTickets({
               'startKm': data['startKm'],
               'endKm': data['endKm'],
               'timestamp': data['timestamp'],
-              'status': data['status'] ?? 'boarded',
+              'status': data['status'] ?? 'paid',
               'ticketType': data['ticketType'] ?? 'manual',
+              // Ensure Trips page can determine boarded
+              'boardedAt': data['boardedAt'],
+              'scannedBy': data['scannedBy'],
+              'boardingStatus': data['boardingStatus'],
               'dropOffTimestamp': data['dropOffTimestamp'],
               'dropOffLocation': data['dropOffLocation'],
               'geofenceStatus': data['geofenceStatus'],

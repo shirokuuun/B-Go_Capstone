@@ -2045,9 +2045,9 @@ class _ReceiptModal extends StatelessWidget {
         'farePerPassenger': ticketData['passengerFares'] ?? [],
         'from': ticketData['from'],
         'quantity': ticketData['quantity'],
-        'scannedBy': conductorId,
+        // DO NOT set scannedBy here - it should only be set when QR is actually scanned
         'startKm': ticketData['fromKm'],
-        'status': 'pending_payment', // Will be updated to 'boarded' when scanned
+        'status': 'pending_payment', // Will be updated to 'paid' when payment confirmed, 'boarded' when scanned
         'ticketType': 'preBooking',
         'timestamp': FieldValue.serverTimestamp(),
         'to': ticketData['to'],

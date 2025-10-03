@@ -1505,27 +1505,127 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
 
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
-  // Find the paid pre-booking
-  final preBookingsQuery = await FirebaseFirestore.instance
-      .collectionGroup('preBookings')
-      .where('qrData', isEqualTo: qrDataString)
-      .where('status', isEqualTo: 'paid')
-      .get();
+  final conductorDocId = conductorDoc.docs.first.id;
+  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+  
+  print('🔍 Looking for pre-booking with QR data...');
+  print('🔍 Conductor ID: $conductorDocId');
+  print('🔍 Active Trip ID: $activeTripId');
+  print('🔍 Data: $data');
 
-  if (preBookingsQuery.docs.isEmpty) {
+  // Try multiple search strategies to find the pre-booking
+  DocumentSnapshot? paidPreBooking;
+  Map<String, dynamic>? preBookingData;
+  String? bookingId;
+
+  // Strategy 1: Search by booking ID if available
+  final dataBookingId = data['bookingId'] ?? data['id'];
+  if (dataBookingId != null) {
+    print('🔍 Strategy 1: Searching by booking ID: $dataBookingId');
+    
+    // Check in conductor's preBookings collection
+    try {
+      final directBooking = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .doc(dataBookingId)
+          .get();
+      
+      if (directBooking.exists) {
+        final bookingData = directBooking.data()!;
+        final bookingStatus = bookingData['status'] ?? '';
+        print('🔍 Found booking in conductor preBookings: status=$bookingStatus');
+        
+        // Accept if paid OR if already boarded (allow re-scan)
+        if (bookingStatus == 'paid' || bookingStatus == 'boarded') {
+          paidPreBooking = directBooking;
+          preBookingData = bookingData;
+          bookingId = dataBookingId;
+          print('✅ Found valid pre-booking by ID');
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error searching by booking ID: $e');
+    }
+  }
+
+  // Strategy 2: Search by QR data if not found by ID
+  if (paidPreBooking == null) {
+    print('🔍 Strategy 2: Searching by QR data string');
+    try {
+      final preBookingsQuery = await FirebaseFirestore.instance
+          .collectionGroup('preBookings')
+          .where('qrData', isEqualTo: qrDataString)
+          .get();
+
+      print('🔍 Found ${preBookingsQuery.docs.length} matching QR codes');
+
+      for (var doc in preBookingsQuery.docs) {
+        final docData = doc.data();
+        final docStatus = docData['status'] ?? '';
+        final docRoute = docData['route'] ?? '';
+        
+        print('🔍 Checking doc ${doc.id}: status=$docStatus, route=$docRoute');
+        
+        // Match route and accept paid or boarded status
+        if (docRoute == data['route'] && 
+            (docStatus == 'paid' || docStatus == 'boarded')) {
+          paidPreBooking = doc;
+          preBookingData = docData;
+          bookingId = doc.id;
+          print('✅ Found valid pre-booking by QR data');
+          break;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error searching by QR data: $e');
+    }
+  }
+
+  // Strategy 3: Search by from/to/quantity if still not found
+  if (paidPreBooking == null && data['from'] != null && data['to'] != null) {
+    print('🔍 Strategy 3: Searching by from/to/quantity');
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .where('from', isEqualTo: data['from'])
+          .where('to', isEqualTo: data['to'])
+          .where('quantity', isEqualTo: quantity)
+          .get();
+
+      for (var doc in query.docs) {
+        final docData = doc.data();
+        final docStatus = docData['status'] ?? '';
+        
+        if (docStatus == 'paid' || docStatus == 'boarded') {
+          paidPreBooking = doc;
+          preBookingData = docData;
+          bookingId = doc.id;
+          print('✅ Found valid pre-booking by route details');
+          break;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error searching by route details: $e');
+    }
+  }
+
+  if (paidPreBooking == null || preBookingData == null) {
+    print('❌ No pre-booking found after all search strategies');
     throw Exception(
         'No paid pre-booking found with this QR code. Please ensure payment is completed.');
   }
 
-  final paidPreBooking = preBookingsQuery.docs.first;
-  final preBookingData = paidPreBooking.data();
-  final bookingId = paidPreBooking.id; // this is the canonical booking id
-
-  // Check if already boarded
-  if (preBookingData['status'] == 'boarded' ||
-      preBookingData['boardingStatus'] == 'boarded') {
-    throw Exception('This pre-booking has already been scanned and boarded.');
+  // Check if already boarded (and warn but allow re-process for safety)
+  if (preBookingData['boardingStatus'] == 'boarded') {
+    print('⚠️ This pre-booking was already marked as boarded, but processing anyway');
   }
+
+  print('✅ Processing pre-booking: $bookingId');
 
   // Update pre-booking status to "boarded"
   await paidPreBooking.reference.update({
@@ -1534,10 +1634,42 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
     'boardingStatus': 'boarded',
+    'tripId': activeTripId,
   });
 
-  // Also force-update the conductor's preBookings document with the SAME booking id
-  final conductorDocId = conductorDoc.docs.first.id;
+  // Store in conductor's scannedQRCodes collection for dashboard display
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('scannedQRCodes')
+      .add({
+    'type': 'preBooking',
+    'bookingId': bookingId,
+    'qrData': qrDataString,
+    'originalDocumentId': paidPreBooking.id,
+    'originalCollection': paidPreBooking.reference.parent.path,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'data': data,
+    'tripId': activeTripId,
+    'tripCompleted': false,
+    'from': data['from'] ?? preBookingData['from'],
+    'to': data['to'] ?? preBookingData['to'],
+    'quantity': quantity,
+    'totalFare': data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
+    'route': data['route'] ?? preBookingData['route'],
+    'status': 'boarded',
+  });
+
+  // **CRITICAL FIX: Increment passenger count when pre-booking boards**
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+
+  print('✅ Pre-booking $bookingId successfully processed. Incremented passengerCount by $quantity');
+
+  // Also update the conductor's preBookings document
   try {
     final conductorPreBookingRef = FirebaseFirestore.instance
         .collection('conductors')
@@ -1554,57 +1686,13 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'scannedBy': user.uid,
         'scannedAt': FieldValue.serverTimestamp(),
         'qr': true,
-      });
-    } else {
-      // As a fallback, create a compact scan log document in a separate subcollection
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorDocId)
-          .collection('scannedQRCodes')
-          .add({
-        'bookingId': bookingId,
-        'data': data,
-        'scannedAt': FieldValue.serverTimestamp(),
-        'scannedBy': user.uid,
-        'type': 'preBooking',
-      });
-    }
-  } catch (_) {}
-
-  // Update remittance ticket status for today (so Trips shows Boarded)
-  try {
-    final now = DateTime.now();
-    final formattedDate =
-        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
-    final ticketsCol = FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorDocId)
-        .collection('remittance')
-        .doc(formattedDate)
-        .collection('tickets');
-
-    final ticketQuery = await ticketsCol
-        .where('documentType', isEqualTo: 'preBooking')
-        .where('documentId', isEqualTo: bookingId)
-        .limit(1)
-        .get();
-
-    if (ticketQuery.docs.isNotEmpty) {
-      await ticketsCol.doc(ticketQuery.docs.first.id).update({
-        'status': 'boarded',
-        'boardedAt': FieldValue.serverTimestamp(),
-        'scannedBy': user.uid,
+        'tripId': activeTripId,
+        'tripCompleted': false,
       });
     }
   } catch (e) {
-    // non-fatal
-    print('⚠️ Failed to update remittance ticket to boarded: $e');
+    print('⚠️ Error updating conductor preBooking: $e');
   }
-
-  // IMPORTANT: Do NOT increment passengerCount here.
-  // Pre-booked passengers are already counted in the dashboard's total capacity
-  // calculation (boarded + preBooked). Moving to boarded should not add again.
 
   // Ensure passenger's own preBookings document is also updated to boarded
   try {
@@ -1621,9 +1709,13 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'scannedBy': user.uid,
         'scannedAt': FieldValue.serverTimestamp(),
         'boardingStatus': 'boarded',
+        'tripId': activeTripId,
       });
+      print('✅ Updated user preBooking to boarded');
     }
   } catch (e) {
     print('⚠️ Failed to update user preBooking to boarded: $e');
   }
+
+  print('✅ Pre-booking successfully processed and stored in scannedQRCodes collection');
 }

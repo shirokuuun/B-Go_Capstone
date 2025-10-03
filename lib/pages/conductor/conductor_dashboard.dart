@@ -421,12 +421,14 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
               final data = doc.data() as Map<String, dynamic>;
               // If there's an active trip, only show pre-bookings for that trip
               // If no active trip, show all pre-bookings for this conductor
-              final isForCurrentTrip = activeTripId == null || 
-                  data['tripId'] == activeTripId || 
+              final isForCurrentTrip = activeTripId == null ||
+                  data['tripId'] == activeTripId ||
                   data['tripId'] == null; // Include pre-bookings without tripId
-              return data['route'] == widget.route && 
-                     data['status'] == 'paid' && 
+              // Only show pre-bookings that are paid but NOT scanned yet
+              return data['route'] == widget.route &&
+                     data['status'] == 'paid' &&
                      data['boardingStatus'] != 'boarded' &&
+                     data['scannedBy'] == null && // NOT scanned yet
                      isForCurrentTrip;
             })
             .toList();
@@ -577,8 +579,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           stream: FirebaseFirestore.instance
               .collection('conductors')
               .doc(conductorDocId)
-              .collection('preBookings')
-              .where('qr', isEqualTo: true)
+              .collection('scannedQRCodes')
+              .orderBy('scannedAt', descending: true)
               .snapshots(),
           builder: (context, qrSnapshot) {
             if (qrSnapshot.connectionState == ConnectionState.waiting) {
@@ -586,43 +588,39 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
             }
 
             if (qrSnapshot.hasError) {
-              return Text(
-                'Error loading scanned QR data: ${qrSnapshot.error}',
-                style: GoogleFonts.outfit(color: Colors.red),
+              print('Error loading scanned QR codes: ${qrSnapshot.error}');
+              // Fallback to legacy preBookings collection
+              return StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('conductors')
+                    .doc(conductorDocId)
+                    .collection('preBookings')
+                    .where('qr', isEqualTo: true)
+                    .orderBy('scannedAt', descending: true)
+                    .snapshots(),
+                builder: (context, legacySnap) {
+                  if (legacySnap.connectionState == ConnectionState.waiting) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+                  if (legacySnap.hasError) {
+                    return Text(
+                      'Error loading scanned QR data: ${legacySnap.error}',
+                      style: GoogleFonts.outfit(color: Colors.red),
+                    );
+                  }
+                  final fallbackDocs = legacySnap.data?.docs ?? [];
+                  if (fallbackDocs.isEmpty) {
+                    return _buildEmptyScannedQRState();
+                  }
+                  return _buildScannedListFromDocs(fallbackDocs);
+                },
               );
             }
 
             final scannedQRs = qrSnapshot.data?.docs ?? [];
 
             if (scannedQRs.isEmpty) {
-              return Container(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.qr_code_scanner,
-                      size: 48,
-                      color: Colors.grey[400],
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'No scanned QR codes yet',
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    Text(
-                      'Scanned pre-bookings will appear here',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                ),
-              );
+              return _buildEmptyScannedQRState();
             }
 
             return Column(
@@ -636,89 +634,172 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   ),
                 ),
                 SizedBox(height: 12),
-                ...scannedQRs.map((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final qrData = data['data'] as Map<String, dynamic>? ?? {};
-                  final scannedAt = data['scannedAt'] as Timestamp?;
-                  
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 8),
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue[200]!),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.qr_code_scanner,
-                            color: Colors.blue[700],
-                            size: 20,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${qrData['from'] ?? 'Unknown'} → ${qrData['to'] ?? 'Unknown'}',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                '${qrData['data']?['quantity'] ?? 1} passenger${(qrData['data']?['quantity'] ?? 1) == 1 ? '' : 's'} • ${qrData['data']?['amount']?.toStringAsFixed(2) ?? '0.00'} PHP',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              if (scannedAt != null)
-                                Text(
-                                  'Scanned: ${scannedAt.toDate().toString().substring(0, 19)}',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 10,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            'BOARDED',
-                            style: GoogleFonts.outfit(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue[700],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+                ..._mapDocsToScannedTiles(scannedQRs),
               ],
             );
           },
         );
       },
     );
+  }
+
+  Widget _buildEmptyScannedQRState() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Icon(
+            Icons.qr_code_scanner,
+            size: 48,
+            color: Colors.grey[400],
+          ),
+          SizedBox(height: 8),
+          Text(
+            'No scanned QR codes yet',
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          Text(
+            'Scanned pre-bookings will appear here',
+            style: GoogleFonts.outfit(
+              fontSize: 12,
+              color: Colors.grey[500],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper to render list from any docs source
+  Widget _buildScannedListFromDocs(List<QueryDocumentSnapshot> docs) {
+    return Column(
+      children: [
+        Text(
+          '${docs.length} scanned QR code${docs.length == 1 ? '' : 's'}',
+          style: GoogleFonts.outfit(
+            fontSize: 14,
+            color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        SizedBox(height: 12),
+        ..._mapDocsToScannedTiles(docs),
+      ],
+    );
+  }
+
+  List<Widget> _mapDocsToScannedTiles(List<QueryDocumentSnapshot> docs) {
+    return docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final scannedAt = data['scannedAt'] as Timestamp?;
+      
+      // Support both scannedQRCodes and preBookings document structures
+      final from = data['from'] ?? data['data']?['from'] ?? 'Unknown';
+      final to = data['to'] ?? data['data']?['to'] ?? 'Unknown';
+      final qty = (data['quantity'] as num?)?.toInt() ?? 
+                  (data['data']?['quantity'] as num?)?.toInt() ?? 1;
+      
+      // Handle different fare field names
+      double amount = 0.0;
+      final totalFareStr = data['totalFare'] ?? data['data']?['totalFare'];
+      if (totalFareStr is String) {
+        amount = double.tryParse(totalFareStr) ?? 0.0;
+      } else if (totalFareStr is num) {
+        amount = totalFareStr.toDouble();
+      } else {
+        // Try other possible amount fields
+        final amountStr = data['data']?['amount'] ?? data['data']?['totalAmount'];
+        if (amountStr != null) {
+          if (amountStr is String) {
+            amount = double.tryParse(amountStr) ?? 0.0;
+          } else if (amountStr is num) {
+            amount = amountStr.toDouble();
+          }
+        }
+      }
+
+      // Get status from data
+      final status = data['status'] ?? 'boarded';
+      final isAccomplished = status == 'accomplished';
+
+      print('🔍 Dashboard QR tile: from=$from, to=$to, qty=$qty, amount=$amount, status=$status');
+
+      return Container(
+        margin: EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isAccomplished ? Colors.green[50] : Colors.blue[50],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isAccomplished ? Colors.green[200]! : Colors.blue[200]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isAccomplished ? Colors.green[100] : Colors.blue[100],
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isAccomplished ? Icons.check_circle : Icons.qr_code_scanner,
+                color: isAccomplished ? Colors.green[700] : Colors.blue[700],
+                size: 20,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$from → $to',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '$qty passenger${qty == 1 ? '' : 's'} • ${amount.toStringAsFixed(2)} PHP',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  if (scannedAt != null)
+                    Text(
+                      'Scanned: ${scannedAt.toDate().toString().substring(0, 19)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: 10,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isAccomplished ? Colors.green[100] : Colors.blue[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                isAccomplished ? 'ACCOMPLISHED' : 'BOARDED',
+                style: GoogleFonts.outfit(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: isAccomplished ? Colors.green[700] : Colors.blue[700],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -855,152 +936,247 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                   .doc(conductorDocId)
                                   .collection('preBookings')
                                   .where('tripId', isEqualTo: activeTripId)
+                                  .where('tripCompleted', isEqualTo: false)
                                   .snapshots()
                               : FirebaseFirestore.instance
                                   .collection('conductors')
                                   .doc(conductorDocId)
                                   .collection('preBookings')
+                                  .where('tripCompleted', isEqualTo: false)
                                   .snapshots(),
                           builder: (context, preBookingSnapshot) {
                             int preBookedPassengers = 0;
                             
                             if (preBookingSnapshot.hasData) {
                               final allPreBookings = preBookingSnapshot.data!.docs;
-                              print('🔍 Dashboard: Found ${allPreBookings.length} pre-bookings');
+                              print('🔍 Dashboard: Found ${allPreBookings.length} pre-bookings in preBookings collection');
+                              
                               for (var doc in allPreBookings) {
                                 final data = doc.data() as Map<String, dynamic>;
-                                print('🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, TripId: ${data['tripId']}');
+                                print('🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, BoardingStatus: ${data['boardingStatus']}, TripId: ${data['tripId']}');
+                                
+                                final isForCurrentTrip = activeTripId == null || 
+                                    data['tripId'] == activeTripId || 
+                                    data['tripId'] == null;
+                                
+                                // FIXED: Only count pre-bookings that are NOT yet boarded/scanned
+                                // Boarded/scanned pre-bookings are already in passengerCount
+                                if (data['route'] == widget.route &&
+                                    isForCurrentTrip &&
+                                    data['status'] == 'paid' &&
+                                    data['boardingStatus'] != 'boarded' &&
+                                    data['scannedBy'] == null) { // NOT scanned yet
+                                  final qty = (data['quantity'] as int?) ?? 1;
+                                  preBookedPassengers += qty;
+                                }
                               }
-                              preBookedPassengers = allPreBookings
-                                   .where((doc) {
-                                     final data = doc.data() as Map<String, dynamic>;
-                                     // If there's an active trip, only show pre-bookings for that trip
-                                     // If no active trip, show all pre-bookings for this conductor
-                                     final isForCurrentTrip = activeTripId == null || 
-                                         data['tripId'] == activeTripId || 
-                                         data['tripId'] == null; // Include pre-bookings without tripId
-                                     return data['route'] == widget.route && 
-                                            (data['status'] == 'paid' || data['status'] == 'pending_payment') &&
-                                            data['boardingStatus'] != 'boarded' &&
-                                            isForCurrentTrip;
-                                   })
-                                   .fold<int>(0, (sum, doc) {
-                                     final data = doc.data() as Map<String, dynamic>;
-                                     return sum + ((data['quantity'] as int?) ?? 1);
-                                   });
                             }
                             
-                            final totalPassengers = boardedPassengers + preBookedPassengers;
-                            final maxCapacity = 27;
-                            final percentage = (totalPassengers / maxCapacity) * 100;
-
-                            return Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Current Passengers:',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: bodyFontSize,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    Text(
-                                      '$totalPassengers/$maxCapacity',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: bodyFontSize,
-                                        fontWeight: FontWeight.bold,
-                                        color: totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: smallSpacing),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Boarded: $boardedPassengers',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: smallFontSize,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                    Text(
-                                      'Pre-booked: $preBookedPassengers',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: smallFontSize,
-                                        color: Colors.grey[600],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: smallSpacing),
-                                LinearProgressIndicator(
-                                  value: percentage / 100,
-                                  backgroundColor: Colors.grey[300],
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
-                                  ),
-                                ),
-                                SizedBox(height: smallSpacing),
-                                Text(
-                                  '${percentage.toStringAsFixed(1)}% capacity used',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: smallFontSize,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                                if (totalPassengers >= maxCapacity) ...[
-                                  SizedBox(height: smallSpacing),
-                                  Container(
-                                    padding: EdgeInsets.all(smallSpacing),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.red[200]!),
-                                    ),
-                                    child: Text(
-                                      'Bus is at full capacity!',
-                                      style: GoogleFonts.outfit(
-                                        fontSize: smallFontSize,
-                                        color: Colors.red[700],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                            // Get additional scanned pre-bookings from scannedQRCodes collection
+                            return StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('conductors')
+                                  .doc(conductorDocId)
+                                  .collection('scannedQRCodes')
+                                  .where('type', isEqualTo: 'preBooking')
+                                  .where('tripCompleted', isEqualTo: false)
+                                  .snapshots(),
+                              builder: (context, scannedSnapshot) {
+                                // REMOVED: scannedPreBookedPassengers calculation
+                                // Scanned pre-bookings are already in passengerCount
                                 
+                                // passengerCount already includes all boarded passengers (regular + pre-booked)
+                                final totalBoardedPassengers = boardedPassengers;
+                                
+                                // Total capacity = boarded + waiting pre-bookings
+                                final totalPassengers = totalBoardedPassengers + preBookedPassengers;
+                                final maxCapacity = 27;
+                                final percentage = (totalPassengers / maxCapacity) * 100;
 
-                                SizedBox(height: mediumSpacing),
-                                Row(
+                                return Column(
                                   children: [
-                                    Expanded(
-                                      child: ElevatedButton(
-                                        onPressed: boardedPassengers > 0 ? () async {
-                                          // Show manual passenger count adjustment dialog
-                                          _showManualPassengerAdjustmentDialog(context, boardedPassengers);
-                                        } : null,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.orange,
-                                          foregroundColor: Colors.white,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          'Current Passengers:',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: bodyFontSize,
+                                            fontWeight: FontWeight.w500,
                                           ),
                                         ),
-                                        child: Text(
-                                          'Adjust Count',
+                                        Text(
+                                          '$totalPassengers/$maxCapacity',
                                           style: GoogleFonts.outfit(
-                                            fontSize: resetButtonFontSize,
+                                            fontSize: bodyFontSize,
+                                            fontWeight: FontWeight.bold,
+                                            color: totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: smallSpacing),
+                                    // Color-coded breakdown
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        // Boarded passengers (light blue)
+                                        Row(
+                                          children: [
+                                            Container(
+                                              width: 12,
+                                              height: 12,
+                                              decoration: BoxDecoration(
+                                                color: Colors.lightBlue[400],
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              'Boarded: $totalBoardedPassengers',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: smallFontSize,
+                                                color: Colors.grey[600],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        // Pre-booked not boarded (orange)
+                                        if (preBookedPassengers > 0)
+                                          Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange[400],
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'Pre-booked: $preBookedPassengers',
+                                                style: GoogleFonts.outfit(
+                                                  fontSize: smallFontSize,
+                                                  color: Colors.grey[600],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                      ],
+                                    ),
+                                    SizedBox(height: smallSpacing),
+                                    // Custom progress bar with two colors
+                                    Container(
+                                      height: 8,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[300],
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // Boarded passengers (light blue)
+                                          if (totalBoardedPassengers > 0)
+                                            Expanded(
+                                              flex: totalBoardedPassengers,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.lightBlue[400],
+                                                  borderRadius: BorderRadius.only(
+                                                    topLeft: Radius.circular(4),
+                                                    bottomLeft: Radius.circular(4),
+                                                    topRight: preBookedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                    bottomRight: preBookedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          // Pre-booked not boarded (orange)
+                                          if (preBookedPassengers > 0)
+                                            Expanded(
+                                              flex: preBookedPassengers,
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange[400],
+                                                  borderRadius: BorderRadius.only(
+                                                    topRight: Radius.circular(4),
+                                                    bottomRight: Radius.circular(4),
+                                                    topLeft: totalBoardedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                    bottomLeft: totalBoardedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          // Remaining capacity (gray)
+                                          if (totalPassengers < maxCapacity)
+                                            Expanded(
+                                              flex: (maxCapacity - totalPassengers).clamp(1, maxCapacity).toInt(),
+                                              child: Container(
+                                                color: Colors.grey[300],
+                                                child: SizedBox.shrink(),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(height: smallSpacing),
+                                    Text(
+                                      '${percentage.toStringAsFixed(1)}% capacity used',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: smallFontSize,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                    if (totalPassengers >= maxCapacity) ...[
+                                      SizedBox(height: smallSpacing),
+                                      Container(
+                                        padding: EdgeInsets.all(smallSpacing),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red[50],
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.red[200]!),
+                                        ),
+                                        child: Text(
+                                          'Bus is at full capacity!',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: smallFontSize,
+                                            color: Colors.red[700],
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
                                       ),
+                                    ],
+                                    
+                                    SizedBox(height: mediumSpacing),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: totalBoardedPassengers > 0 ? () async {
+                                              // Show manual passenger count adjustment dialog
+                                              _showManualPassengerAdjustmentDialog(context, totalBoardedPassengers);
+                                            } : null,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.orange,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              'Adjust Count',
+                                              style: GoogleFonts.outfit(
+                                                fontSize: resetButtonFontSize,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
-                                ),
-                              ],
+                                );
+                              },
                             );
                           },
                         );

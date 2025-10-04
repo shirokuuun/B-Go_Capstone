@@ -290,14 +290,10 @@ class GeofencingService {
         final ticketsCollection = dateDoc.reference.collection('tickets');
         final tickets = await ticketsCollection.get();
 
-        print('📅 Date ${dateDoc.id}: Found ${tickets.docs.length} tickets');
-
         for (var ticketDoc in tickets.docs) {
           final ticket = ticketDoc.data();
           final destinationName = ticket['to'];
           final isActive = ticket['active'] ?? false;
-          
-          print('🎫 Ticket ${ticketDoc.id}: to=$destinationName, active=$isActive');
           
           if (isActive && destinationName != null && !processedDestinations.contains(destinationName)) {
             // Check if we've processed this destination recently to prevent excessive processing

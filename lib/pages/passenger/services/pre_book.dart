@@ -897,7 +897,9 @@ class _PreBookState extends State<PreBook> {
                             SizedBox(width: isMobile ? 12 : 16),
                             Expanded(
                               child: Text(
-                                routeLabels[selectedRoute]![directionIndex],
+                                selectedConductor != null
+                                    ? (selectedConductor!['activeTrip']?['direction'] ?? routeLabels[selectedRoute]![directionIndex])
+                                    : routeLabels[selectedRoute]![directionIndex],
                                 style: GoogleFonts.outfit(
                                     fontSize: routeFontSize,
                                     color: Colors.white,
@@ -1830,6 +1832,12 @@ class _ReceiptModal extends StatelessWidget {
       'tripId': selectedConductor?['activeTrip']?['tripId'],
     };
 
+    // Debug logging to see what coordinates we have
+    print('💾 PreBook: fromPlace data: $fromPlace');
+    print('💾 PreBook: toPlace data: $toPlace');
+    print('💾 PreBook: fromPlace latitude/longitude: ${fromPlace['latitude']}, ${fromPlace['longitude']}');
+    print('💾 PreBook: toPlace latitude/longitude: ${toPlace['latitude']}, ${toPlace['longitude']}');
+
     final data = {
       'route': route,
       'direction': directionLabel,
@@ -1887,6 +1895,21 @@ class _ReceiptModal extends StatelessWidget {
           '✅ PreBook: Booking saved successfully to Firebase with ID: ${docRef.id}');
       print(
           '✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
+
+      // Update qrData to include the booking ID
+      qrData['bookingId'] = docRef.id;
+      qrData['id'] = docRef.id;
+      final updatedQrDataString = jsonEncode(qrData);
+
+      // Update the document with the new qrData that includes the booking ID
+      await docRef.update({
+        'qrData': updatedQrDataString,
+      });
+
+      print('✅ PreBook: Updated QR data with booking ID: ${docRef.id}');
+
+      // Update data map for conductor collections
+      data['qrData'] = updatedQrDataString;
 
       // If conductor is selected, also save to conductor's collections
       if (selectedConductor != null && selectedConductor!['id'] != null) {

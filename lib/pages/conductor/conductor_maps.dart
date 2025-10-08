@@ -6,7 +6,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:b_go/pages/conductor/destination_service.dart';
 import 'package:b_go/services/direction_validation_service.dart';
-import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:convert';
@@ -29,22 +28,19 @@ class _ConductorMapsState extends State<ConductorMaps>
   Position? _currentPosition;
   int passengerCount = 0;
   List<Map<String, dynamic>> _activeBookings = [];
-  List<Map<String, dynamic>> _activePreTickets =
-      []; // Separate list for pre-tickets
+  List<Map<String, dynamic>> _activePreTickets = [];
   List<Map<String, dynamic>> _activeManualTickets = [];
   List<Map<String, dynamic>> _routeDestinations = [];
   Timer? _locationTimer;
   bool _isLoading = true;
   StreamSubscription<QuerySnapshot>? _conductorSubscription;
   StreamSubscription<QuerySnapshot>? _bookingsSubscription;
-  StreamSubscription<QuerySnapshot>?
-      _preTicketsSubscription; // Separate subscription for pre-tickets
+  StreamSubscription<QuerySnapshot>? _preTicketsSubscription;
   StreamSubscription<QuerySnapshot>? _manualTicketsSubscription;
 
-  static const int MIN_ROUTE_MARKERS =
-      12; // Minimum route markers to always show
-  static const int MAX_ROUTE_MARKERS = 20; // Increased max route markers
-  static const int MAX_PASSENGER_MARKERS = 100; // Allow more passenger markers
+  static const int MIN_ROUTE_MARKERS = 12;
+  static const int MAX_ROUTE_MARKERS = 20;
+  static const int MAX_PASSENGER_MARKERS = 100;
   static const int MAX_DESTINATIONS_CACHE = 50;
   static const Duration MARKER_REFRESH_COOLDOWN = Duration(seconds: 2);
 
@@ -54,15 +50,9 @@ class _ConductorMapsState extends State<ConductorMaps>
   String? _activeTripDirection;
   String? _activePlaceCollection;
 
-  // Geofencing variables
-  List<Map<String, dynamic>> _passengersNearDropOff = [];
-  bool _showDropOffBanner = false;
-  DateTime? _lastGeofencingCheck;
-
   // Optimization variables
   static const int _locationUpdateInterval = 5;
   static const Duration _debounceDelay = Duration(milliseconds: 800);
-  static const Duration _geofencingCooldown = Duration(seconds: 10);
   Timer? _debounceTimer;
 
   // Memory optimization
@@ -72,16 +62,12 @@ class _ConductorMapsState extends State<ConductorMaps>
   // Performance flags
   bool _isUpdatingLocation = false;
   bool _isProcessingBookings = false;
-  bool _isProcessingPreTickets = false; // Separate flag for pre-tickets
+  bool _isProcessingPreTickets = false;
   bool _isRefreshingMarkers = false;
   bool _isDisposed = false;
 
   // App lifecycle management
   bool _isAppActive = true;
-
-  // Geofencing constants
-  static const double _dropOffRadius = 600.0;
-  static const double _readyDropOffRadius = 250.0;
 
   // Helper method to convert any numeric value to double
   double? _convertToDouble(dynamic value) {
@@ -127,8 +113,7 @@ class _ConductorMapsState extends State<ConductorMaps>
     if (color == Colors.yellow) return BitmapDescriptor.hueYellow;
     if (color == Colors.green) return BitmapDescriptor.hueGreen;
     if (color == Colors.red) return BitmapDescriptor.hueRed;
-    if (color == Colors.black)
-      return BitmapDescriptor.hueViolet; // Use violet for black markers
+    if (color == Colors.black) return BitmapDescriptor.hueViolet;
     return BitmapDescriptor.hueAzure;
   }
 
@@ -137,7 +122,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _safeInitialize();
-    _startGeofencingService();
   }
 
   Future<void> _safeInitialize() async {
@@ -161,7 +145,7 @@ class _ConductorMapsState extends State<ConductorMaps>
       // Load other data
       if (mounted && !_isDisposed && _currentPosition != null) {
         _loadBookings();
-        _loadPreTickets(); // Load pre-tickets separately
+        _loadPreTickets();
         _loadManualTickets();
         _loadConductorData();
       }
@@ -227,7 +211,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     _activePreTickets.clear();
     _activeManualTickets.clear();
     _routeDestinations.clear();
-    _passengersNearDropOff.clear();
     _cachedMarkers.clear();
 
     // Reset counters
@@ -243,20 +226,17 @@ class _ConductorMapsState extends State<ConductorMaps>
   void _periodicMemoryCleanup() {
     if (_isDisposed) return;
 
-    // FIXED: Use separate limits for route and passenger markers
     final totalMarkers = _cachedMarkers.length;
     final maxTotalMarkers = MIN_ROUTE_MARKERS + MAX_PASSENGER_MARKERS + 50;
 
     if (totalMarkers > maxTotalMarkers) {
       _cachedMarkers.clear();
       _lastMarkerCacheKey = '';
-      print(
-          'Cleared marker cache due to size ($totalMarkers > $maxTotalMarkers)');
+      print('Cleared marker cache due to size ($totalMarkers > $maxTotalMarkers)');
     }
 
     if (_routeDestinations.length > MAX_DESTINATIONS_CACHE) {
-      _routeDestinations =
-          _routeDestinations.take(MAX_DESTINATIONS_CACHE).toList();
+      _routeDestinations = _routeDestinations.take(MAX_DESTINATIONS_CACHE).toList();
       print('Trimmed destinations cache to ${MAX_DESTINATIONS_CACHE}');
     }
   }
@@ -268,12 +248,13 @@ class _ConductorMapsState extends State<ConductorMaps>
     _locationTimer?.cancel();
     _debounceTimer?.cancel();
     _bookingsSubscription?.cancel();
-    _preTicketsSubscription?.cancel(); // Cancel pre-tickets subscription
+    _preTicketsSubscription?.cancel();
     _conductorSubscription?.cancel();
     _manualTicketsSubscription?.cancel();
 
-    // Stop geofencing service
-    GeofencingService().stopMonitoring();
+    // ✅ DON'T stop geofencing service here - it should continue running
+    // even when the conductor leaves the maps page. It will be stopped
+    // when the conductor logs out or ends their trip in conductor_home.dart
 
     // Dispose map controller safely
     _mapController?.dispose();
@@ -281,42 +262,16 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     // Clear data structures
     _activeBookings.clear();
-    _activePreTickets.clear(); // Clear pre-tickets
+    _activePreTickets.clear();
     _activeManualTickets.clear();
     _routeDestinations.clear();
-    _passengersNearDropOff.clear();
     _cachedMarkers.clear();
 
     // Reset flags
     _isUpdatingLocation = false;
     _isProcessingBookings = false;
-    _isProcessingPreTickets = false; // Reset pre-tickets flag
+    _isProcessingPreTickets = false;
     _isRefreshingMarkers = false;
-  }
-
-  // Start geofencing service for conductor
-  Future<void> _startGeofencingService() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      // Get conductor document ID
-      final conductorQuery = await FirebaseFirestore.instance
-          .collection('conductors')
-          .where('uid', isEqualTo: user.uid)
-          .limit(1)
-          .get();
-
-      if (conductorQuery.docs.isNotEmpty) {
-        final conductorDocId = conductorQuery.docs.first.id;
-        await GeofencingService()
-            .startConductorMonitoring(widget.route, conductorDocId);
-        print(
-            '✅ Started conductor geofencing service for route: ${widget.route}');
-      }
-    } catch (e) {
-      print('❌ Error starting conductor geofencing service: $e');
-    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -392,8 +347,7 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     if (_currentPosition == null || !_isAppActive) return;
 
-    _locationTimer =
-        Timer.periodic(Duration(seconds: _locationUpdateInterval), (timer) {
+    _locationTimer = Timer.periodic(Duration(seconds: _locationUpdateInterval), (timer) {
       if (_isDisposed || !mounted || !_isAppActive) {
         timer.cancel();
         return;
@@ -409,13 +363,11 @@ class _ConductorMapsState extends State<ConductorMaps>
   Future<void> _updateCurrentLocation() async {
     if (_isUpdatingLocation || !_isAppActive || _isDisposed) return;
 
-    // FIXED: Only check passenger markers for memory pressure, not route markers
     final passengerMarkerCount = _activeBookings.length +
         _activePreTickets.length +
         _activeManualTickets.length;
     if (passengerMarkerCount > MAX_PASSENGER_MARKERS + 30) {
-      print(
-          'Skipping location update due to memory pressure (${passengerMarkerCount} passenger markers)');
+      print('Skipping location update due to memory pressure (${passengerMarkerCount} passenger markers)');
       return;
     }
 
@@ -432,7 +384,9 @@ class _ConductorMapsState extends State<ConductorMaps>
           _currentPosition = position;
         });
 
-        _performGeofencingCheck(position);
+        // ✅ GEOFENCING IS NOW HANDLED BY BACKGROUND SERVICE ONLY
+        // Background geofencing_service.dart started in conductor_home.dart handles all drop-offs
+        // This prevents duplicate drop-offs and passenger count issues
       }
     } catch (e) {
       print('Location update error: $e');
@@ -441,320 +395,11 @@ class _ConductorMapsState extends State<ConductorMaps>
     }
   }
 
-  // UPDATED: Improved geofencing logic with support for both pre-bookings and pre-tickets
-  void _performGeofencingCheck(Position currentPosition) {
-    print(
-        '🔍 Checking conductor geofencing for route: ${widget.route} at ${DateTime.now()}');
-    print(
-        '📍 Conductor position: ${currentPosition.latitude}, ${currentPosition.longitude}');
-    print('👥 Current passenger count: $passengerCount');
-    print('📊 Active bookings loaded: ${_activeBookings.length}');
-    print('📊 Active pre-tickets loaded: ${_activePreTickets.length}');
-    print('📊 Active manual tickets loaded: ${_activeManualTickets.length}');
+  // GEOFENCING COMPLETELY REMOVED FROM CONDUCTOR_MAPS.DART
+  // All passenger drop-offs are now handled by the background geofencing_service.dart
+  // which is started in conductor_home.dart on login
+  // This prevents duplicate drop-offs and incorrect passenger counts
 
-    if (_isDisposed ||
-        (_activeBookings.isEmpty &&
-            _activePreTickets.isEmpty &&
-            _activeManualTickets.isEmpty)) return;
-
-    final now = DateTime.now();
-    if (_lastGeofencingCheck != null &&
-        now.difference(_lastGeofencingCheck!) < _geofencingCooldown) {
-      final timeSinceLastCheck = now.difference(_lastGeofencingCheck!).inSeconds;
-      print('⏸️ Geofencing check skipped - cooldown active (${timeSinceLastCheck}s / ${_geofencingCooldown.inSeconds}s)');
-      return;
-    }
-    _lastGeofencingCheck = now;
-    print('✅ Geofencing cooldown expired - running full check...');
-
-    try {
-      List<Map<String, dynamic>> passengersNear = [];
-      List<Map<String, dynamic>> readyForDropOff = [];
-
-      // Check pre-bookings (only boarded ones for geofencing)
-      print('🔍 Checking ${_activeBookings.length} pre-bookings for geofencing...');
-      for (final booking in _activeBookings) {
-        print(
-            '📋 Pre-booking ${booking['id']}: status=${booking['status']}, to=${booking['to']}, coords=(${booking['toLatitude']}, ${booking['toLongitude']})');
-        if (_isDisposed) return;
-
-        // Only process boarded passengers for geofencing
-        final status = booking['status'] ?? '';
-        if (status != 'boarded') {
-          print('   ⏭️ Skipping - status is "$status", not "boarded"');
-          continue;
-        }
-        print('   ✅ Status is "boarded" - checking distance...');
-
-        final toLat = _convertToDouble(booking['toLatitude']);
-        final toLng = _convertToDouble(booking['toLongitude']);
-
-        if (toLat != null && toLng != null) {
-          final distance = Geolocator.distanceBetween(
-            currentPosition.latitude,
-            currentPosition.longitude,
-            toLat,
-            toLng,
-          );
-
-          print('📏 Distance to ${booking['to']}: ${distance.toStringAsFixed(1)}m (Pre-booking ID: ${booking['id']})');
-
-          if (distance <= _dropOffRadius) {
-            if (distance <= _readyDropOffRadius) {
-              print('🎯 Pre-booking READY for drop-off (≤${_readyDropOffRadius}m)');
-              readyForDropOff.add({...booking, 'ticketType': 'preBooking'});
-            } else {
-              print('⚠️ Pre-booking NEAR drop-off (≤${_dropOffRadius}m)');
-              passengersNear.add({...booking, 'ticketType': 'preBooking'});
-            }
-          }
-        } else {
-          print('❌ Pre-booking ${booking['id']} missing coordinates (to: ${booking['to']})');
-        }
-      }
-
-      // Check pre-tickets (scanned from PreTicket page)
-      for (final ticket in _activePreTickets) {
-        if (_isDisposed) return;
-
-        double? toLat = _convertToDouble(ticket['toLatitude']);
-        double? toLng = _convertToDouble(ticket['toLongitude']);
-
-        // If coordinates are missing, try to get them from the destination name
-        if ((toLat == null || toLng == null) && ticket['to'] != null) {
-          final coords = _getCoordinatesForPlace(ticket['to']);
-          if (coords != null) {
-            toLat = coords['latitude'];
-            toLng = coords['longitude'];
-            // Update the ticket with coordinates for future use
-            ticket['toLatitude'] = toLat;
-            ticket['toLongitude'] = toLng;
-          }
-        }
-
-        if (toLat != null && toLng != null) {
-          final distance = Geolocator.distanceBetween(
-            currentPosition.latitude,
-            currentPosition.longitude,
-            toLat,
-            toLng,
-          );
-
-          if (distance <= _dropOffRadius) {
-            if (distance <= _readyDropOffRadius) {
-              readyForDropOff.add({...ticket, 'ticketType': 'preTicket'});
-            } else {
-              passengersNear.add({...ticket, 'ticketType': 'preTicket'});
-            }
-          }
-        }
-      }
-
-      // Check manual tickets
-      for (final ticket in _activeManualTickets) {
-        if (_isDisposed) return;
-
-        double? toLat = _convertToDouble(ticket['toLatitude']);
-        double? toLng = _convertToDouble(ticket['toLongitude']);
-
-        // If coordinates are missing, try to get them from the destination name
-        if ((toLat == null || toLng == null) && ticket['to'] != null) {
-          final coords = _getCoordinatesForPlace(ticket['to']);
-          if (coords != null) {
-            toLat = coords['latitude'];
-            toLng = coords['longitude'];
-            // Update the ticket with coordinates for future use
-            ticket['toLatitude'] = toLat;
-            ticket['toLongitude'] = toLng;
-          }
-        }
-
-        if (toLat != null && toLng != null) {
-          final distance = Geolocator.distanceBetween(
-            currentPosition.latitude,
-            currentPosition.longitude,
-            toLat,
-            toLng,
-          );
-
-          print('📏 Distance to ${ticket['to']}: ${distance.toStringAsFixed(1)}m (Manual ticket)');
-
-          if (distance <= _dropOffRadius) {
-            if (distance <= _readyDropOffRadius) {
-              print('🎯 Manual ticket READY for drop-off (≤${_readyDropOffRadius}m)');
-              readyForDropOff.add({...ticket, 'ticketType': 'manual'});
-            } else {
-              print('⚠️ Manual ticket NEAR drop-off (≤${_dropOffRadius}m)');
-              passengersNear.add({...ticket, 'ticketType': 'manual'});
-            }
-          }
-        }
-      }
-
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      print('📊 GEOFENCING CHECK SUMMARY:');
-      print('   Pre-bookings active: ${_activeBookings.length}');
-      print('   Pre-tickets active: ${_activePreTickets.length}');
-      print('   Manual tickets active: ${_activeManualTickets.length}');
-      print('   Passengers NEAR drop-off: ${passengersNear.length}');
-      print('   Passengers READY for drop-off: ${readyForDropOff.length}');
-      print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      if (readyForDropOff.isNotEmpty) {
-        print('🚨 AUTO-DROP-OFF WILL BE TRIGGERED FOR ${readyForDropOff.length} PASSENGERS!');
-        for (var passenger in readyForDropOff) {
-          print('   - ${passenger['ticketType']}: ${passenger['from']} → ${passenger['to']}');
-        }
-      }
-
-      // Update UI safely
-      if (mounted && !_isDisposed) {
-        setState(() {
-          _passengersNearDropOff = passengersNear + readyForDropOff;
-          _showDropOffBanner = _passengersNearDropOff.isNotEmpty;
-        });
-      }
-
-      // Process ready passengers for automatic drop-off
-      if (readyForDropOff.isNotEmpty) {
-        print('🔄 Calling _processReadyPassengers...');
-        _processReadyPassengers(readyForDropOff);
-      }
-    } catch (e) {
-      print('Error in geofencing check: $e');
-      // Don't crash the app, just log the error
-    }
-  }
-
-  // UPDATED: Process passengers ready for drop-off with support for pre-tickets
-  void _processReadyPassengers(List<Map<String, dynamic>> readyPassengers) {
-    if (_isDisposed || readyPassengers.isEmpty) return;
-
-    // Process passengers one by one to avoid overwhelming the system
-    _processPassengerBatch(readyPassengers, 0);
-  }
-
-  // NEW: Process passengers in batches to prevent crashes
-  void _processPassengerBatch(
-      List<Map<String, dynamic>> passengers, int startIndex) {
-    if (_isDisposed || startIndex >= passengers.length) return;
-
-    final batchSize = 2; // Process 2 passengers at a time
-    final endIndex = math.min(startIndex + batchSize, passengers.length);
-    final currentBatch = passengers.sublist(startIndex, endIndex);
-
-    print(
-        'Processing passenger batch ${startIndex + 1}-$endIndex of ${passengers.length}');
-
-    for (final passenger in currentBatch) {
-      if (_isDisposed) return;
-
-      try {
-        final passengerId = passenger['id'];
-        final userId = passenger['userId'];
-        final quantity = passenger['quantity'] ?? 1;
-        final from = passenger['from'];
-        final to = passenger['to'];
-        final ticketType = passenger['ticketType'];
-
-        print('🚨 GEOFENCING DROP-OFF TRIGGERED 🚨');
-        print('📍 Passenger ID: $passengerId');
-        print('👤 User ID: $userId');
-        print('🎫 Ticket Type: $ticketType');
-        print('👥 Quantity: $quantity');
-        print('🚏 Route: $from → $to');
-        print('👫 Current passenger count BEFORE drop-off: $passengerCount');
-
-        // Update status and decrement count based on ticket type
-        if (ticketType == 'preBooking') {
-          print('📱 Processing PRE-BOOKING drop-off...');
-
-          // Check if already processed to prevent duplicates
-          final existsInList = _activeBookings.any((b) => b['id'] == passengerId);
-          if (!existsInList) {
-            print('⚠️ Pre-booking $passengerId already removed from activeBookings, skipping');
-            continue;
-          }
-
-          print('✅ Pre-booking $passengerId found in activeBookings, proceeding with drop-off');
-
-          // Remove from active bookings and decrement passengerCount
-          if (mounted && !_isDisposed) {
-            setState(() {
-              _activeBookings
-                  .removeWhere((booking) => booking['id'] == passengerId);
-              // FIXED: Pre-bookings DO affect passenger count when boarded
-              final decrementBy = quantity is int ? quantity : (quantity as num).toInt();
-              passengerCount = math.max(0, passengerCount - decrementBy);
-              print('➖ Decremented passenger count by $decrementBy');
-              print('👫 New passenger count AFTER drop-off: $passengerCount');
-            });
-          }
-
-          print('📝 Updating pre-booking status to "accomplished"...');
-          _updatePreBookingStatus(passengerId, userId, 'accomplished');
-
-          print('💰 Updating remittance ticket status...');
-          _updateRemittanceTicketStatus(passengerId, 'accomplished');
-
-          print('🔍 Updating scannedQRCodes collection status...');
-          _updateScannedQRCodeStatus(passengerId, 'accomplished');
-
-          print('✅ Pre-booking drop-off complete for $passengerId');
-          print('─────────────────────────────────────────');
-        } else if (ticketType == 'preTicket') {
-          // Remove from active pre-tickets
-          if (mounted && !_isDisposed) {
-            setState(() {
-              _activePreTickets
-                  .removeWhere((ticket) => ticket['id'] == passengerId);
-              passengerCount = math.max(
-                  0,
-                  passengerCount -
-                      (quantity is int ? quantity : (quantity as num).toInt()));
-            });
-          }
-          _updatePreTicketStatus(passengerId, userId, 'accomplished');
-        } else if (ticketType == 'manual') {
-          // Remove from active manual tickets
-          if (mounted && !_isDisposed) {
-            setState(() {
-              _activeManualTickets
-                  .removeWhere((ticket) => ticket['id'] == passengerId);
-              passengerCount = math.max(
-                  0,
-                  passengerCount -
-                      (quantity is int ? quantity : (quantity as num).toInt()));
-            });
-          }
-          _updateManualTicketStatus(passengerId, 'dropped_off', passenger);
-        }
-
-        _showDropOffNotification(passengerId, from, to, quantity);
-        print('Passenger count after drop-off: $passengerCount');
-      } catch (e) {
-        print('Error processing passenger drop-off: $e');
-        // Continue with next passenger instead of crashing
-      }
-    }
-
-    // Process next batch after a delay
-    if (endIndex < passengers.length && !_isDisposed) {
-      Timer(Duration(milliseconds: 500), () {
-        if (!_isDisposed) {
-          _processPassengerBatch(passengers, endIndex);
-        }
-      });
-    } else {
-      // All passengers processed, update conductor count and refresh markers
-      if (!_isDisposed) {
-        _updateConductorPassengerCount();
-        _debouncedRefreshMarkers();
-      }
-    }
-  }
-
-  // Update the _updatePreBookingStatus method
   Future<void> _updatePreBookingStatus(
       String passengerId, String userId, String status) async {
     if (_isDisposed) return;
@@ -762,6 +407,8 @@ class _ConductorMapsState extends State<ConductorMaps>
     print('🔄 _updatePreBookingStatus called for passenger: $passengerId');
     print('   User ID: $userId');
     print('   Target status: $status');
+
+    String? actualUserId = userId;
 
     try {
       // Update in conductor's preBookings collection
@@ -776,6 +423,14 @@ class _ConductorMapsState extends State<ConductorMaps>
 
       if (query.docs.isNotEmpty && !_isDisposed) {
         print('✏️ Updating conductor preBooking document...');
+
+        // If userId wasn't provided, try to get it from the conductor's document
+        if (actualUserId.isEmpty) {
+          final docData = query.docs.first.data();
+          actualUserId = docData['userId'] as String;
+          print('🔍 Retrieved userId from conductor document: $actualUserId');
+        }
+
         await query.docs.first.reference.update({
           'status': status,
           'dropOffTimestamp': FieldValue.serverTimestamp(),
@@ -791,41 +446,46 @@ class _ConductorMapsState extends State<ConductorMaps>
         print('⚠️ No conductor preBooking found for $passengerId');
       }
 
-      // FIXED: Also update in passenger's collection
-      if (userId.isNotEmpty && !_isDisposed) {
+      // Also update in passenger's collection with improved error handling
+      if (actualUserId.isNotEmpty && !_isDisposed) {
         print('👤 Updating passenger preBooking collection...');
-        print('   Path: users/$userId/preBookings/$passengerId');
+        print('   Path: users/$actualUserId/preBookings/$passengerId');
         try {
-          await FirebaseFirestore.instance
+          final docRef = FirebaseFirestore.instance
               .collection('users')
-              .doc(userId)
+              .doc(actualUserId)
               .collection('preBookings')
-              .doc(passengerId)
-              .update({
-            'status': status,
-            'dropOffTimestamp': FieldValue.serverTimestamp(),
-            'dropOffLocation': _currentPosition != null
-                ? {
-                    'latitude': _currentPosition!.latitude,
-                    'longitude': _currentPosition!.longitude,
-                  }
-                : null,
-          });
-          print('✅ Updated passenger pre-booking $passengerId status to $status');
+              .doc(passengerId);
+
+          final docSnapshot = await docRef.get();
+          if (docSnapshot.exists) {
+            await docRef.update({
+              'status': status,
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'dropOffLocation': _currentPosition != null
+                  ? {
+                      'latitude': _currentPosition!.latitude,
+                      'longitude': _currentPosition!.longitude,
+                    }
+                  : null,
+            });
+            print('✅ Updated passenger pre-booking $passengerId status to $status');
+          } else {
+            print('❌ Passenger pre-booking document does not exist at users/$actualUserId/preBookings/$passengerId');
+          }
         } catch (userUpdateError) {
           print('❌ Error updating passenger pre-booking: $userUpdateError');
-          // Continue - conductor side was updated successfully
+          print('   Stack trace: ${StackTrace.current}');
         }
       } else {
-        print('⚠️ Skipping passenger update - userId is empty or disposed');
+        print('⚠️ Skipping passenger update - userId is empty or disposed (actualUserId: $actualUserId)');
       }
     } catch (e) {
       print('❌ Error updating pre-booking status: $e');
-      // Don't crash the app, just log the error
+      print('   Stack trace: ${StackTrace.current}');
     }
   }
 
-  // Update remittance ticket status for pre-bookings
   Future<void> _updateRemittanceTicketStatus(
       String preBookingId, String status) async {
     if (_isDisposed) return;
@@ -834,7 +494,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      // Get conductor document
       final conductorQuery = await FirebaseFirestore.instance
           .collection('conductors')
           .where('uid', isEqualTo: user.uid)
@@ -848,7 +507,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       final formattedDate =
           '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-      // Find and update the remittance ticket
       final ticketQuery = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorDocId)
@@ -876,25 +534,30 @@ class _ConductorMapsState extends State<ConductorMaps>
         });
         print('Updated remittance ticket for pre-booking $preBookingId to $status');
 
-        // FIXED: Also sync to passenger's collection
         if (userId != null && !_isDisposed) {
           try {
-            await FirebaseFirestore.instance
+            final docRef = FirebaseFirestore.instance
                 .collection('users')
                 .doc(userId)
                 .collection('preBookings')
-                .doc(preBookingId)
-                .update({
-              'status': status,
-              'dropOffTimestamp': FieldValue.serverTimestamp(),
-              'dropOffLocation': _currentPosition != null
-                  ? {
-                      'latitude': _currentPosition!.latitude,
-                      'longitude': _currentPosition!.longitude,
-                    }
-                  : null,
-            });
-            print('✅ Synced status to passenger collection for $preBookingId');
+                .doc(preBookingId);
+
+            final docSnapshot = await docRef.get();
+            if (docSnapshot.exists) {
+              await docRef.update({
+                'status': status,
+                'dropOffTimestamp': FieldValue.serverTimestamp(),
+                'dropOffLocation': _currentPosition != null
+                    ? {
+                        'latitude': _currentPosition!.latitude,
+                        'longitude': _currentPosition!.longitude,
+                      }
+                    : null,
+              });
+              print('✅ Synced status to passenger collection for $preBookingId');
+            } else {
+              print('❌ Passenger pre-booking document does not exist at users/$userId/preBookings/$preBookingId');
+            }
           } catch (userSyncError) {
             print('⚠️ Failed to sync to passenger collection: $userSyncError');
           }
@@ -902,11 +565,9 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     } catch (e) {
       print('Error updating remittance ticket status: $e');
-      // Don't crash the app, just log the error
     }
   }
 
-  // Update scannedQRCodes collection status
   Future<void> _updateScannedQRCodeStatus(
       String preBookingId, String status) async {
     if (_isDisposed) return;
@@ -923,7 +584,6 @@ class _ConductorMapsState extends State<ConductorMaps>
 
       print('👤 Current user UID: ${user.uid}');
 
-      // Get conductor document
       print('🔍 Searching for conductor document...');
       final conductorQuery = await FirebaseFirestore.instance
           .collection('conductors')
@@ -939,7 +599,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       final conductorDocId = conductorQuery.docs.first.id;
       print('✅ Conductor document found: $conductorDocId');
 
-      // Find and update the scanned QR code
       print('🔍 Searching scannedQRCodes collection...');
       print('   Path: conductors/$conductorDocId/scannedQRCodes');
       print('   Query: WHERE bookingId == $preBookingId');
@@ -978,11 +637,9 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     } catch (e) {
       print('❌ Error updating scanned QR code status: $e');
-      // Don't crash the app, just log the error
     }
   }
 
-  // Update manual ticket status
   Future<void> _updateManualTicketStatus(
       String ticketId, String status, Map<String, dynamic> ticketData) async {
     if (_isDisposed) return;
@@ -1013,11 +670,9 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     } catch (e) {
       print('Error updating manual ticket status: $e');
-      // Don't crash the app, just log the error
     }
   }
 
-  // Update pre-ticket status
   Future<void> _updatePreTicketStatus(
       String ticketId, String userId, String status) async {
     if (_isDisposed || userId.isEmpty) return;
@@ -1042,7 +697,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       print('Updated pre-ticket $ticketId status to $status');
     } catch (e) {
       print('Error updating pre-ticket status: $e');
-      // Don't crash the app, just log the error
     }
   }
 
@@ -1069,7 +723,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     } catch (e) {
       print('Error updating conductor count: $e');
-      // Don't crash the app, just log the error
     }
   }
 
@@ -1104,14 +757,12 @@ class _ConductorMapsState extends State<ConductorMaps>
           backgroundColor: Colors.green[600],
           duration: Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.all(16),
         ),
       );
     } catch (e) {
       print('Error showing drop-off notification: $e');
-      // Don't crash the app, just log the error
     }
   }
 
@@ -1134,8 +785,7 @@ class _ConductorMapsState extends State<ConductorMaps>
         final conductorData = snapshot.docs.first.data();
         final activeTrip = conductorData['activeTrip'];
 
-        // Sync passenger count directly from Firebase (no double-counting)
-        // passengerCount already includes all boarded passengers (manual + pre-bookings)
+        // Sync passenger count directly from Firebase
         final firebasePassengerCount = conductorData['passengerCount'] ?? 0;
 
         if (passengerCount != firebasePassengerCount && mounted && !_isDisposed) {
@@ -1175,14 +825,12 @@ class _ConductorMapsState extends State<ConductorMaps>
     });
   }
 
-  // Load manual tickets with proper status filtering
   void _loadManualTickets() {
     if (_isDisposed) return;
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Get conductor ID first
     FirebaseFirestore.instance
         .collection('conductors')
         .where('uid', isEqualTo: user.uid)
@@ -1213,7 +861,6 @@ class _ConductorMapsState extends State<ConductorMaps>
           final manualTickets = snapshot.docs.map((doc) {
             final data = doc.data();
 
-            // Get coordinates for the destination if not present
             Map<String, double>? toCoords;
             if (data['toLatitude'] == null || data['toLongitude'] == null) {
               toCoords = _getCoordinatesForPlace(data['to'] ?? '');
@@ -1241,8 +888,7 @@ class _ConductorMapsState extends State<ConductorMaps>
             setState(() {
               _activeManualTickets = manualTickets;
             });
-            print(
-                'Loaded ${_activeManualTickets.length} active manual tickets for geofencing');
+            print('Loaded ${_activeManualTickets.length} active manual tickets for geofencing');
           }
         } catch (e) {
           print('Error processing manual tickets: $e');
@@ -1253,14 +899,12 @@ class _ConductorMapsState extends State<ConductorMaps>
     });
   }
 
-  // UPDATED: Load pre-bookings only (separate from pre-tickets)
   void _loadBookings() {
     if (_isProcessingBookings || _isDisposed) return;
     _isProcessingBookings = true;
 
     _bookingsSubscription?.cancel();
 
-    // Get conductor ID first, then load pre-bookings from conductor's collection
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _isProcessingBookings = false;
@@ -1281,11 +925,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       final conductorDocId = conductorQuery.docs.first.id;
       final conductorData = conductorQuery.docs.first.data();
 
-      // Load ALL pre-bookings for the route, filtering by status in code
-      // This ensures we catch scanned pre-bookings regardless of status
-      // 'paid' = waiting to be picked up with real-time location updates
-      // 'boarded' = on the bus for geofencing
-      // 'pending_payment' with scannedBy = scanned and boarded
       final activeTripId = conductorData['activeTrip']?['tripId'];
       final preBookingsStream = activeTripId != null
           ? FirebaseFirestore.instance
@@ -1311,28 +950,34 @@ class _ConductorMapsState extends State<ConductorMaps>
         try {
           List<Map<String, dynamic>> activeBookings = [];
 
-          // Process pre-bookings with both 'paid' and 'boarded' status
+          print('📊 Processing ${preBookingsSnapshot.docs.length} pre-bookings from conductor collection...');
+
           for (var doc in preBookingsSnapshot.docs) {
             final data = doc.data();
             final status = data['status'] ?? '';
             final scannedBy = data['scannedBy'];
 
-            // If there's an active trip, only process pre-bookings for that trip
-            // If no active trip, process all pre-bookings for this conductor
+            print('  📋 Pre-booking ${doc.id}: status="$status", from="${data['from']}", to="${data['to']}", scannedBy=${scannedBy != null}');
+
             final isForCurrentTrip = activeTripId == null ||
                 data['tripId'] == activeTripId ||
-                data['tripId'] == null; // Include pre-bookings without tripId
+                data['tripId'] == null;
 
-            // Check if pre-booking is active:
-            // 1. status is 'paid' (waiting to board) OR 'boarded' (already boarded)
-            // 2. OR has scannedBy field (was scanned, regardless of status)
-            final isActive = (status == 'paid' || status == 'boarded' || scannedBy != null);
+            final isActive = (status == 'paid' || status == 'boarded' || scannedBy != null) &&
+                            status != 'accomplished';
+
+            if (status == 'accomplished') {
+              print('  ⏭️ SKIPPING - already accomplished');
+            } else if (!isForCurrentTrip) {
+              print('  ⏭️ SKIPPING - not for current trip');
+            } else if (!isActive) {
+              print('  ⏭️ SKIPPING - not active (status="$status")');
+            }
 
             if (isActive && isForCurrentTrip) {
-              // Determine actual status: if scannedBy exists, treat as boarded
+              print('  ✅ ACTIVE - adding to activeBookings list');
               final actualStatus = (scannedBy != null) ? 'boarded' : status;
 
-              // Get coordinates from route destinations if not present
               Map<String, double>? fromCoords;
               Map<String, double>? toCoords;
 
@@ -1343,16 +988,12 @@ class _ConductorMapsState extends State<ConductorMaps>
                 toCoords = _getCoordinatesForPlace(data['to'] ?? '');
               }
 
-              // For 'paid' status, use real-time passenger location
-              // For 'boarded' status, use destination location for geofencing
               double? passengerLat, passengerLng;
 
               if (actualStatus == 'paid') {
-                // Use real-time passenger location for waiting passengers
                 passengerLat = _convertToDouble(data['passengerLatitude']);
                 passengerLng = _convertToDouble(data['passengerLongitude']);
               } else {
-                // For boarded passengers, use destination for geofencing
                 passengerLat = toCoords?['latitude'] ?? _convertToDouble(data['toLatitude']);
                 passengerLng = toCoords?['longitude'] ?? _convertToDouble(data['toLongitude']);
               }
@@ -1371,8 +1012,8 @@ class _ConductorMapsState extends State<ConductorMaps>
                 'passengerLongitude': passengerLng,
                 'status': actualStatus,
                 'ticketType': 'preBooking',
-                'qrData': data['qrData'], // Include QR data for scanning
-                'isRealTime': actualStatus == 'paid', // Flag for real-time tracking
+                'qrData': data['qrData'],
+                'isRealTime': actualStatus == 'paid',
               });
             }
           }
@@ -1390,8 +1031,7 @@ class _ConductorMapsState extends State<ConductorMaps>
             _debouncedRefreshMarkers();
             _isProcessingBookings = false;
 
-            print(
-                'Loaded ${_activeBookings.length} active pre-bookings for geofencing');
+            print('Loaded ${_activeBookings.length} active pre-bookings for geofencing');
           });
         } catch (e) {
           print('Error processing pre-bookings: $e');
@@ -1404,14 +1044,12 @@ class _ConductorMapsState extends State<ConductorMaps>
     });
   }
 
-  // NEW: Load pre-tickets separately
   void _loadPreTickets() {
     if (_isProcessingPreTickets || _isDisposed) return;
     _isProcessingPreTickets = true;
 
     _preTicketsSubscription?.cancel();
 
-    // Get conductor ID first, then load pre-tickets from conductor's collection
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _isProcessingPreTickets = false;
@@ -1431,7 +1069,6 @@ class _ConductorMapsState extends State<ConductorMaps>
 
       final conductorDocId = conductorQuery.docs.first.id;
 
-      // Load pre-tickets (created from PreTicket page)
       final preTicketsStream = FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorDocId)
@@ -1449,13 +1086,11 @@ class _ConductorMapsState extends State<ConductorMaps>
         try {
           List<Map<String, dynamic>> activePreTickets = [];
 
-          // Process pre-tickets (created from PreTicket page)
           for (var doc in preTicketsSnapshot.docs) {
             final data = doc.data();
             final status = data['status'] ?? '';
 
             if (status == 'boarded') {
-              // Get coordinates from route destinations if not present
               Map<String, double>? fromCoords;
               Map<String, double>? toCoords;
 
@@ -1504,8 +1139,7 @@ class _ConductorMapsState extends State<ConductorMaps>
             _debouncedRefreshMarkers();
             _isProcessingPreTickets = false;
 
-            print(
-                'Loaded ${_activePreTickets.length} active pre-tickets for geofencing');
+            print('Loaded ${_activePreTickets.length} active pre-tickets for geofencing');
           });
         } catch (e) {
           print('Error processing pre-tickets: $e');
@@ -1518,9 +1152,7 @@ class _ConductorMapsState extends State<ConductorMaps>
     });
   }
 
-  // Add helper method to extract userId from document path
   String _getUserIdFromPath(String documentPath) {
-    // Path format: users/{userId}/preTickets/{ticketId}
     final pathParts = documentPath.split('/');
     if (pathParts.length >= 2 && pathParts[0] == 'users') {
       return pathParts[1];
@@ -1534,7 +1166,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     try {
       String routeId = widget.route;
 
-      // Try to get route ID from conductor data first
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
         try {
@@ -1563,7 +1194,6 @@ class _ConductorMapsState extends State<ConductorMaps>
 
       if (mounted && !_isDisposed) {
         setState(() {
-          // Limit cached destinations to prevent memory issues
           _routeDestinations =
               destinations.take(MAX_DESTINATIONS_CACHE).toList();
         });
@@ -1594,7 +1224,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       if (snapshot.exists) {
         List<Map<String, dynamic>> manualDestinations = [];
 
-        // Process Place collection
         final placeSnapshot = await FirebaseFirestore.instance
             .collection('Destinations')
             .doc(routeName)
@@ -1619,7 +1248,6 @@ class _ConductorMapsState extends State<ConductorMaps>
           }
         }
 
-        // Process Place 2 collection
         final place2Snapshot = await FirebaseFirestore.instance
             .collection('Destinations')
             .doc(routeName)
@@ -1674,7 +1302,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     _cachedMarkers.clear();
     final Set<Marker> markers = {};
 
-    // 1. Add conductor marker (always include)
     if (_currentPosition != null) {
       markers.add(
         Marker(
@@ -1689,14 +1316,13 @@ class _ConductorMapsState extends State<ConductorMaps>
         ),
       );
     }
-    // 2. FIXED: Always add route markers first (minimum guaranteed)
+
     if (_routeDestinations.isNotEmpty) {
       final routeMarkers = _createGuaranteedRouteMarkers();
       markers.addAll(routeMarkers);
       print('Added ${routeMarkers.length} route markers (guaranteed)');
     }
 
-    // 3. Add passenger markers (unlimited but with memory awareness)
     final passengerMarkers = _createSmartPassengerMarkers();
     markers.addAll(passengerMarkers);
     print('Added ${passengerMarkers.length} passenger markers');
@@ -1705,8 +1331,7 @@ class _ConductorMapsState extends State<ConductorMaps>
     _lastMarkerCacheKey = cacheKey;
     _lastMarkerRefresh = now;
 
-    print(
-        'Created ${markers.length} markers total (${passengerMarkers.length} passengers + 1 conductor)');
+    print('Created ${markers.length} markers total (${passengerMarkers.length} passengers + 1 conductor)');
     return markers;
   }
 
@@ -1715,7 +1340,6 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     List<Map<String, dynamic>> filteredDestinations = [];
 
-    // Filter by active trip direction if available
     if (_activePlaceCollection != null) {
       filteredDestinations = _routeDestinations.where((destination) {
         final direction = destination['direction'] ?? 'unknown';
@@ -1731,13 +1355,11 @@ class _ConductorMapsState extends State<ConductorMaps>
       filteredDestinations = _routeDestinations;
     }
 
-    // Ensure we always show at least MIN_ROUTE_MARKERS, but cap at MAX_ROUTE_MARKERS
     int targetRouteMarkers =
         math.min(filteredDestinations.length, MAX_ROUTE_MARKERS);
     targetRouteMarkers = math.max(targetRouteMarkers,
         math.min(MIN_ROUTE_MARKERS, filteredDestinations.length));
 
-    // If we have more destinations than our target, sample them evenly
     List<Map<String, dynamic>> selectedDestinations;
     if (filteredDestinations.length > targetRouteMarkers) {
       selectedDestinations = [];
@@ -1752,7 +1374,6 @@ class _ConductorMapsState extends State<ConductorMaps>
       selectedDestinations = filteredDestinations;
     }
 
-    // Create markers for selected destinations
     for (final destination in selectedDestinations) {
       final name = destination['name'] ?? 'Unknown';
       final km = destination['km'] ?? 0.0;
@@ -1775,20 +1396,16 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     }
 
-    print(
-        'Created ${markers.length} guaranteed route markers from ${filteredDestinations.length} destinations');
+    print('Created ${markers.length} guaranteed route markers from ${filteredDestinations.length} destinations');
     return markers;
   }
 
   Set<Marker> _createSmartPassengerMarkers() {
     final Set<Marker> markers = {};
 
-    // Calculate available memory budget for passenger markers
-    final availableSlots =
-        MAX_PASSENGER_MARKERS; // Don't reduce based on route markers
+    final availableSlots = MAX_PASSENGER_MARKERS;
 
-    print(
-        'Creating smart passenger markers with ${availableSlots} available slots');
+    print('Creating smart passenger markers with ${availableSlots} available slots');
 
     List<Map<String, dynamic>> allPassengers = [
       ..._activeBookings.map((b) => {...b, 'ticketType': 'preBooking'}),
@@ -1798,12 +1415,9 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     print('Total passengers: ${allPassengers.length}');
 
-    // If we have more passengers than slots, prioritize by importance and distance
     List<Map<String, dynamic>> prioritizedPassengers;
     if (allPassengers.length > availableSlots && _currentPosition != null) {
-      // Sort by priority: waiting passengers first, then by distance
       allPassengers.sort((a, b) {
-        // Priority 1: Waiting passengers (paid pre-bookings)
         final aWaiting =
             a['status'] == 'paid' && a['ticketType'] == 'preBooking';
         final bWaiting =
@@ -1812,7 +1426,6 @@ class _ConductorMapsState extends State<ConductorMaps>
         if (aWaiting && !bWaiting) return -1;
         if (!aWaiting && bWaiting) return 1;
 
-        // Priority 2: Distance to passenger location (for waiting) or destination (for boarded)
         final aLat = aWaiting
             ? (_convertToDouble(a['passengerLatitude']) ?? 0.0)
             : (_convertToDouble(a['toLatitude']) ?? 0.0);
@@ -1847,13 +1460,11 @@ class _ConductorMapsState extends State<ConductorMaps>
       });
 
       prioritizedPassengers = allPassengers.take(availableSlots).toList();
-      print(
-          'Prioritized ${prioritizedPassengers.length} passengers out of ${allPassengers.length}');
+      print('Prioritized ${prioritizedPassengers.length} passengers out of ${allPassengers.length}');
     } else {
       prioritizedPassengers = allPassengers;
     }
 
-    // Create markers for prioritized passengers
     for (final passenger in prioritizedPassengers) {
       final passengerLat =
           _convertToDouble(passenger['passengerLatitude']) ?? 0.0;
@@ -1870,8 +1481,7 @@ class _ConductorMapsState extends State<ConductorMaps>
         switch (ticketType) {
           case 'preBooking':
             if (status == 'paid' && isRealTime) {
-              icon = _getSmallCircularMarker(Colors
-                  .red); // Red for waiting passengers with real-time tracking
+              icon = _getSmallCircularMarker(Colors.red);
               title = 'Pre-booked Passenger';
             } else if (status == 'boarded') {
               icon = _getHumanIcon();
@@ -1932,9 +1542,7 @@ class _ConductorMapsState extends State<ConductorMaps>
       _cachedMarkers.clear();
 
       if (mounted && !_isDisposed) {
-        setState(() {
-          // Trigger rebuild
-        });
+        setState(() {});
       }
     } finally {
       _isRefreshingMarkers = false;
@@ -1942,46 +1550,7 @@ class _ConductorMapsState extends State<ConductorMaps>
   }
 
   void _refreshPassengerCount() {
-    // Passenger count comes from Firebase conductor document
-    print(
-        'Passenger count refresh called - current count: $passengerCount (from Firebase)');
-  }
-
-  String _getGeofencingStatus() {
-    if (_passengersNearDropOff.isEmpty) return 'No passengers near drop-off';
-
-    final readyCount = _passengersNearDropOff.where((p) {
-      if (_currentPosition == null) return false;
-      final distance = Geolocator.distanceBetween(
-        _currentPosition!.latitude,
-        _currentPosition!.longitude,
-        p['toLatitude'] ?? 0,
-        p['toLongitude'] ?? 0,
-      );
-      return distance <= 50;
-    }).length;
-
-    final approachingCount = _passengersNearDropOff.length - readyCount;
-
-    if (readyCount > 0 && approachingCount > 0) {
-      return '$readyCount ready, $approachingCount approaching';
-    } else if (readyCount > 0) {
-      return '$readyCount ready for drop-off';
-    } else {
-      return '$approachingCount approaching drop-off';
-    }
-  }
-
-  void _manualGeofencingCheck() {
-    if (_currentPosition != null &&
-        (_activeBookings.isNotEmpty ||
-            _activePreTickets.isNotEmpty ||
-            _activeManualTickets.isNotEmpty) &&
-        _isAppActive &&
-        !_isDisposed) {
-      _performGeofencingCheck(_currentPosition!);
-      _refreshPassengerCount();
-    }
+    print('Passenger count refresh called - current count: $passengerCount (from Firebase)');
   }
 
   void _showLocationError(String errorMessage) {
@@ -2065,11 +1634,6 @@ class _ConductorMapsState extends State<ConductorMaps>
               tooltip: 'Scan QR Code',
             ),
             IconButton(
-              icon: Icon(Icons.location_on),
-              onPressed: _manualGeofencingCheck,
-              tooltip: 'Check Geofencing',
-            ),
-            IconButton(
               icon: Icon(Icons.refresh),
               onPressed: _debouncedRefreshMarkers,
               tooltip: 'Refresh Markers',
@@ -2108,7 +1672,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                   tiltGesturesEnabled: false,
                 ),
                 _buildInfoOverlay(),
-                if (_showDropOffBanner && !_isDisposed) _buildDropOffBanner(),
               ],
             ),
     );
@@ -2149,7 +1712,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     );
   }
 
-  // UPDATED: Build info overlay with three separate sections
   Widget _buildInfoOverlay() {
     return Positioned(
       top: 16,
@@ -2174,13 +1736,10 @@ class _ConductorMapsState extends State<ConductorMaps>
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF0091AD))),
-
-            // Separate sections for different ticket types and statuses
             Wrap(
               spacing: 4,
               runSpacing: 4,
               children: [
-                // Paid pre-bookings (waiting to be picked up) - Red markers with real-time tracking
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2195,8 +1754,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                           fontWeight: FontWeight.w500,
                           color: Colors.red[800])),
                 ),
-
-                // Boarded pre-bookings (on the bus)
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2211,8 +1768,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                           fontWeight: FontWeight.w500,
                           color: Colors.green[700])),
                 ),
-
-                // Pre-tickets section
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2226,8 +1781,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                           fontWeight: FontWeight.w500,
                           color: Colors.orange[700])),
                 ),
-
-                // Manual tickets section
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
@@ -2243,7 +1796,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                 ),
               ],
             ),
-
             if (_routeDestinations.isNotEmpty) ...[
               SizedBox(height: 4),
               Text('Route: ${widget.route}',
@@ -2251,22 +1803,6 @@ class _ConductorMapsState extends State<ConductorMaps>
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                       color: Colors.grey[700])),
-              if (_showDropOffBanner) ...[
-                SizedBox(height: 4),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.green[100],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green[300]!, width: 1),
-                  ),
-                  child: Text(_getGeofencingStatus(),
-                      style: GoogleFonts.outfit(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green[700])),
-                ),
-              ],
               if (_activeTripDirection != null) ...[
                 Container(
                   margin: EdgeInsets.only(top: 2),
@@ -2298,153 +1834,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     );
   }
 
-  Widget _buildDropOffBanner() {
-    return Positioned(
-      top: 120,
-      left: 16,
-      right: 16,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.green[100],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.green[400]!, width: 2),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black12, blurRadius: 8, offset: Offset(0, 4)),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.location_on, color: Colors.green[700], size: 20),
-                SizedBox(width: 8),
-                Text('Passengers Near Drop-off',
-                    style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green[800])),
-              ],
-            ),
-            SizedBox(height: 8),
-            ..._passengersNearDropOff.take(3).map((passenger) {
-              final distance = _currentPosition != null
-                  ? Geolocator.distanceBetween(
-                      _currentPosition!.latitude,
-                      _currentPosition!.longitude,
-                      passenger['toLatitude'] ?? 0,
-                      passenger['toLongitude'] ?? 0,
-                    )
-                  : 0.0;
-
-              final ticketType = passenger['ticketType'] ?? 'unknown';
-              Color badgeColor = Colors.grey;
-              String typeLabel = 'Unknown';
-
-              switch (ticketType) {
-                case 'preBooking':
-                  badgeColor = Colors.blue;
-                  typeLabel = 'Pre-book';
-                  break;
-                case 'preTicket':
-                  badgeColor = Colors.orange;
-                  typeLabel = 'Pre-ticket';
-                  break;
-                case 'manual':
-                  badgeColor = Colors.grey;
-                  typeLabel = 'Manual';
-                  break;
-              }
-
-              return Container(
-                margin: EdgeInsets.only(bottom: 4),
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[300]!, width: 1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.person, color: Colors.green[600], size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${passenger['from']} → ${passenger['to']} (${passenger['quantity']} pax)',
-                            style: GoogleFonts.outfit(
-                                fontSize: 12, color: Colors.green[700]),
-                          ),
-                          Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 4, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: badgeColor.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(typeLabel,
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w600,
-                                        color:
-                                            badgeColor.withValues(alpha: 0.7))),
-                              ),
-                              Spacer(),
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.green[200],
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text('${distance.toStringAsFixed(0)}m',
-                                    style: GoogleFonts.outfit(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.green[800])),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-            if (_passengersNearDropOff.length > 3) ...[
-              Text('... and ${_passengersNearDropOff.length - 3} more',
-                  style: GoogleFonts.outfit(
-                      fontSize: 10, color: Colors.green[600])),
-            ],
-            SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _isDisposed
-                      ? null
-                      : () => setState(() => _showDropOffBanner = false),
-                  child: Text('Dismiss',
-                      style: GoogleFonts.outfit(
-                          fontSize: 12, color: Colors.grey[600])),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Add QR scanner method
   void _openQRScanner() {
     Navigator.of(context)
         .push(
@@ -2454,7 +1843,6 @@ class _ConductorMapsState extends State<ConductorMaps>
     )
         .then((result) {
       if (result == true) {
-        // Refresh markers and passenger count after successful scan
         _debouncedRefreshMarkers();
         _refreshPassengerCount();
       }
@@ -2462,7 +1850,6 @@ class _ConductorMapsState extends State<ConductorMaps>
   }
 }
 
-// QR Scanner page for conductor maps
 class _QRScannerPage extends StatefulWidget {
   @override
   State<_QRScannerPage> createState() => _QRScannerPageState();
@@ -2531,7 +1918,6 @@ class _QRScannerPageState extends State<_QRScannerPage> {
   }
 }
 
-// Helper functions for QR code processing (reused from conductor_from.dart)
 Map<String, dynamic> parseQRData(String qrData) {
   try {
     final Map<String, dynamic> data = jsonDecode(qrData);
@@ -2548,7 +1934,6 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   final qrDataString = jsonEncode(data);
   final quantity = data['quantity'] ?? 1;
 
-  // Get conductor document
   final conductorDoc = await FirebaseFirestore.instance
       .collection('conductors')
       .where('uid', isEqualTo: user.uid)
@@ -2562,18 +1947,15 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   final conductorRoute = conductorData['route'];
   final route = data['route'];
 
-  // Validate route match
   if (conductorRoute != route) {
     throw Exception(
         'Invalid route. You are a $conductorRoute conductor but trying to scan a $route ticket. Only $conductorRoute tickets can be scanned.');
   }
 
-  // Check if this is a pre-booking or pre-ticket
   final type = data['type'] ?? '';
   if (type == 'preBooking') {
     await _processPreBooking(data, user, conductorDoc, quantity, qrDataString);
   } else {
-    // Validate direction compatibility for pre-tickets
     if (type == 'preTicket') {
       final passengerDirection = data['direction'];
       final passengerPlaceCollection = data['placeCollection'];
@@ -2587,7 +1969,6 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
         );
 
         if (!isDirectionCompatible) {
-          // Get conductor's active trip direction for better error message
           final activeTrip = conductorData['activeTrip'];
           final conductorDirection = activeTrip?['direction'] ?? 'Unknown';
 
@@ -2603,7 +1984,6 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
 
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
-  // Find the paid pre-booking
   final preBookingsQuery = await FirebaseFirestore.instance
       .collectionGroup('preBookings')
       .where('qrData', isEqualTo: qrDataString)
@@ -2618,25 +1998,21 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   final paidPreBooking = preBookingsQuery.docs.first;
   final preBookingData = paidPreBooking.data();
 
-  // Check if already boarded
   if (preBookingData['status'] == 'boarded' ||
       preBookingData['boardingStatus'] == 'boarded') {
     throw Exception('This pre-booking has already been scanned and boarded.');
   }
 
-  // Update pre-booking status to "boarded"
   await paidPreBooking.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
     'boardingStatus': 'boarded',
-    // Stop real-time location tracking by removing location update fields
     'locationTrackingStopped': true,
     'locationTrackingStoppedAt': FieldValue.serverTimestamp(),
   });
 
-  // Sync passenger doc and remittance ticket; do NOT increment passengerCount for pre-bookings
   try {
     final bookingId = paidPreBooking.id;
     final passengerUserId = preBookingData['userId'];
@@ -2680,7 +2056,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     print('⚠️ Conductor maps sync to boarded failed: $e');
   }
 
-  // Store in conductor's preBookings collection
   final conductorDocId = conductorDoc.docs.first.id;
   await FirebaseFirestore.instance
       .collection('conductors')
@@ -2696,13 +2071,10 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     'status': 'boarded',
     'data': data,
   });
-
-  // Do NOT increment passenger count for pre-bookings here to avoid double counting.
 }
 
 Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
-  // Find the pending pre-ticket
   final preTicketsQuery = await FirebaseFirestore.instance
       .collectionGroup('preTickets')
       .where('qrData', isEqualTo: qrDataString)
@@ -2716,12 +2088,10 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   final pendingPreTicket = preTicketsQuery.docs.first;
   final preTicketData = pendingPreTicket.data();
 
-  // Check if already boarded
   if (preTicketData['status'] == 'boarded') {
     throw Exception('This pre-ticket has already been scanned and boarded.');
   }
 
-  // Update pre-ticket status to "boarded"
   await pendingPreTicket.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
@@ -2729,7 +2099,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'scannedAt': FieldValue.serverTimestamp(),
   });
 
-  // Store in conductor's preTickets collection
   final conductorDocId = conductorDoc.docs.first.id;
   await FirebaseFirestore.instance
       .collection('conductors')
@@ -2746,7 +2115,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'data': data,
   });
 
-  // Increment passenger count
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)

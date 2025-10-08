@@ -55,9 +55,6 @@ class _HomePageState extends State<HomePage> {
   // Store ETA calculations for each bus with timestamp
   Map<String, Map<String, dynamic>> _busETAs = {};
 
-  // Filter container animation
-  bool _isFilterVisible = false;
-
   @override
   void initState() {
     super.initState();
@@ -738,7 +735,7 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  // Passenger count from Firestore
+                  // Passenger count (manual + pre-ticket boarded) + boarded pre-bookings
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
                         .collection('conductors')
@@ -746,30 +743,86 @@ class _HomePageState extends State<HomePage> {
                         .limit(1)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      int passengerCount = 0;
+                      int baseCount = 0;
+                      String? conductorDocId;
+                      String? activeTripId;
                       if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>?;
-                        passengerCount = data?['passengerCount'] ?? 0;
+                        final doc = snapshot.data!.docs.first;
+                        final data = doc.data() as Map<String, dynamic>?;
+                        baseCount = data?['passengerCount'] ?? 0;
+                        conductorDocId = doc.id;
+                        activeTripId = (data?['activeTrip'] as Map<String, dynamic>?)?['tripId'];
                       }
 
-                      final isFull = passengerCount >= 27;
-
-                      return Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isFull ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: isFull ? Colors.red : Colors.green, width: 1),
-                        ),
-                        child: Text(
-                          '$passengerCount/27 Passengers',
-                          style: GoogleFonts.outfit(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: isFull ? Colors.red : Colors.green,
+                      if (conductorDocId == null) {
+                        final isFull = baseCount >= 27;
+                        return Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isFull ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: isFull ? Colors.red : Colors.green, width: 1),
                           ),
-                        ),
+                          child: Text(
+                            '$baseCount/27 Passengers',
+                            style: GoogleFonts.outfit(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: isFull ? Colors.red : Colors.green,
+                            ),
+                          ),
+                        );
+                      }
+
+                      // Nested stream: count boarded pre-bookings for the conductor (current trip if available)
+                      final preBookingsQuery = activeTripId != null
+                          ? FirebaseFirestore.instance
+                              .collection('conductors')
+                              .doc(conductorDocId)
+                              .collection('preBookings')
+                              .where('tripId', isEqualTo: activeTripId)
+                              .where('status', isEqualTo: 'boarded')
+                              .where('boardingStatus', isEqualTo: 'boarded')
+                              .snapshots()
+                          : FirebaseFirestore.instance
+                              .collection('conductors')
+                              .doc(conductorDocId)
+                              .collection('preBookings')
+                              .where('status', isEqualTo: 'boarded')
+                              .where('boardingStatus', isEqualTo: 'boarded')
+                              .snapshots();
+
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: preBookingsQuery,
+                        builder: (context, preSnap) {
+                          int boardedPreBooked = 0;
+                          if (preSnap.hasData) {
+                            boardedPreBooked = preSnap.data!.docs.fold<int>(0, (sum, d) {
+                              final m = d.data() as Map<String, dynamic>;
+                              return sum + ((m['quantity'] as int?) ?? 1);
+                            });
+                          }
+                          final total = baseCount + boardedPreBooked;
+                          final isFull = total >= 27;
+                          return Container(
+                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isFull ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                  color: isFull ? Colors.red : Colors.green, width: 1),
+                            ),
+                            child: Text(
+                              '$total/27 Passengers',
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isFull ? Colors.red : Colors.green,
+                              ),
+                            ),
+                          );
+                        },
                       );
                     },
                   ),
@@ -878,18 +931,223 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _toggleFilterContainer() {
-    setState(() {
-      _isFilterVisible = !_isFilterVisible;
-    });
-  }
+  void _showFilterBottomSheet() {
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
-  void _selectRoute(String? route) {
-    setState(() {
-      _selectedRoute = route;
-      _updateMarkers();
-      _isFilterVisible = false; // Close filter after selection
-    });
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                margin: EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.filter_list,
+                      color: Color(0xFF0091AD),
+                      size: isMobile ? 24 : 28,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Filter by Route',
+                      style: GoogleFonts.outfit(
+                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close, size: isMobile ? 24 : 28),
+                      onPressed: () => Navigator.pop(context),
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1),
+              // Options list
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Show All Routes option
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedRoute = null;
+                            _updateMarkers();
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: _selectedRoute == null 
+                                ? Color(0xFF0091AD).withOpacity(0.1)
+                                : Colors.transparent,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade200,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: isMobile ? 20 : 24,
+                                height: isMobile ? 20 : 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _selectedRoute == null 
+                                        ? Color(0xFF0091AD)
+                                        : Colors.grey.shade400,
+                                    width: 2,
+                                  ),
+                                  color: _selectedRoute == null 
+                                      ? Color(0xFF0091AD)
+                                      : Colors.transparent,
+                                ),
+                                child: _selectedRoute == null
+                                    ? Center(
+                                        child: Container(
+                                          width: isMobile ? 8 : 10,
+                                          height: isMobile ? 8 : 10,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              SizedBox(width: 16),
+                              Text(
+                                'Show All Routes',
+                                style: GoogleFonts.outfit(
+                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                                  fontWeight: _selectedRoute == null 
+                                      ? FontWeight.w600 
+                                      : FontWeight.w500,
+                                  color: _selectedRoute == null 
+                                      ? Color(0xFF0091AD)
+                                      : Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Route options
+                      ..._availableRoutes.map((route) => InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedRoute = route;
+                            _updateMarkers();
+                          });
+                          Navigator.of(context).pop();
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          decoration: BoxDecoration(
+                            color: _selectedRoute == route 
+                                ? Color(0xFF0091AD).withOpacity(0.1)
+                                : Colors.transparent,
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Colors.grey.shade200,
+                                width: 1,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: isMobile ? 20 : 24,
+                                height: isMobile ? 20 : 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: _selectedRoute == route 
+                                        ? Color(0xFF0091AD)
+                                        : Colors.grey.shade400,
+                                    width: 2,
+                                  ),
+                                  color: _selectedRoute == route 
+                                      ? Color(0xFF0091AD)
+                                      : Colors.transparent,
+                                ),
+                                child: _selectedRoute == route
+                                    ? Center(
+                                        child: Container(
+                                          width: isMobile ? 8 : 10,
+                                          height: isMobile ? 8 : 10,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  route,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                                    fontWeight: _selectedRoute == route 
+                                        ? FontWeight.w600 
+                                        : FontWeight.w500,
+                                    color: _selectedRoute == route 
+                                        ? Color(0xFF0091AD)
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )).toList(),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -931,7 +1189,7 @@ class _HomePageState extends State<HomePage> {
           ),
           IconButton(
             icon: Icon(Icons.filter_list, color: Colors.white),
-            onPressed: _toggleFilterContainer,
+            onPressed: _showFilterBottomSheet,
             tooltip: 'Filter by Route',
           ),
         ],
@@ -1070,188 +1328,6 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          // Backdrop overlay
-          if (_isFilterVisible)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: GestureDetector(
-                onTap: _toggleFilterContainer,
-                child: Container(
-                  color: Colors.black.withOpacity(0.3),
-                ),
-              ),
-            ),
-          // Sliding Filter Container
-          AnimatedPositioned(
-            duration: Duration(milliseconds: 400),
-            curve: Curves.easeOutCubic,
-            bottom: _isFilterVisible ? 0 : -MediaQuery.of(context).size.height * 0.6,
-            left: 0,
-            right: 0,
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.6,
-              child: GestureDetector(
-                onPanUpdate: (details) {
-                  // Allow swiping down to close
-                  if (details.delta.dy > 0) {
-                    _toggleFilterContainer();
-                  }
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(25),
-                      topRight: Radius.circular(25),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 15,
-                        offset: Offset(0, -5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Handle bar
-                      Container(
-                        margin: EdgeInsets.only(top: 12),
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      // Header
-                      Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.filter_list,
-                              color: Color(0xFF0091AD),
-                              size: 24,
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Filter by Route',
-                              style: GoogleFonts.outfit(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            Spacer(),
-                            GestureDetector(
-                              onTap: _toggleFilterContainer,
-                              child: Container(
-                                padding: EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(Icons.close, color: Colors.grey[600], size: 20),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Filter options
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            children: [
-                              // Show All Routes option
-                              Container(
-                                width: double.infinity,
-                                margin: EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: _selectedRoute == null
-                                      ? Color(0xFF0091AD).withOpacity(0.1)
-                                      : Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedRoute == null
-                                        ? Color(0xFF0091AD)
-                                        : Colors.grey[300]!,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ListTile(
-                                  title: Text(
-                                    'Show All Routes',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedRoute == null
-                                          ? Color(0xFF0091AD)
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                  leading: Radio<String?>(
-                                    value: null,
-                                    groupValue: _selectedRoute,
-                                    onChanged: _selectRoute,
-                                    activeColor: Color(0xFF0091AD),
-                                  ),
-                                  onTap: () => _selectRoute(null),
-                                ),
-                              ),
-                              // Individual route options
-                              ..._availableRoutes.map((route) => Container(
-                                width: double.infinity,
-                                margin: EdgeInsets.only(bottom: 12),
-                                decoration: BoxDecoration(
-                                  color: _selectedRoute == route
-                                      ? Color(0xFF0091AD).withOpacity(0.1)
-                                      : Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: _selectedRoute == route
-                                        ? Color(0xFF0091AD)
-                                        : Colors.grey[300]!,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: ListTile(
-                                  title: Text(
-                                    route,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: _selectedRoute == route
-                                          ? Color(0xFF0091AD)
-                                          : Colors.black87,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  leading: Radio<String?>(
-                                    value: route,
-                                    groupValue: _selectedRoute,
-                                    onChanged: _selectRoute,
-                                    activeColor: Color(0xFF0091AD),
-                                  ),
-                                  onTap: () => _selectRoute(route),
-                                ),
-                              )),
-                              SizedBox(height: 20), // Extra space at bottom
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),

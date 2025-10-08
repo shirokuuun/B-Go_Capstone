@@ -362,6 +362,8 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
     }
   }
 
+// Replace your _endCurrentTrip method with this fixed version
+
   Future<void> _endCurrentTrip() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -383,6 +385,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           final endingTripId = activeTrip['tripId'];
           final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+          // Move tickets to remittance
           try {
             final ticketsSnapshot = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -425,16 +428,22 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('Error moving tickets to remittance: $e');
           }
 
+          // FIXED: Mark scannedQRCodes as completed, but DON'T update if already accomplished
           try {
             final scannedQRs = await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
                 .collection('scannedQRCodes')
+                .where('tripId', isEqualTo: endingTripId)
                 .get();
 
             for (var doc in scannedQRs.docs) {
               final data = doc.data();
-              if (data['tripCompleted'] != true) {
+              final currentStatus = data['status'] ?? '';
+
+              // Only update if NOT already accomplished by geofencing
+              if (currentStatus != 'accomplished' &&
+                  data['tripCompleted'] != true) {
                 await doc.reference.update({
                   'tripCompleted': true,
                   'completedAt': FieldValue.serverTimestamp(),
@@ -443,16 +452,27 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               }
             }
 
+            print(
+                '✅ Marked scannedQRCodes as completed (preserved accomplished status)');
+          } catch (e) {
+            print('⚠️ Error marking QR codes as completed: $e');
+          }
+
+          // FIXED: Mark preBookings as completed, but DON'T overwrite accomplished status
+          try {
             final preBookings = await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
                 .collection('preBookings')
-                .where('boardingStatus', isEqualTo: 'boarded')
+                .where('tripId', isEqualTo: endingTripId)
                 .get();
 
             for (var doc in preBookings.docs) {
               final data = doc.data();
-              if (data['tripId'] == endingTripId &&
+              final currentStatus = data['status'] ?? '';
+
+              // Only mark as completed if NOT already accomplished by geofencing
+              if (currentStatus != 'accomplished' &&
                   data['tripCompleted'] != true) {
                 await doc.reference.update({
                   'tripCompleted': true,
@@ -462,11 +482,12 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             }
 
             print(
-                '✅ Marked scanned QRs and pre-bookings from trip $endingTripId as completed');
+                '✅ Marked preBookings as completed (preserved accomplished status)');
           } catch (e) {
-            print('⚠️ Error marking QR codes as completed: $e');
+            print('⚠️ Error marking pre-bookings as completed: $e');
           }
 
+          // FIXED: Only delete scannedQRCodes that were NOT accomplished
           try {
             final scannedQRsToDelete = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -475,36 +496,66 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                 .where('tripId', isEqualTo: endingTripId)
                 .get();
 
+            int deletedCount = 0;
+            int preservedCount = 0;
+
             for (var doc in scannedQRsToDelete.docs) {
+              final data = doc.data();
+              final status = data['status'] ?? '';
+
+              // CRITICAL: Don't delete if accomplished by geofencing
+              if (status == 'accomplished' ||
+                  data['dropOffTimestamp'] != null) {
+                print('🛡️ Preserving accomplished scannedQR: ${doc.id}');
+                preservedCount++;
+                continue;
+              }
+
               await doc.reference.delete();
+              deletedCount++;
             }
 
             print(
-                '✅ Cleared ${scannedQRsToDelete.docs.length} scanned QR codes from trip $endingTripId');
+                '✅ Cleared $deletedCount scanned QR codes, preserved $preservedCount accomplished ones from trip $endingTripId');
           } catch (e) {
             print('⚠️ Error clearing scanned QR codes: $e');
           }
 
-// Also clear pre-bookings that were boarded in this trip
+          // FIXED: Only delete pre-bookings that were NOT accomplished
           try {
             final preBookingsToDelete = await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
                 .collection('preBookings')
                 .where('tripId', isEqualTo: endingTripId)
-                .where('boardingStatus', isEqualTo: 'boarded')
                 .get();
 
+            int deletedCount = 0;
+            int preservedCount = 0;
+
             for (var doc in preBookingsToDelete.docs) {
+              final data = doc.data();
+              final status = data['status'] ?? '';
+
+              // CRITICAL: Don't delete if accomplished by geofencing
+              if (status == 'accomplished' ||
+                  data['dropOffTimestamp'] != null) {
+                print('🛡️ Preserving accomplished preBooking: ${doc.id}');
+                preservedCount++;
+                continue;
+              }
+
               await doc.reference.delete();
+              deletedCount++;
             }
 
             print(
-                '✅ Cleared ${preBookingsToDelete.docs.length} boarded pre-bookings from trip $endingTripId');
+                '✅ Cleared $deletedCount boarded pre-bookings, preserved $preservedCount accomplished ones from trip $endingTripId');
           } catch (e) {
             print('⚠️ Error clearing boarded pre-bookings: $e');
           }
 
+          // FIXED: Process trip end with respect to accomplished pre-bookings
           try {
             await PreBook.processTripEndForPreBookings(
                 conductorDocId, today, endingTripId);
@@ -513,6 +564,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('❌ Error processing pre-bookings for trip end: $e');
           }
 
+          // Rest of the trip ending logic (unchanged)
           try {
             final dailyTripDoc = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -1411,7 +1463,8 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   }
 
   if (type == 'preBooking') {
-    await _processPreBooking(data, user, conductorDoc, quantity, jsonEncode(data));
+    await _processPreBooking(
+        data, user, conductorDoc, quantity, jsonEncode(data));
   } else {
     await _processPreTicket(data, user, conductorDoc, quantity);
   }
@@ -1425,7 +1478,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   // Get current passenger count BEFORE increment
   final currentData = conductorDoc.docs.first.data() as Map<String, dynamic>;
   final currentCount = currentData['passengerCount'] ?? 0;
-  
+
   print('🔍 BEFORE INCREMENT: passengerCount = $currentCount');
   print('🔍 Incrementing by: $quantity');
 
@@ -1493,7 +1546,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
       .collection('conductors')
       .doc(conductorDocId)
       .update({'passengerCount': FieldValue.increment(quantity)});
-  
+
   // Verify the update
   final updatedDoc = await FirebaseFirestore.instance
       .collection('conductors')
@@ -1501,7 +1554,8 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
       .get();
   final newCount = updatedDoc.data()?['passengerCount'] ?? 0;
   print('🔍 AFTER INCREMENT: passengerCount = $newCount');
-  print('✅ Successfully incremented passenger count from $currentCount to $newCount');
+  print(
+      '✅ Successfully incremented passenger count from $currentCount to $newCount');
 }
 
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
@@ -1576,7 +1630,8 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     'from': data['from'] ?? preBookingData['from'],
     'to': data['to'] ?? preBookingData['to'],
     'quantity': quantity,
-    'totalFare': data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
+    'totalFare':
+        data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
     'route': data['route'] ?? preBookingData['route'],
     'status': 'boarded',
   });
@@ -1601,16 +1656,19 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     'from': data['from'] ?? preBookingData['from'],
     'to': data['to'] ?? preBookingData['to'],
     'quantity': quantity,
-    'totalFare': data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
+    'totalFare':
+        data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
     'route': data['route'] ?? preBookingData['route'],
   });
 
-  print('✅ Pre-booking successfully processed. Dashboard will track this separately from passengerCount.');
+  print(
+      '✅ Pre-booking successfully processed. Dashboard will track this separately from passengerCount.');
 
-      await FirebaseFirestore.instance
+  await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
       .update({'passengerCount': FieldValue.increment(quantity)});
 
-  print('✅ Pre-booking successfully processed. Incremented passengerCount by $quantity');
+  print(
+      '✅ Pre-booking successfully processed. Incremented passengerCount by $quantity');
 }

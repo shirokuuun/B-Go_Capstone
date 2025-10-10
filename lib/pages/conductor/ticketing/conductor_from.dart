@@ -1637,15 +1637,17 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
   final activeTripId = conductorData['activeTrip']?['tripId'];
 
-  print('🔍 Looking for pre-booking with QR data...');
+  print('\n🔍 === STARTING PRE-BOOKING SCAN PROCESS ===');
   print('🔍 Conductor ID: $conductorDocId');
   print('🔍 Active Trip ID: $activeTripId');
-  print('🔍 Data: $data');
+  print('🔍 QR Data: $data');
 
   DocumentSnapshot? paidPreBooking;
   Map<String, dynamic>? preBookingData;
   String? bookingId;
+  String? userId;
 
+  // ✅ STRATEGY 1: Search by booking ID
   final dataBookingId = data['bookingId'] ?? data['id'];
   if (dataBookingId != null) {
     print('🔍 Strategy 1: Searching by booking ID: $dataBookingId');
@@ -1661,13 +1663,14 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       if (directBooking.exists) {
         final bookingData = directBooking.data()!;
         final bookingStatus = bookingData['status'] ?? '';
-        print(
-            '🔍 Found booking in conductor preBookings: status=$bookingStatus');
+        print('🔍 Found booking: status=$bookingStatus');
 
+        // ✅ Accept both 'paid' and 'boarded' status
         if (bookingStatus == 'paid' || bookingStatus == 'boarded') {
           paidPreBooking = directBooking;
           preBookingData = bookingData;
           bookingId = dataBookingId;
+          userId = bookingData['userId'];
           print('✅ Found valid pre-booking by ID');
         }
       }
@@ -1676,6 +1679,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
+  // ✅ STRATEGY 2: Search by QR data string
   if (paidPreBooking == null) {
     print('🔍 Strategy 2: Searching by QR data string');
     try {
@@ -1698,6 +1702,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
           paidPreBooking = doc;
           preBookingData = docData;
           bookingId = doc.id;
+          userId = docData['userId'];
           print('✅ Found valid pre-booking by QR data');
           break;
         }
@@ -1707,6 +1712,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
+  // ✅ STRATEGY 3: Search by route details
   if (paidPreBooking == null && data['from'] != null && data['to'] != null) {
     print('🔍 Strategy 3: Searching by from/to/quantity');
     try {
@@ -1727,6 +1733,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
           paidPreBooking = doc;
           preBookingData = docData;
           bookingId = doc.id;
+          userId = docData['userId'];
           print('✅ Found valid pre-booking by route details');
           break;
         }
@@ -1742,54 +1749,26 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'No paid pre-booking found with this QR code. Please ensure payment is completed.');
   }
 
-  if (preBookingData['boardingStatus'] == 'boarded') {
-    print(
-        '⚠️ This pre-booking was already marked as boarded, but processing anyway');
+  // ✅ Get userId if not found yet
+  if (userId == null) {
+    userId = preBookingData['userId'] ?? data['userId'];
   }
 
   print('✅ Processing pre-booking: $bookingId');
+  print('✅ User ID: $userId');
 
+  // ✅ CRITICAL FIX: Update status from "paid" → "boarded" in original location
   await paidPreBooking.reference.update({
-    'status': 'boarded',
+    'status': 'boarded', // ✅ CRITICAL: Change from "paid" to "boarded"
+    'boardingStatus': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
-    'boardingStatus': 'boarded',
     'tripId': activeTripId,
   });
+  print('✅ Updated original pre-booking to "boarded"');
 
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .collection('scannedQRCodes')
-      .add({
-    'type': 'preBooking',
-    'bookingId': bookingId,
-    'qrData': qrDataString,
-    'originalDocumentId': paidPreBooking.id,
-    'originalCollection': paidPreBooking.reference.parent.path,
-    'scannedAt': FieldValue.serverTimestamp(),
-    'scannedBy': user.uid,
-    'data': data,
-    'tripId': activeTripId,
-    'tripCompleted': false,
-    'from': data['from'] ?? preBookingData['from'],
-    'to': data['to'] ?? preBookingData['to'],
-    'quantity': quantity,
-    'totalFare':
-        data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
-    'route': data['route'] ?? preBookingData['route'],
-    'status': 'boarded',
-  });
-
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .update({'passengerCount': FieldValue.increment(quantity)});
-
-  print(
-      '✅ Pre-booking $bookingId successfully processed. Incremented passengerCount by $quantity');
-
+  // ✅ Update in conductor's preBookings collection (if exists)
   try {
     final conductorPreBookingRef = FirebaseFirestore.instance
         .collection('conductors')
@@ -1800,6 +1779,19 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     final conductorPreBookingSnap = await conductorPreBookingRef.get();
     if (conductorPreBookingSnap.exists) {
       await conductorPreBookingRef.update({
+        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'boardingStatus': 'boarded',
+        'boardedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'scannedAt': FieldValue.serverTimestamp(),
+        'qr': true,
+        'tripId': activeTripId,
+      });
+      print('✅ Updated conductor preBookings to "boarded"');
+    } else {
+      // ✅ If doesn't exist, create it as "boarded"
+      await conductorPreBookingRef.set({
+        ...preBookingData,
         'status': 'boarded',
         'boardingStatus': 'boarded',
         'boardedAt': FieldValue.serverTimestamp(),
@@ -1807,35 +1799,77 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'scannedAt': FieldValue.serverTimestamp(),
         'qr': true,
         'tripId': activeTripId,
-        'tripCompleted': false,
-      });
+        'userId': userId,
+        'from': data['from'] ?? preBookingData['from'],
+        'to': data['to'] ?? preBookingData['to'],
+        'quantity': quantity,
+        'route': data['route'] ?? preBookingData['route'],
+      }, SetOptions(merge: true));
+      print('✅ Created conductor preBookings as "boarded"');
     }
   } catch (e) {
     print('⚠️ Error updating conductor preBooking: $e');
   }
 
-  try {
-    final userId = preBookingData['userId'] ?? data['userId'];
-    if (userId != null) {
+  // ✅ Update in user's preBookings collection
+  if (userId != null) {
+    try {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('preBookings')
           .doc(bookingId)
           .update({
-        'status': 'boarded',
+        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'boardingStatus': 'boarded',
         'boardedAt': FieldValue.serverTimestamp(),
         'scannedBy': user.uid,
         'scannedAt': FieldValue.serverTimestamp(),
-        'boardingStatus': 'boarded',
         'tripId': activeTripId,
       });
-      print('✅ Updated user preBooking to boarded');
+      print('✅ Updated user preBookings to "boarded"');
+    } catch (e) {
+      print('⚠️ Failed to update user preBooking: $e');
     }
-  } catch (e) {
-    print('⚠️ Failed to update user preBooking to boarded: $e');
   }
 
-  print(
-      '✅ Pre-booking successfully processed and stored in scannedQRCodes collection');
+  // ✅ Add to scannedQRCodes collection as "boarded"
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('scannedQRCodes')
+      .add({
+    'type': 'preBooking',
+    'bookingId': bookingId,
+    'preBookingId': bookingId, // ✅ For query compatibility
+    'id': bookingId, // ✅ For query compatibility
+    'documentId': bookingId, // ✅ For query compatibility
+    'qrData': qrDataString,
+    'originalDocumentId': paidPreBooking.id,
+    'originalCollection': paidPreBooking.reference.parent.path,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'data': data,
+    'tripId': activeTripId,
+    'from': data['from'] ?? preBookingData['from'],
+    'to': data['to'] ?? preBookingData['to'],
+    'quantity': quantity,
+    'userId': userId, // ✅ Include userId
+    'totalFare':
+        data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
+    'route': data['route'] ?? preBookingData['route'],
+    'status': 'boarded', // ✅ CRITICAL: Start as "boarded"
+    'boardingStatus': 'boarded',
+  });
+  print('✅ Added to scannedQRCodes as "boarded"');
+
+  // ✅ Increment passenger count
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+  print('✅ Incremented passengerCount by $quantity');
+
+  print('✅ === PRE-BOOKING SCAN COMPLETE ===');
+  print('✅ Pre-booking $bookingId is now "boarded" and ready for geofencing\n');
 }

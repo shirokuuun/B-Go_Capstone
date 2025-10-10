@@ -380,9 +380,6 @@ class GeofencingService {
       }
 
       int totalDecremented = 0;
-      Set<String> processedDestinations = {};
-
-      // ✅ NEW: Group tickets by destination
       Map<String, List<Map<String, dynamic>>> ticketsByDestination = {};
 
       // 1. COLLECT ALL MANUAL TICKETS grouped by destination
@@ -407,32 +404,19 @@ class GeofencingService {
           final ticketTripId = ticket['tripId'];
           final status = ticket['status'] ?? '';
 
-          print(
-              '🔍 Manual ticket ${ticketDoc.id}: to=$destinationName, active=$isActive, status=$status, tripId=$ticketTripId');
-
-          // Check if should process
           bool shouldProcess = isActive &&
               destinationName != null &&
               status != 'accomplished' &&
               status != 'completed';
 
-          // Check tripId compatibility
           bool tripIdMatches = false;
           if (ticketTripId == null) {
             tripIdMatches = true;
-            print(
-                '✅ Ticket has null tripId - will process as current trip ticket');
           } else if (ticketTripId == activeTripId) {
             tripIdMatches = true;
-            print('✅ Ticket tripId matches active trip');
-          } else {
-            tripIdMatches = false;
-            print(
-                '⏭️ Skipping ticket - belongs to different trip: $ticketTripId vs $activeTripId');
           }
 
           if (shouldProcess && tripIdMatches) {
-            // ✅ NEW: Group tickets by destination
             if (!ticketsByDestination.containsKey(destinationName)) {
               ticketsByDestination[destinationName] = [];
             }
@@ -444,64 +428,76 @@ class GeofencingService {
               'quantity': (ticket['quantity'] as num?)?.toInt() ?? 1,
               'ticketId': ticketDoc.id,
             });
-
-            print(
-                '📦 Grouped manual ticket ${ticketDoc.id} to destination: $destinationName');
-          } else {
-            if (!isActive) {
-              print(
-                  '⏭️ Skipping manual ticket ${ticketDoc.id} - not active (already accomplished)');
-            } else if (!tripIdMatches) {
-              print(
-                  '⏭️ Skipping manual ticket ${ticketDoc.id} - tripId mismatch');
-            } else if (status == 'accomplished' || status == 'completed') {
-              print(
-                  '⏭️ Skipping manual ticket ${ticketDoc.id} - status is already $status');
-            }
           }
         }
       }
 
-      // 2. COLLECT PRE-BOOKINGS grouped by destination
+      // 2. ✅ FIXED: COLLECT PRE-BOOKINGS with better query and status checks
+      print('\n🔍 === STARTING PRE-BOOKINGS COLLECTION ===');
+
+      // Query for boarded pre-bookings
       final preBookingsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
           .collection('preBookings')
-          .where('status', isEqualTo: 'boarded')
+          .where('status', isEqualTo: 'boarded') // ✅ Only get boarded ones
           .get();
 
       print('📚 Found ${preBookingsSnapshot.docs.length} boarded pre-bookings');
 
       for (var doc in preBookingsSnapshot.docs) {
         final booking = doc.data();
+        final bookingId = doc.id;
         final destinationName = booking['to'];
         final bookingTripId = booking['tripId'];
+        final currentStatus = booking['status'] ?? '';
+        final boardingStatus = booking['boardingStatus'] ?? '';
 
+        print('\n🔍 Processing pre-booking: $bookingId');
+        print('   - Destination: $destinationName');
+        print('   - Status: $currentStatus');
+        print('   - BoardingStatus: $boardingStatus');
+        print('   - TripId: $bookingTripId vs Active: $activeTripId');
+
+        // ✅ CRITICAL: Check if already completed
+        final hasDropOffTimestamp = booking['dropOffTimestamp'] != null;
+        final hasCompletedAt = booking['completedAt'] != null;
+        final hasAccomplishedAt = booking['accomplishedAt'] != null;
+        final geofenceStatus = booking['geofenceStatus'] ?? '';
+
+        print('   - hasDropOffTimestamp: $hasDropOffTimestamp');
+        print('   - hasCompletedAt: $hasCompletedAt');
+        print('   - hasAccomplishedAt: $hasAccomplishedAt');
+        print('   - geofenceStatus: $geofenceStatus');
+
+        // ✅ Skip if already completed
+        if (hasDropOffTimestamp ||
+            hasCompletedAt ||
+            hasAccomplishedAt ||
+            currentStatus == 'completed' ||
+            currentStatus == 'accomplished' ||
+            geofenceStatus == 'completed') {
+          print('   ⏭️ SKIPPING - Already completed');
+          continue;
+        }
+
+        // ✅ Check tripId compatibility
         bool bookingTripMatches =
             (bookingTripId == null || bookingTripId == activeTripId);
 
         if (!bookingTripMatches) {
-          print(
-              '⏭️ Skipping pre-booking ${doc.id} - belongs to different trip');
+          print('   ⏭️ SKIPPING - TripId mismatch');
           continue;
         }
 
-        final hasDropOffTimestamp = booking['dropOffTimestamp'] != null;
-        final hasCompletedAt = booking['completedAt'] != null;
-        final currentStatus = booking['status'] ?? '';
-
-        if (hasDropOffTimestamp ||
-            hasCompletedAt ||
-            currentStatus == 'completed' ||
-            currentStatus == 'accomplished') {
-          print('⏭️ Skipping pre-booking ${doc.id} - already completed');
-          continue;
-        }
-
+        // ✅ Get quantity
         int quantity = 1;
         if (booking['quantity'] != null) {
           quantity = (booking['quantity'] as num).toInt();
         }
+
+        print('   ✅ Pre-booking qualifies for geofencing!');
+        print('   - Quantity: $quantity');
 
         if (destinationName != null) {
           if (!ticketsByDestination.containsKey(destinationName)) {
@@ -512,13 +508,14 @@ class GeofencingService {
             'type': 'preBooking',
             'reference': doc.reference,
             'quantity': quantity,
-            'bookingId': doc.id,
+            'bookingId': bookingId,
           });
 
-          print(
-              '📦 Grouped pre-booking ${doc.id} to destination: $destinationName');
+          print('   📦 Added to destination group: $destinationName');
         }
       }
+
+      print('\n🔍 === PRE-BOOKINGS COLLECTION COMPLETE ===\n');
 
       // 3. COLLECT PRE-TICKETS grouped by destination
       final preTicketsSnapshot = await FirebaseFirestore.instance
@@ -581,14 +578,27 @@ class GeofencingService {
 
       // ✅ NOW PROCESS ALL DESTINATIONS
       print(
-          '\n🎯 Processing ${ticketsByDestination.length} unique destinations...\n');
+          '\n🎯 === PROCESSING ${ticketsByDestination.length} DESTINATIONS ===\n');
 
       for (var entry in ticketsByDestination.entries) {
         final destinationName = entry.key;
         final ticketsForDestination = entry.value;
 
-        print(
-            '🔍 Processing destination: $destinationName with ${ticketsForDestination.length} ticket(s)');
+        print('\n🔍 Processing destination: $destinationName');
+        print('   Total tickets: ${ticketsForDestination.length}');
+
+        // Count by type
+        final manualCount =
+            ticketsForDestination.where((t) => t['type'] == 'manual').length;
+        final preBookingCount = ticketsForDestination
+            .where((t) => t['type'] == 'preBooking')
+            .length;
+        final preTicketCount =
+            ticketsForDestination.where((t) => t['type'] == 'preTicket').length;
+
+        print('   - Manual: $manualCount');
+        print('   - Pre-bookings: $preBookingCount');
+        print('   - Pre-tickets: $preTicketCount');
 
         // Get coordinates for this destination
         final destinationCoords =
@@ -596,7 +606,7 @@ class GeofencingService {
 
         if (destinationCoords == null) {
           print(
-              '⚠️ Could not get coordinates for $destinationName, skipping all tickets to this destination');
+              '   ⚠️ Could not get coordinates, skipping all tickets to this destination');
           continue;
         }
 
@@ -604,7 +614,7 @@ class GeofencingService {
         final lng = destinationCoords['longitude'];
 
         if (lat == null || lng == null) {
-          print('⚠️ Invalid coordinates for $destinationName, skipping');
+          print('   ⚠️ Invalid coordinates, skipping');
           continue;
         }
 
@@ -616,16 +626,15 @@ class GeofencingService {
         );
 
         print(
-            '🎯 Destination $destinationName: ${distance.toStringAsFixed(1)}m away (threshold: ${_geofenceRadius}m)');
+            '   📍 Distance: ${distance.toStringAsFixed(1)}m (threshold: ${_geofenceRadius}m)');
 
         if (distance <= _geofenceRadius) {
-          print('✅ Conductor is within geofence radius!');
-          print('🔍 Checking if approaching destination...');
+          print('   ✅ Within geofence radius!');
 
           if (await _isApproachingDestination(conductorPosition, lat, lng)) {
-            print('✅ Conductor IS approaching destination!');
+            print('   ✅ Conductor IS approaching destination!');
             print(
-                '🚀 Processing ALL ${ticketsForDestination.length} ticket(s) to $destinationName');
+                '   🚀 PROCESSING ALL ${ticketsForDestination.length} ticket(s)');
 
             // ✅ PROCESS ALL TICKETS TO THIS DESTINATION
             for (var ticketData in ticketsForDestination) {
@@ -638,44 +647,42 @@ class GeofencingService {
                 final ticketId = ticketData['ticketId'] as String;
 
                 print(
-                    '🚀 MARKING MANUAL TICKET AS COMPLETED: $ticketId (quantity: $quantity)');
+                    '      🚀 MARKING MANUAL TICKET: $ticketId (qty: $quantity)');
                 await _markConductorTicketCompleted(
                     reference, quantity, dateId);
                 totalDecremented += quantity;
-                print(
-                    '✅ Manual ticket $ticketId completed: $quantity passenger(s) dropped off');
+                print('      ✅ Manual ticket $ticketId completed');
               } else if (type == 'preBooking') {
                 final bookingId = ticketData['bookingId'] as String;
 
                 print(
-                    '🚀 MARKING PRE-BOOKING AS COMPLETED: $bookingId (quantity: $quantity)');
+                    '      🚀 MARKING PRE-BOOKING: $bookingId (qty: $quantity)');
                 await _markPreBookingCompleted(reference, quantity);
                 totalDecremented += quantity;
-                print(
-                    '✅ Pre-booking $bookingId completed: $quantity passenger(s) dropped off');
+                print('      ✅ Pre-booking $bookingId completed');
               } else if (type == 'preTicket') {
                 final ticketId = ticketData['ticketId'] as String;
 
                 print(
-                    '🚀 MARKING PRE-TICKET AS COMPLETED: $ticketId (quantity: $quantity)');
+                    '      🚀 MARKING PRE-TICKET: $ticketId (qty: $quantity)');
                 await _markPreTicketCompleted(reference, quantity);
                 totalDecremented += quantity;
-                print(
-                    '✅ Pre-ticket $ticketId completed: $quantity passenger(s) dropped off');
+                print('      ✅ Pre-ticket $ticketId completed');
               }
             }
 
-            print('✅ Total decremented so far: $totalDecremented');
-            processedDestinations.add(destinationName);
-          } else {
             print(
-                '⏭️ Conductor is NOT approaching (moving away from destination)');
+                '   ✅ Total decremented for $destinationName: ${ticketsForDestination.fold<int>(0, (sum, t) => sum + (t['quantity'] as int))}');
+          } else {
+            print('   ⏭️ NOT approaching (moving away from destination)');
           }
         } else {
-          print(
-              '⏭️ Not within geofence radius yet (${distance.toStringAsFixed(1)}m > ${_geofenceRadius}m)');
+          print('   ⏭️ Not within geofence radius yet');
         }
       }
+
+      print('\n🎯 === GEOFENCING COMPLETE ===');
+      print('Total passengers to drop off: $totalDecremented');
 
       // Update passenger count
       if (totalDecremented > 0) {
@@ -694,9 +701,12 @@ class GeofencingService {
         print('✅ Total passengers dropped off: $totalDecremented');
         print(
             '✅ Conductor passenger count updated: $currentPassengerCount → $newPassengerCount');
+      } else {
+        print('ℹ️ No passengers dropped off this check');
       }
     } catch (e) {
       print('❌ Error in conductor geofencing check: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -1136,7 +1146,9 @@ class GeofencingService {
   Future<void> _markPreBookingCompleted(
       DocumentReference bookingRef, int quantity) async {
     try {
-      // Get the booking data first to find the userId
+      print('\n🔄 === STARTING _markPreBookingCompleted ===');
+
+      // Get the booking data first
       final bookingDoc = await bookingRef.get();
       if (!bookingDoc.exists) {
         print('❌ Pre-booking document not found');
@@ -1148,10 +1160,14 @@ class GeofencingService {
       final bookingId = bookingDoc.id;
       final destination = bookingData['to'] ?? bookingData['data']?['to'];
 
-      print(
-          '🔄 Marking pre-booking as accomplished: userId=$userId, bookingId=$bookingId, destination=$destination');
+      print('📋 Pre-booking details:');
+      print('   - ID: $bookingId');
+      print('   - UserID: $userId');
+      print('   - Destination: $destination');
+      print('   - Quantity: $quantity');
 
-      // Update in conductor's preBookings collection
+      // ✅ STEP 1: Update conductor's preBookings collection
+      print('\n🔄 STEP 1: Updating conductor preBookings...');
       await bookingRef.update({
         'status': 'accomplished',
         'boardingStatus': 'accomplished',
@@ -1160,39 +1176,52 @@ class GeofencingService {
         'dropOffLocation': destination,
         'geofenceStatus': 'completed',
         'tripCompleted': true,
+        'accomplishedAt': FieldValue.serverTimestamp(),
       });
+      print('   ✅ Conductor preBookings updated');
 
-      print('✅ Updated conductor preBookings collection');
-
-      // Update in user's preBookings collection
+      // ✅ STEP 2: Update user's preBookings collection
       if (userId != null) {
+        print('\n🔄 STEP 2: Updating user preBookings...');
         try {
-          await FirebaseFirestore.instance
+          final userPreBookingRef = FirebaseFirestore.instance
               .collection('users')
               .doc(userId)
               .collection('preBookings')
-              .doc(bookingId)
-              .update({
-            'status': 'accomplished',
-            'boardingStatus': 'accomplished',
-            'dropOffTimestamp': FieldValue.serverTimestamp(),
-            'dropOffLocation': destination,
-            'geofenceStatus': 'completed',
-            'tripCompleted': true,
-          });
-          print('✅ Updated user preBookings collection');
+              .doc(bookingId);
+
+          final userPreBookingSnap = await userPreBookingRef.get();
+
+          if (userPreBookingSnap.exists) {
+            await userPreBookingRef.update({
+              'status': 'accomplished',
+              'boardingStatus': 'accomplished',
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'dropOffLocation': destination,
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+              'accomplishedAt': FieldValue.serverTimestamp(),
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+            print('   ✅ User preBookings updated successfully');
+          } else {
+            print('   ⚠️ User pre-booking document not found');
+          }
         } catch (e) {
-          print('⚠️ Error updating user preBookings collection: $e');
+          print('   ⚠️ Error updating user preBookings: $e');
         }
+      } else {
+        print('\n⚠️ STEP 2 SKIPPED: No userId found');
       }
 
-      // Also update in conductor's scannedQRCodes collection if exists
+      // ✅ STEP 3: Update scannedQRCodes collection
       if (_conductorDocId != null) {
+        print('\n🔄 STEP 3: Updating scannedQRCodes...');
         try {
-          // Try multiple query methods to find the scanned QR code
-          QuerySnapshot scannedQRQuery;
+          // Try multiple query methods
+          QuerySnapshot? scannedQRQuery;
 
-          // First try: search by booking ID
+          // Method 1: Search by 'id' field
           scannedQRQuery = await FirebaseFirestore.instance
               .collection('conductors')
               .doc(_conductorDocId!)
@@ -1201,7 +1230,7 @@ class GeofencingService {
               .limit(1)
               .get();
 
-          // If not found, try searching by preBookingId field
+          // Method 2: Search by 'preBookingId' field
           if (scannedQRQuery.docs.isEmpty) {
             scannedQRQuery = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -1212,7 +1241,7 @@ class GeofencingService {
                 .get();
           }
 
-          // If not found, try searching by documentId field
+          // Method 3: Search by 'documentId' field
           if (scannedQRQuery.docs.isEmpty) {
             scannedQRQuery = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -1230,21 +1259,23 @@ class GeofencingService {
               'dropOffLocation': destination,
               'geofenceStatus': 'completed',
               'tripCompleted': true,
+              'completedAt': FieldValue.serverTimestamp(),
             });
-            print('✅ Updated scannedQRCodes collection for booking $bookingId');
+            print('   ✅ ScannedQRCodes updated successfully');
           } else {
-            print(
-                '⚠️ Could not find scannedQR entry for booking $bookingId in scannedQRCodes collection');
+            print('   ⚠️ ScannedQR entry not found for booking $bookingId');
           }
         } catch (e) {
-          print('⚠️ Error updating scannedQRCodes collection: $e');
+          print('   ⚠️ Error updating scannedQRCodes: $e');
         }
       }
 
+      print('\n✅ === _markPreBookingCompleted FINISHED ===');
       print(
-          '✅ Pre-booking $bookingId marked as accomplished for $quantity passenger(s)');
+          '✅ Pre-booking $bookingId marked as accomplished for $quantity passenger(s)\n');
     } catch (e) {
-      print('❌ Error marking pre-booking as completed: $e');
+      print('❌ ERROR in _markPreBookingCompleted: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 

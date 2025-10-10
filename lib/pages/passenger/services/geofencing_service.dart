@@ -21,7 +21,7 @@ class GeofencingService {
   // Configuration
   static const double _geofenceRadius =
       250.0; // 250 meters for drop-off detection
-  static const Duration _checkInterval = Duration(seconds: 30);
+  static const Duration _checkInterval = Duration(seconds: 20);
   static const double _locationAccuracyThreshold = 50.0;
   static const Duration _minProcessingInterval = Duration(seconds: 10);
 
@@ -382,7 +382,10 @@ class GeofencingService {
       int totalDecremented = 0;
       Set<String> processedDestinations = {};
 
-      // 1. CHECK MANUAL TICKETS from remittance/tickets
+      // ✅ NEW: Group tickets by destination
+      Map<String, List<Map<String, dynamic>>> ticketsByDestination = {};
+
+      // 1. COLLECT ALL MANUAL TICKETS grouped by destination
       final remittanceSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
@@ -403,7 +406,6 @@ class GeofencingService {
           final isActive = ticket['active'] ?? false;
           final ticketTripId = ticket['tripId'];
           final status = ticket['status'] ?? '';
-          final ticketKey = '${destinationName}_${ticketDoc.id}';
 
           print(
               '🔍 Manual ticket ${ticketDoc.id}: to=$destinationName, active=$isActive, status=$status, tripId=$ticketTripId');
@@ -411,7 +413,6 @@ class GeofencingService {
           // Check if should process
           bool shouldProcess = isActive &&
               destinationName != null &&
-              !processedDestinations.contains(ticketKey) &&
               status != 'accomplished' &&
               status != 'completed';
 
@@ -431,54 +432,21 @@ class GeofencingService {
           }
 
           if (shouldProcess && tripIdMatches) {
-            final destinationCoords = await _getDestinationCoordinates(
-                destinationName, _conductorRoute!);
-
-            if (destinationCoords != null) {
-              final lat = destinationCoords['latitude'];
-              final lng = destinationCoords['longitude'];
-              if (lat != null && lng != null) {
-                final distance = Geolocator.distanceBetween(
-                  conductorPosition.latitude,
-                  conductorPosition.longitude,
-                  lat,
-                  lng,
-                );
-
-                print(
-                    '🎯 Manual ticket destination $destinationName: ${distance.toStringAsFixed(1)}m away (threshold: ${_geofenceRadius}m)');
-
-                if (distance <= _geofenceRadius) {
-                  print('✅ Conductor is within geofence radius!');
-                  print('🔍 Checking if approaching destination...');
-
-                  if (await _isApproachingDestination(
-                      conductorPosition, lat, lng)) {
-                    print('✅ Conductor IS approaching destination!');
-
-                    final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
-                    print(
-                        '🚀 MARKING TICKET AS COMPLETED: ${ticketDoc.id} (quantity: $quantity)');
-
-                    await _markConductorTicketCompleted(
-                        ticketDoc.reference, quantity, dateId);
-
-                    totalDecremented += quantity;
-                    processedDestinations.add(ticketKey);
-
-                    print(
-                        '✅ Manual ticket ${ticketDoc.id} completed: ${quantity} passenger(s) dropped off at ${destinationName}');
-                    print('✅ Total decremented so far: $totalDecremented');
-                  } else {
-                    print(
-                        '⏭️ Conductor is NOT approaching (moving away from destination)');
-                  }
-                } else {
-                  print(
-                      '⏭️ Not within geofence radius yet (${distance.toStringAsFixed(1)}m > ${_geofenceRadius}m)');
-                }
-              }
+            // ✅ NEW: Group tickets by destination
+            if (!ticketsByDestination.containsKey(destinationName)) {
+              ticketsByDestination[destinationName] = [];
             }
+
+            ticketsByDestination[destinationName]!.add({
+              'type': 'manual',
+              'reference': ticketDoc.reference,
+              'dateId': dateId,
+              'quantity': (ticket['quantity'] as num?)?.toInt() ?? 1,
+              'ticketId': ticketDoc.id,
+            });
+
+            print(
+                '📦 Grouped manual ticket ${ticketDoc.id} to destination: $destinationName');
           } else {
             if (!isActive) {
               print(
@@ -489,15 +457,12 @@ class GeofencingService {
             } else if (status == 'accomplished' || status == 'completed') {
               print(
                   '⏭️ Skipping manual ticket ${ticketDoc.id} - status is already $status');
-            } else if (processedDestinations.contains(ticketKey)) {
-              print(
-                  '⏭️ Skipping manual ticket ${ticketDoc.id} - already processed this destination');
             }
           }
         }
       }
 
-      // 2. CHECK PRE-BOOKINGS
+      // 2. COLLECT PRE-BOOKINGS grouped by destination
       final preBookingsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
@@ -510,7 +475,6 @@ class GeofencingService {
       for (var doc in preBookingsSnapshot.docs) {
         final booking = doc.data();
         final destinationName = booking['to'];
-        final bookingKey = '${destinationName}_${doc.id}';
         final bookingTripId = booking['tripId'];
 
         bool bookingTripMatches =
@@ -539,41 +503,24 @@ class GeofencingService {
           quantity = (booking['quantity'] as num).toInt();
         }
 
-        if (destinationName != null &&
-            !processedDestinations.contains(bookingKey)) {
-          final destinationCoords = await _getDestinationCoordinates(
-              destinationName, _conductorRoute!);
-
-          if (destinationCoords != null) {
-            final lat = destinationCoords['latitude'];
-            final lng = destinationCoords['longitude'];
-            if (lat != null && lng != null) {
-              final distance = Geolocator.distanceBetween(
-                conductorPosition.latitude,
-                conductorPosition.longitude,
-                lat,
-                lng,
-              );
-
-              print(
-                  '📍 Pre-booking destination $destinationName: ${distance.toStringAsFixed(1)}m away');
-
-              if (distance <= _geofenceRadius) {
-                if (await _isApproachingDestination(
-                    conductorPosition, lat, lng)) {
-                  await _markPreBookingCompleted(doc.reference, quantity);
-                  totalDecremented += quantity;
-                  processedDestinations.add(bookingKey);
-                  print(
-                      '🎯 Pre-booking completed: ${quantity} passenger(s) dropped off at ${destinationName}');
-                }
-              }
-            }
+        if (destinationName != null) {
+          if (!ticketsByDestination.containsKey(destinationName)) {
+            ticketsByDestination[destinationName] = [];
           }
+
+          ticketsByDestination[destinationName]!.add({
+            'type': 'preBooking',
+            'reference': doc.reference,
+            'quantity': quantity,
+            'bookingId': doc.id,
+          });
+
+          print(
+              '📦 Grouped pre-booking ${doc.id} to destination: $destinationName');
         }
       }
 
-      // 3. CHECK PRE-TICKETS
+      // 3. COLLECT PRE-TICKETS grouped by destination
       final preTicketsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
@@ -586,7 +533,6 @@ class GeofencingService {
       for (var doc in preTicketsSnapshot.docs) {
         final ticket = doc.data();
         final destinationName = ticket['data']?['to'] ?? ticket['to'];
-        final ticketKey = '${destinationName}_${doc.id}';
         final ticketTripId = ticket['tripId'];
 
         bool ticketTripMatches =
@@ -616,37 +562,118 @@ class GeofencingService {
           quantity = (ticket['quantity'] as num).toInt();
         }
 
-        if (destinationName != null &&
-            !processedDestinations.contains(ticketKey)) {
-          final destinationCoords = await _getDestinationCoordinates(
-              destinationName, _conductorRoute!);
+        if (destinationName != null) {
+          if (!ticketsByDestination.containsKey(destinationName)) {
+            ticketsByDestination[destinationName] = [];
+          }
 
-          if (destinationCoords != null) {
-            final lat = destinationCoords['latitude'];
-            final lng = destinationCoords['longitude'];
-            if (lat != null && lng != null) {
-              final distance = Geolocator.distanceBetween(
-                conductorPosition.latitude,
-                conductorPosition.longitude,
-                lat,
-                lng,
-              );
+          ticketsByDestination[destinationName]!.add({
+            'type': 'preTicket',
+            'reference': doc.reference,
+            'quantity': quantity,
+            'ticketId': doc.id,
+          });
 
-              print(
-                  '📍 Pre-ticket destination $destinationName: ${distance.toStringAsFixed(1)}m away');
+          print(
+              '📦 Grouped pre-ticket ${doc.id} to destination: $destinationName');
+        }
+      }
 
-              if (distance <= _geofenceRadius) {
-                if (await _isApproachingDestination(
-                    conductorPosition, lat, lng)) {
-                  await _markPreTicketCompleted(doc.reference, quantity);
-                  totalDecremented += quantity;
-                  processedDestinations.add(ticketKey);
-                  print(
-                      '🎯 Pre-ticket completed: ${quantity} passenger(s) dropped off at ${destinationName}');
-                }
+      // ✅ NOW PROCESS ALL DESTINATIONS
+      print(
+          '\n🎯 Processing ${ticketsByDestination.length} unique destinations...\n');
+
+      for (var entry in ticketsByDestination.entries) {
+        final destinationName = entry.key;
+        final ticketsForDestination = entry.value;
+
+        print(
+            '🔍 Processing destination: $destinationName with ${ticketsForDestination.length} ticket(s)');
+
+        // Get coordinates for this destination
+        final destinationCoords =
+            await _getDestinationCoordinates(destinationName, _conductorRoute!);
+
+        if (destinationCoords == null) {
+          print(
+              '⚠️ Could not get coordinates for $destinationName, skipping all tickets to this destination');
+          continue;
+        }
+
+        final lat = destinationCoords['latitude'];
+        final lng = destinationCoords['longitude'];
+
+        if (lat == null || lng == null) {
+          print('⚠️ Invalid coordinates for $destinationName, skipping');
+          continue;
+        }
+
+        final distance = Geolocator.distanceBetween(
+          conductorPosition.latitude,
+          conductorPosition.longitude,
+          lat,
+          lng,
+        );
+
+        print(
+            '🎯 Destination $destinationName: ${distance.toStringAsFixed(1)}m away (threshold: ${_geofenceRadius}m)');
+
+        if (distance <= _geofenceRadius) {
+          print('✅ Conductor is within geofence radius!');
+          print('🔍 Checking if approaching destination...');
+
+          if (await _isApproachingDestination(conductorPosition, lat, lng)) {
+            print('✅ Conductor IS approaching destination!');
+            print(
+                '🚀 Processing ALL ${ticketsForDestination.length} ticket(s) to $destinationName');
+
+            // ✅ PROCESS ALL TICKETS TO THIS DESTINATION
+            for (var ticketData in ticketsForDestination) {
+              final type = ticketData['type'];
+              final reference = ticketData['reference'] as DocumentReference;
+              final quantity = ticketData['quantity'] as int;
+
+              if (type == 'manual') {
+                final dateId = ticketData['dateId'] as String;
+                final ticketId = ticketData['ticketId'] as String;
+
+                print(
+                    '🚀 MARKING MANUAL TICKET AS COMPLETED: $ticketId (quantity: $quantity)');
+                await _markConductorTicketCompleted(
+                    reference, quantity, dateId);
+                totalDecremented += quantity;
+                print(
+                    '✅ Manual ticket $ticketId completed: $quantity passenger(s) dropped off');
+              } else if (type == 'preBooking') {
+                final bookingId = ticketData['bookingId'] as String;
+
+                print(
+                    '🚀 MARKING PRE-BOOKING AS COMPLETED: $bookingId (quantity: $quantity)');
+                await _markPreBookingCompleted(reference, quantity);
+                totalDecremented += quantity;
+                print(
+                    '✅ Pre-booking $bookingId completed: $quantity passenger(s) dropped off');
+              } else if (type == 'preTicket') {
+                final ticketId = ticketData['ticketId'] as String;
+
+                print(
+                    '🚀 MARKING PRE-TICKET AS COMPLETED: $ticketId (quantity: $quantity)');
+                await _markPreTicketCompleted(reference, quantity);
+                totalDecremented += quantity;
+                print(
+                    '✅ Pre-ticket $ticketId completed: $quantity passenger(s) dropped off');
               }
             }
+
+            print('✅ Total decremented so far: $totalDecremented');
+            processedDestinations.add(destinationName);
+          } else {
+            print(
+                '⏭️ Conductor is NOT approaching (moving away from destination)');
           }
+        } else {
+          print(
+              '⏭️ Not within geofence radius yet (${distance.toStringAsFixed(1)}m > ${_geofenceRadius}m)');
         }
       }
 

@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:b_go/auth/auth_services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TripsPage extends StatefulWidget {
   final String route;
@@ -30,7 +31,8 @@ class _TripsPageState extends State<TripsPage> {
   List<Map<String, dynamic>> tickets = [];
   List<Map<String, dynamic>> filteredTickets = [];
   bool isLoading = true;
-  String selectedTicketType = 'All'; // 'All', 'Pre-tickets', 'Pre-bookings', 'Manual'
+  String selectedTicketType =
+      'All'; // 'All', 'preTicket', 'preBooking', 'Manual'
 
   @override
   void initState() {
@@ -58,23 +60,39 @@ class _TripsPageState extends State<TripsPage> {
 
     availableDates = await RouteService.fetchAvailableDates(conductorId);
 
-    if (availableDates.isNotEmpty) {
-      selectedDate = availableDates[0];
+    // ✅ UPDATED: Always prioritize today's date first
+    final prefs = await SharedPreferences.getInstance();
+    final todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+    // Check if today's date exists in available dates
+    if (availableDates.contains(todayDate)) {
+      selectedDate = todayDate;
+    } else {
+      // Fall back to saved date if today is not available
+      String? savedDate = prefs.getString('trips_selected_date');
+      if (savedDate != null && availableDates.contains(savedDate)) {
+        selectedDate = savedDate;
+      } else if (availableDates.isNotEmpty) {
+        // Last resort: use first available date
+        selectedDate = availableDates[0];
+      }
+    }
+
+    if (selectedDate.isNotEmpty) {
       tickets = await RouteService.fetchTickets(
         conductorId: conductorId,
         date: selectedDate,
       );
 
-      // ✅ FIXED: Sort tickets by timestamp (oldest first = first ticket on top)
+      // Sort tickets by timestamp
       tickets.sort((a, b) {
         final aTimestamp = a['timestamp'] as Timestamp?;
         final bTimestamp = b['timestamp'] as Timestamp?;
-        
+
         if (aTimestamp == null && bTimestamp == null) return 0;
         if (aTimestamp == null) return 1;
         if (bTimestamp == null) return -1;
-        
+
         return aTimestamp.compareTo(bTimestamp);
       });
 
@@ -130,20 +148,24 @@ class _TripsPageState extends State<TripsPage> {
         isLoading = true;
       });
 
+      // ✅ FIX 2: Save selected date to SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('trips_selected_date', formattedDate);
+
       tickets = await RouteService.fetchTickets(
         conductorId: conductorId,
         date: formattedDate,
       );
 
-      // ✅ FIXED: Sort tickets by timestamp
+      // Sort tickets by timestamp
       tickets.sort((a, b) {
         final aTimestamp = a['timestamp'] as Timestamp?;
         final bTimestamp = b['timestamp'] as Timestamp?;
-        
+
         if (aTimestamp == null && bTimestamp == null) return 0;
         if (aTimestamp == null) return 1;
         if (bTimestamp == null) return -1;
-        
+
         return aTimestamp.compareTo(bTimestamp);
       });
 
@@ -158,20 +180,40 @@ class _TripsPageState extends State<TripsPage> {
     if (selectedTicketType == 'All') {
       filteredTickets = tickets;
     } else {
+      // ✅ FIX 3: Use correct ticketType values from Firestore
       filteredTickets = tickets.where((ticket) {
         String ticketType = ticket['ticketType'] ?? 'Manual';
-        return ticketType == selectedTicketType;
+
+        // Match the exact values stored in Firestore
+        if (selectedTicketType == 'preTicket') {
+          return ticketType == 'preTicket';
+        } else if (selectedTicketType == 'preBooking') {
+          return ticketType == 'preBooking';
+        } else if (selectedTicketType == 'Manual') {
+          return ticketType == 'Manual' || ticketType.isEmpty;
+        }
+
+        return false;
       }).toList();
     }
-    setState(() {}); // ✅ Update UI after filtering
+    setState(() {}); // Update UI after filtering
   }
 
   void _showFilterDialog() {
-    // ✅ Calculate counts for each type
+    // ✅ FIX 4: Calculate counts using correct ticketType values
     final allCount = tickets.length;
-    final preTicketsCount = tickets.where((t) => (t['ticketType'] ?? 'Manual') == 'Pre-tickets').length;
-    final preBookingsCount = tickets.where((t) => (t['ticketType'] ?? 'Manual') == 'Pre-bookings').length;
-    final manualCount = tickets.where((t) => (t['ticketType'] ?? 'Manual') == 'Manual').length;
+    final preTicketsCount = tickets.where((t) {
+      String ticketType = t['ticketType'] ?? 'Manual';
+      return ticketType == 'preTicket';
+    }).length;
+    final preBookingsCount = tickets.where((t) {
+      String ticketType = t['ticketType'] ?? 'Manual';
+      return ticketType == 'preBooking';
+    }).length;
+    final manualCount = tickets.where((t) {
+      String ticketType = t['ticketType'] ?? 'Manual';
+      return ticketType == 'Manual' || ticketType.isEmpty;
+    }).length;
 
     showDialog(
       context: context,
@@ -194,10 +236,10 @@ class _TripsPageState extends State<TripsPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildFilterOption('All', allCount),
-            _buildFilterOption('Pre-tickets', preTicketsCount),
-            _buildFilterOption('Pre-bookings', preBookingsCount),
-            _buildFilterOption('Manual', manualCount),
+            _buildFilterOption('All', allCount, 'All'),
+            _buildFilterOption('Pre-tickets', preTicketsCount, 'preTicket'),
+            _buildFilterOption('Pre-bookings', preBookingsCount, 'preBooking'),
+            _buildFilterOption('Manual', manualCount, 'Manual'),
           ],
         ),
         actions: [
@@ -216,12 +258,13 @@ class _TripsPageState extends State<TripsPage> {
     );
   }
 
-  Widget _buildFilterOption(String option, int count) {
-    final isSelected = selectedTicketType == option;
+  // ✅ FIX 5: Updated to accept filterValue parameter
+  Widget _buildFilterOption(String displayName, int count, String filterValue) {
+    final isSelected = selectedTicketType == filterValue;
     return InkWell(
       onTap: () {
         setState(() {
-          selectedTicketType = option;
+          selectedTicketType = filterValue;
           _applyFilter();
         });
         Navigator.pop(context);
@@ -230,7 +273,9 @@ class _TripsPageState extends State<TripsPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF0091AD).withOpacity(0.1) : Colors.transparent,
+          color: isSelected
+              ? Color(0xFF0091AD).withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? Color(0xFF0091AD) : Colors.grey.shade300,
@@ -266,7 +311,7 @@ class _TripsPageState extends State<TripsPage> {
             SizedBox(width: 16),
             Expanded(
               child: Text(
-                option,
+                displayName,
                 style: GoogleFonts.outfit(
                   fontSize: 16,
                   color: isSelected ? Color(0xFF0091AD) : Colors.black87,
@@ -277,9 +322,7 @@ class _TripsPageState extends State<TripsPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected 
-                    ? Color(0xFF0091AD) 
-                    : Colors.grey.shade200,
+                color: isSelected ? Color(0xFF0091AD) : Colors.grey.shade200,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -303,11 +346,11 @@ class _TripsPageState extends State<TripsPage> {
     bool isActive = ticket['active'] ?? true;
 
     bool isAccomplished() {
-      // ✅ CRITICAL: For manual tickets, active: false means accomplished
+      // For manual tickets, active: false means accomplished
       if (ticketType == 'Manual' && isActive == false) {
         return true;
       }
-      
+
       return ticket['accomplishedAt'] != null ||
           ticket['dropOffTimestamp'] != null ||
           ticket['dropOffLocation'] != null ||
@@ -330,7 +373,7 @@ class _TripsPageState extends State<TripsPage> {
     }
 
     // PRE-TICKETS
-    if (ticketType == 'preTicket' || ticketType == 'Pre-tickets') {
+    if (ticketType == 'preTicket') {
       if (isAccomplished()) return 'Accomplished';
       if (isBoarded()) return 'Boarded';
       if (status.toLowerCase() == 'paid') return 'Paid';
@@ -340,10 +383,11 @@ class _TripsPageState extends State<TripsPage> {
     }
 
     // PRE-BOOKINGS
-    if (ticketType == 'preBooking' || ticketType == 'Pre-bookings') {
+    if (ticketType == 'preBooking') {
       if (isAccomplished()) return 'Accomplished';
       if (isBoarded()) return 'Boarded';
-      if (status.toLowerCase() == 'paid' || status.toLowerCase() == 'pending_payment') return 'Paid';
+      if (status.toLowerCase() == 'paid' ||
+          status.toLowerCase() == 'pending_payment') return 'Paid';
       if (status.toLowerCase() == 'pending') return 'Pending';
       if (status.toLowerCase() == 'cancelled') return 'Cancelled';
       return 'Paid';
@@ -378,6 +422,20 @@ class _TripsPageState extends State<TripsPage> {
         return Colors.grey;
       default:
         return Colors.grey;
+    }
+  }
+
+  // ✅ FIX 6: Updated to show user-friendly display names
+  String _getTicketTypeDisplay(String ticketType) {
+    switch (ticketType) {
+      case 'preTicket':
+        return 'Pre-ticket';
+      case 'preBooking':
+        return 'Pre-booking';
+      case 'Manual':
+        return 'Manual';
+      default:
+        return 'Manual';
     }
   }
 
@@ -451,7 +509,8 @@ class _TripsPageState extends State<TripsPage> {
                         Padding(
                           padding: const EdgeInsets.only(left: 8.0),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(Icons.arrow_back,
+                                color: Colors.white),
                             onPressed: () {
                               Navigator.of(context).pushReplacement(
                                 MaterialPageRoute(
@@ -483,7 +542,8 @@ class _TripsPageState extends State<TripsPage> {
                               final authServices = AuthServices();
                               await authServices.signOut();
                               Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (context) => ConductorLogin()),
+                                MaterialPageRoute(
+                                    builder: (context) => ConductorLogin()),
                                 (route) => false,
                               );
                             },
@@ -493,9 +553,11 @@ class _TripsPageState extends State<TripsPage> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 8.0),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
                         color: const Color(0xFF007A8F),
                         borderRadius: BorderRadius.circular(16),
@@ -530,7 +592,8 @@ class _TripsPageState extends State<TripsPage> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -567,26 +630,32 @@ class _TripsPageState extends State<TripsPage> {
                               child: GestureDetector(
                                 onTap: () => _showDatePicker(context),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 12),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFF1F1F1),
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.shade300),
+                                    border:
+                                        Border.all(color: Colors.grey.shade300),
                                   ),
                                   child: Row(
                                     children: [
-                                      const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+                                      const Icon(Icons.calendar_today,
+                                          size: 20, color: Colors.grey),
                                       const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
-                                          selectedDate.isNotEmpty ? selectedDate : 'Select a date',
+                                          selectedDate.isNotEmpty
+                                              ? selectedDate
+                                              : 'Select a date',
                                           style: GoogleFonts.outfit(
                                             color: Colors.black87,
                                             fontSize: 16,
                                           ),
                                         ),
                                       ),
-                                      const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                      const Icon(Icons.arrow_drop_down,
+                                          color: Colors.grey),
                                     ],
                                   ),
                                 ),
@@ -596,7 +665,8 @@ class _TripsPageState extends State<TripsPage> {
                             GestureDetector(
                               onTap: _showFilterDialog,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF0091AD),
                                   borderRadius: BorderRadius.circular(12),
@@ -611,12 +681,14 @@ class _TripsPageState extends State<TripsPage> {
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.filter_list, size: 20, color: Colors.white),
+                                    const Icon(Icons.filter_list,
+                                        size: 20, color: Colors.white),
                                     const SizedBox(width: 8),
                                     Text(
                                       selectedTicketType == 'All'
                                           ? 'Filter'
-                                          : selectedTicketType,
+                                          : _getFilterDisplayName(
+                                              selectedTicketType),
                                       style: GoogleFonts.outfit(
                                         color: Colors.white,
                                         fontSize: 14,
@@ -649,7 +721,7 @@ class _TripsPageState extends State<TripsPage> {
                             Text(
                               selectedTicketType == 'All'
                                   ? "No tickets for $selectedDate"
-                                  : "No $selectedTicketType tickets for $selectedDate",
+                                  : "No ${_getFilterDisplayName(selectedTicketType)} tickets for $selectedDate",
                               style: GoogleFonts.outfit(
                                 fontSize: 16,
                                 color: Colors.grey.shade600,
@@ -666,24 +738,25 @@ class _TripsPageState extends State<TripsPage> {
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: filteredTickets.length,
                       itemBuilder: (context, index) {
-                        // ✅ FIXED: No reversal - tickets are already sorted oldest first
                         final ticket = filteredTickets[index];
-                        final ticketNumber = index + 1; // Show ticket number
-                        
+                        final ticketNumber = index + 1;
+
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 8.0),
                           child: GestureDetector(
                             onTap: () {
                               final discountBreakdown =
-                                  ticket['discountBreakdown'] as List<dynamic>? ?? [];
+                                  ticket['discountBreakdown']
+                                          as List<dynamic>? ??
+                                      [];
                               final timestamp = ticket['timestamp'];
                               final formattedDate = timestamp != null
-                                  ? DateFormat('yyyy-MM-dd').format(
-                                      (timestamp as Timestamp).toDate())
+                                  ? DateFormat('yyyy-MM-dd')
+                                      .format((timestamp as Timestamp).toDate())
                                   : 'N/A';
                               final formattedTime = timestamp != null
-                                  ? DateFormat('hh:mm a').format(
-                                      (timestamp as Timestamp).toDate())
+                                  ? DateFormat('hh:mm a')
+                                      .format((timestamp as Timestamp).toDate())
                                   : 'N/A';
                               final fromKm = ticket['startKm'] ?? '';
                               final toKm = ticket['endKm'] ?? '';
@@ -704,43 +777,53 @@ class _TripsPageState extends State<TripsPage> {
                                   ),
                                   content: SingleChildScrollView(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           'Route: ${getRouteLabel(widget.placeCollection)}',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'Date: $formattedDate',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'Time: $formattedTime',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'From: ${ticket['from']}',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'To: ${ticket['to']}',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'From KM: $fromKm',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'To KM: $toKm',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'Base Fare (Regular): ${baseFare is List ? (baseFare.isNotEmpty ? baseFare.first.toString() : '0') : baseFare} PHP',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'Quantity: $quantity',
-                                          style: GoogleFonts.outfit(fontSize: 14),
+                                          style:
+                                              GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
                                           'Total Amount: $totalFare PHP',
@@ -761,13 +844,15 @@ class _TripsPageState extends State<TripsPage> {
                                           ...discountBreakdown.map(
                                             (e) => Text(
                                               e.toString(),
-                                              style: GoogleFonts.outfit(fontSize: 13),
+                                              style: GoogleFonts.outfit(
+                                                  fontSize: 13),
                                             ),
                                           ),
                                         if (discountBreakdown.isEmpty)
                                           Text(
                                             'No discounts.',
-                                            style: GoogleFonts.outfit(fontSize: 13),
+                                            style: GoogleFonts.outfit(
+                                                fontSize: 13),
                                           ),
                                       ],
                                     ),
@@ -807,17 +892,19 @@ class _TripsPageState extends State<TripsPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      // ✅ Show ticket number
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 10,
                                           vertical: 4,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Color(0xFF0091AD).withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(8),
+                                          color: Color(0xFF0091AD)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Text(
                                           '#$ticketNumber',
@@ -837,7 +924,8 @@ class _TripsPageState extends State<TripsPage> {
                                           color: _getStatusColor(
                                                   _getTicketStatus(ticket))
                                               .withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                           border: Border.all(
                                             color: _getStatusColor(
                                                     _getTicketStatus(ticket))
@@ -859,7 +947,8 @@ class _TripsPageState extends State<TripsPage> {
                                   ),
                                   const SizedBox(height: 8),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Expanded(
                                         child: Text(
@@ -885,7 +974,8 @@ class _TripsPageState extends State<TripsPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         'Quantity: ${ticket['quantity']}',
@@ -897,7 +987,9 @@ class _TripsPageState extends State<TripsPage> {
                                       Text(
                                         ticket['timestamp'] != null
                                             ? DateFormat('hh:mm a').format(
-                                                (ticket['timestamp'] as Timestamp).toDate())
+                                                (ticket['timestamp']
+                                                        as Timestamp)
+                                                    .toDate())
                                             : 'N/A',
                                         style: GoogleFonts.outfit(
                                           fontSize: 13,
@@ -909,20 +1001,23 @@ class _TripsPageState extends State<TripsPage> {
                                   ),
                                   const SizedBox(height: 2),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
                                       Text(
                                         'Date: ' +
                                             (ticket['timestamp'] != null
-                                                ? DateFormat('yyyy-MM-dd').format(
-                                                    (ticket['timestamp'] as Timestamp).toDate())
+                                                ? DateFormat('yyyy-MM-dd')
+                                                    .format((ticket['timestamp']
+                                                            as Timestamp)
+                                                        .toDate())
                                                 : 'N/A'),
                                         style: GoogleFonts.outfit(
                                           fontSize: 13,
                                           color: Colors.grey[700],
                                         ),
                                       ),
-                                      // ✅ Show ticket type badge
+                                      // ✅ Show user-friendly ticket type display
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
@@ -930,10 +1025,12 @@ class _TripsPageState extends State<TripsPage> {
                                         ),
                                         decoration: BoxDecoration(
                                           color: Colors.grey.shade200,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
                                         ),
                                         child: Text(
-                                          ticket['ticketType'] ?? 'Manual',
+                                          _getTicketTypeDisplay(
+                                              ticket['ticketType'] ?? 'Manual'),
                                           style: GoogleFonts.outfit(
                                             fontSize: 11,
                                             color: Colors.grey.shade700,
@@ -956,5 +1053,19 @@ class _TripsPageState extends State<TripsPage> {
         ],
       ),
     );
+  }
+
+  // ✅ Helper method to get display name for filter button
+  String _getFilterDisplayName(String filterValue) {
+    switch (filterValue) {
+      case 'preTicket':
+        return 'Pre-tickets';
+      case 'preBooking':
+        return 'Pre-bookings';
+      case 'Manual':
+        return 'Manual';
+      default:
+        return 'All';
+    }
   }
 }

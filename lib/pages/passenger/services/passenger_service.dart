@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/bus_picker.dart';
+import 'package:b_go/pages/passenger/services/route_picker.dart';
 
 class PassengerService extends StatelessWidget {
   const PassengerService({super.key});
@@ -11,20 +12,64 @@ class PassengerService extends StatelessWidget {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     // Responsive sizing
-    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final cardTitleFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final cardSubtitleFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
-    final orFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final iconSize = isMobile ? 80.0 : isTablet ? 100.0 : 120.0;
-    final horizontalPadding = isMobile ? 24.0 : isTablet ? 32.0 : 40.0;
-    final verticalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final cardVerticalPadding = isMobile ? 32.0 : isTablet ? 40.0 : 48.0;
-    final spacing = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final smallSpacing = isMobile ? 4.0 : isTablet ? 6.0 : 8.0;
-    final orSpacing = isMobile ? 8.0 : isTablet ? 12.0 : 16.0;
-    
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final cardTitleFontSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final cardSubtitleFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final orFontSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final iconSize = isMobile
+        ? 80.0
+        : isTablet
+            ? 100.0
+            : 120.0;
+    final horizontalPadding = isMobile
+        ? 24.0
+        : isTablet
+            ? 32.0
+            : 40.0;
+    final verticalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final cardVerticalPadding = isMobile
+        ? 32.0
+        : isTablet
+            ? 40.0
+            : 48.0;
+    final spacing = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final smallSpacing = isMobile
+        ? 4.0
+        : isTablet
+            ? 6.0
+            : 8.0;
+    final orSpacing = isMobile
+        ? 8.0
+        : isTablet
+            ? 12.0
+            : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -55,12 +100,19 @@ class PassengerService extends StatelessWidget {
                     horizontal: horizontalPadding, vertical: verticalPadding),
                 child: InkWell(
                   onTap: () {
-                    Navigator.pushNamed(context, '/pre_ticket');
+                    // Navigate to route picker instead of pre_ticket
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const RoutePicker(),
+                      ),
+                    );
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: cardVerticalPadding),
+                    padding:
+                        EdgeInsets.symmetric(vertical: cardVerticalPadding),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: Colors.grey, width: 2),
@@ -115,7 +167,9 @@ class PassengerService extends StatelessWidget {
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: Text('Pre-Booking Notice', style: GoogleFonts.outfit(fontSize: isMobile ? 16 : 18)),
+                        title: Text('Pre-Booking Notice',
+                            style: GoogleFonts.outfit(
+                                fontSize: isMobile ? 16 : 18)),
                         content: Text(
                           'By using Pre-Booking, you are reserving a guaranteed seat for the entire trip (from the starting point to the last stop). The payment is fixed for the full route. Do you want to continue?',
                           style: GoogleFonts.outfit(
@@ -164,7 +218,8 @@ class PassengerService extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: cardVerticalPadding),
+                    padding:
+                        EdgeInsets.symmetric(vertical: cardVerticalPadding),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       border: Border.all(color: Colors.grey, width: 2),

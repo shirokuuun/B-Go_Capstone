@@ -5,6 +5,7 @@ import 'package:b_go/pages/conductor/conductor_departure.dart';
 import 'package:b_go/pages/conductor/sos.dart';
 import 'package:b_go/pages/conductor/passenger_status_service.dart';
 import 'package:b_go/services/direction_validation_service.dart';
+import 'package:b_go/services/thermal_printer_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,6 +34,10 @@ class _ConductorFromState extends State<ConductorFrom> {
   Future<List<Map<String, dynamic>>>? placesFuture;
   String selectedPlaceCollection = 'Place';
   late List<Map<String, String>> routeDirections;
+  
+  // Thermal Printer Service
+  final ThermalPrinterService _printerService = ThermalPrinterService();
+  final Map<String, bool> _printingStates = {};
 
   final Map<String, String> _routeFirestoreNames = {
     'Batangas': 'Batangas',
@@ -52,7 +57,180 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   @override
   void dispose() {
+    _printerService.disconnectPrinter();
     super.dispose();
+  }
+
+  String getRouteLabel(String placeCollection) {
+    final route = widget.route.trim();
+
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Mataas Na Kahoy Palengke') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'Lipa Palengke - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - Lipa Palengke';
+      }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
+    } else if (route == 'San Juan') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - San Juan';
+        case 'Place 2':
+          return 'San Juan - SM City Lipa';
+      }
+    }
+
+    return 'Unknown Route';
+  }
+
+  Future<void> _printManualTicket(Map<String, dynamic> ticket) async {
+    final ticketId = ticket['id'] as String;
+    
+    setState(() {
+      _printingStates[ticketId] = true;
+    });
+
+    try {
+      // If not connected to printer, show connection dialog
+      if (!_printerService.isConnected) {
+        await ThermalPrinterService.showPrinterConnectionDialog(
+          context,
+          (ip, port) async {
+            final connected = await _printerService.connectPrinter(ip, port);
+            if (!connected) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to connect to printer'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              setState(() {
+                _printingStates[ticketId] = false;
+              });
+              return;
+            }
+            
+            // Now print after successful connection
+            await _performPrint(ticket, ticketId);
+          },
+        );
+      } else {
+        // Already connected, just print
+        await _performPrint(ticket, ticketId);
+      }
+    } catch (e) {
+      print('Error printing: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        _printingStates[ticketId] = false;
+      });
+    }
+  }
+
+  Future<void> _performPrint(Map<String, dynamic> ticket, String ticketId) async {
+    try {
+      // Extract ticket data
+      final from = ticket['from']?.toString() ?? 'N/A';
+      final to = ticket['to']?.toString() ?? 'N/A';
+      final fromKm = ticket['fromKm']?.toString() ?? ticket['startKm']?.toString() ?? '0';
+      final toKm = ticket['toKm']?.toString() ?? ticket['endKm']?.toString() ?? '0';
+      
+      String baseFare = '0.00';
+      final fareData = ticket['farePerPassenger'];
+      if (fareData != null) {
+        if (fareData is List && fareData.isNotEmpty) {
+          baseFare = fareData.first.toString();
+        } else if (fareData is num) {
+          baseFare = fareData.toStringAsFixed(2);
+        } else if (fareData is String) {
+          baseFare = fareData;
+        }
+      }
+
+      final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
+      final totalFare = ticket['totalFare']?.toString() ?? '0.00';
+      final discountAmount = ticket['discountAmount']?.toString() ?? '0.00';
+      
+      List<String>? discountBreakdown;
+      if (ticket['discountBreakdown'] != null) {
+        discountBreakdown = List<String>.from(
+          (ticket['discountBreakdown'] as List).map((e) => e.toString())
+        );
+      }
+
+      // Print receipt
+      final success = await _printerService.printManualTicket(
+        route: getRouteLabel(selectedPlaceCollection),
+        from: from,
+        to: to,
+        fromKm: fromKm,
+        toKm: toKm,
+        baseFare: baseFare,
+        quantity: quantity,
+        totalFare: totalFare,
+        discountAmount: discountAmount,
+        discountBreakdown: discountBreakdown,
+      );
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt printed successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to print receipt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } finally {
+      setState(() {
+        _printingStates[ticketId] = false;
+      });
+    }
   }
 
   void _initializeRouteDirections() {
@@ -150,7 +328,7 @@ class _ConductorFromState extends State<ConductorFrom> {
     if (toPlaces.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
               content:
                   Text('No valid drop-off locations after selected pick-up.')),
         );
@@ -183,14 +361,14 @@ class _ConductorFromState extends State<ConductorFrom> {
       if (result == true) {
         _refreshPassengerCount();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('QR code scanned and stored successfully!'),
             backgroundColor: Colors.green,
           ),
         );
       } else if (result == false) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Failed to process QR code.'),
             backgroundColor: Colors.red,
           ),
@@ -198,7 +376,7 @@ class _ConductorFromState extends State<ConductorFrom> {
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Camera permission is required to scan QR codes.'),
           backgroundColor: Colors.red,
         ),
@@ -268,7 +446,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                                   ),
                                 );
                               },
-                              icon: Icon(
+                              icon: const Icon(
                                 Icons.sos,
                                 color: Colors.red,
                                 size: 24.0,
@@ -277,7 +455,7 @@ class _ConductorFromState extends State<ConductorFrom> {
                             ),
                             IconButton(
                               onPressed: _openQRScanner,
-                              icon: Icon(
+                              icon: const Icon(
                                 Icons.qr_code_scanner,
                                 color: Colors.white,
                                 size: 24.0,
@@ -338,8 +516,8 @@ class _ConductorFromState extends State<ConductorFrom> {
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.only(top: 20.0),
+          const SliverPadding(
+            padding: EdgeInsets.only(top: 20.0),
           ),
           SliverToBoxAdapter(
             child: LayoutBuilder(
@@ -459,11 +637,11 @@ class _ConductorFromState extends State<ConductorFrom> {
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
                                 gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   mainAxisSpacing: 16,
                                   crossAxisSpacing: 16,
-                                  childAspectRatio: aspectRatio,
+                                  childAspectRatio: 2.2,
                                 ),
                                 itemCount: myList.length,
                                 itemBuilder: (context, index) {
@@ -526,7 +704,7 @@ class _ConductorFromState extends State<ConductorFrom> {
               children: [
                 const SizedBox(height: 24),
                 const Padding(
-                  padding: EdgeInsets.only(left: 10),
+                  padding: EdgeInsets.only(left: 26),
                   child: Text(
                     "Manually Ticketed Passengers:",
                     style: TextStyle(
@@ -537,164 +715,210 @@ class _ConductorFromState extends State<ConductorFrom> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                FutureBuilder<List<Map<String, dynamic>>>(
-                  key: const ValueKey('manual_tickets_future'),
-                  future: _getManualTickets(),
-                  builder: (context, snapshot) {
-                    if (!mounted) {
-                      return const SizedBox.shrink();
-                    }
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    key: const ValueKey('manual_tickets_future'),
+                    future: _getManualTickets(),
+                    builder: (context, snapshot) {
+                      if (!mounted) {
+                        return const SizedBox.shrink();
+                      }
 
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData ||
-                        snapshot.data == null ||
-                        snapshot.data!.isEmpty) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'No manually ticketed passengers yet',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    final manualTickets = snapshot.data!;
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: manualTickets.length,
-                      itemBuilder: (context, index) {
-                        final ticket = manualTickets[index];
-                        final status = ticket['status'] ?? 'boarded';
-                        final isAccomplished = status == 'accomplished';
-
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else if (!snapshot.hasData ||
+                          snapshot.data == null ||
+                          snapshot.data!.isEmpty) {
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: isAccomplished
-                                ? Colors.green[50]
-                                : Colors.blue[50],
+                            color: Colors.grey[100],
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isAccomplished
-                                  ? Colors.green[300]!
-                                  : Colors.blue[300]!,
-                              width: 1,
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'No manually ticketed passengers yet',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                        );
+                      }
+
+                      final manualTickets = snapshot.data!;
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: manualTickets.length,
+                        itemBuilder: (context, index) {
+                          final ticket = manualTickets[index];
+                          final ticketId = ticket['id'] as String;
+                          final status = ticket['status'] ?? 'boarded';
+                          final isAccomplished = status == 'accomplished';
+                          final isPrinting = _printingStates[ticketId] ?? false;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isAccomplished
+                                  ? Colors.green[50]
+                                  : Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isAccomplished
+                                    ? Colors.green[300]!
+                                    : Colors.blue[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${ticket['from']} → ${ticket['to']}',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Passengers: ${ticket['quantity']}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Fare: ₱${ticket['totalFare']}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
                                       children: [
-                                        Text(
-                                          '${ticket['from']} → ${ticket['to']}',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isAccomplished
+                                                ? Colors.green[100]
+                                                : Colors.blue[100],
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            isAccomplished
+                                                ? 'ACCOMPLISHED'
+                                                : 'BOARDED',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isAccomplished
+                                                  ? Colors.green[700]
+                                                  : Colors.blue[700],
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Passengers: ${ticket['quantity']}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Fare: ₱${ticket['totalFare']}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black54,
-                                          ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Print button
+                                            ElevatedButton(
+                                              onPressed: isPrinting
+                                                  ? null
+                                                  : () => _printManualTicket(ticket),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color(0xFF0091AD),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                minimumSize: const Size(40, 36),
+                                              ),
+                                              child: isPrinting
+                                                  ? const SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    )
+                                                  : const Icon(Icons.print,
+                                                      size: 18),
+                                            ),
+                                            if (!isAccomplished) ...[
+                                              const SizedBox(width: 8),
+                                              ElevatedButton(
+                                                onPressed: () =>
+                                                    _markTicketAccomplished(
+                                                        ticket),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.green[600],
+                                                  foregroundColor: Colors.white,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(20),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Mark Done',
+                                                  style: TextStyle(fontSize: 11),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isAccomplished
-                                              ? Colors.green[100]
-                                              : Colors.blue[100],
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          isAccomplished
-                                              ? 'ACCOMPLISHED'
-                                              : 'BOARDED',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: isAccomplished
-                                                ? Colors.green[700]
-                                                : Colors.blue[700],
-                                          ),
-                                        ),
-                                      ),
-                                      if (!isAccomplished) ...[
-                                        const SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              _markTicketAccomplished(ticket),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green[600],
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Mark Accomplished',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ],
             ),

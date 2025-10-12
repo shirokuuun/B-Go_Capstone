@@ -9,7 +9,8 @@ import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 
 class PreTicket extends StatefulWidget {
-  const PreTicket({super.key});
+  final String? selectedRoute;
+  const PreTicket({super.key, this.selectedRoute});
 
   @override
   State<PreTicket> createState() => _PreTicketState();
@@ -53,9 +54,9 @@ class _PreTicketState extends State<PreTicket> {
     ],
   };
 
-  String selectedRoute = 'Rosario';
+  late String selectedRoute;
   String selectedPlaceCollection = 'Place';
-  int directionIndex = 0; // 0: Place, 1: Place 2
+  int directionIndex = 0;
   late Future<List<Map<String, dynamic>>> placesFuture;
   String? verifiedIDType;
 
@@ -72,12 +73,11 @@ class _PreTicketState extends State<PreTicket> {
   @override
   void initState() {
     super.initState();
+    selectedRoute = widget.selectedRoute ?? 'Rosario';
     placesFuture = RouteService.fetchPlaces(
-      _routeFirestoreNames[selectedRoute] ?? selectedRoute,
-      placeCollection: 'Place'
-    );
+        _routeFirestoreNames[selectedRoute] ?? selectedRoute,
+        placeCollection: 'Place');
     _fetchVerifiedIDType();
-    // Start geofencing service for passenger monitoring
     GeofencingService().startMonitoring();
   }
 
@@ -91,7 +91,7 @@ class _PreTicketState extends State<PreTicket> {
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -189,7 +189,8 @@ class _PreTicketState extends State<PreTicket> {
   }
 
   // Method to mark ticket as boarded (called when conductor scans QR)
-  static Future<void> markTicketAsBoarded(String ticketId, String userId) async {
+  static Future<void> markTicketAsBoarded(
+      String ticketId, String userId) async {
     try {
       await FirebaseFirestore.instance
           .collection('users')
@@ -206,25 +207,27 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-  static Future<void> markTicketAsAccomplished(String ticketId, String userId) async {
-  try {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .collection('preTickets')
-        .doc(ticketId)
-        .update({
-      'status': 'accomplished',
-      'accomplishedAt': DateTime.now(),
-    });
-    print('✅ Pre-ticket marked as accomplished: $ticketId');
-  } catch (e) {
-    print('Error marking pre-ticket as accomplished: $e');
+  static Future<void> markTicketAsAccomplished(
+      String ticketId, String userId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('preTickets')
+          .doc(ticketId)
+          .update({
+        'status': 'accomplished',
+        'accomplishedAt': DateTime.now(),
+      });
+      print('✅ Pre-ticket marked as accomplished: $ticketId');
+    } catch (e) {
+      print('Error marking pre-ticket as accomplished: $e');
+    }
   }
-}
 
   // Method to check if a ticket can be marked as accomplished
-  static Future<bool> canMarkTicketAccomplished(String ticketId, String userId) async {
+  static Future<bool> canMarkTicketAccomplished(
+      String ticketId, String userId) async {
     try {
       final doc = await FirebaseFirestore.instance
           .collection('users')
@@ -232,7 +235,7 @@ class _PreTicketState extends State<PreTicket> {
           .collection('preTickets')
           .doc(ticketId)
           .get();
-      
+
       if (doc.exists) {
         final data = doc.data();
         final status = data?['status'];
@@ -245,7 +248,6 @@ class _PreTicketState extends State<PreTicket> {
     }
   }
 
-
   void _onRouteChanged(String? newRoute) {
     if (newRoute != null && newRoute != selectedRoute) {
       setState(() {
@@ -254,10 +256,8 @@ class _PreTicketState extends State<PreTicket> {
         selectedPlaceCollection = 'Place';
         // Use the Firestore route name instead of the display name
         String firestoreRouteName = _routeFirestoreNames[newRoute] ?? newRoute;
-        placesFuture = RouteService.fetchPlaces(
-          firestoreRouteName,
-          placeCollection: selectedPlaceCollection
-        );
+        placesFuture = RouteService.fetchPlaces(firestoreRouteName,
+            placeCollection: selectedPlaceCollection);
       });
     }
   }
@@ -267,11 +267,10 @@ class _PreTicketState extends State<PreTicket> {
       directionIndex = directionIndex == 0 ? 1 : 0;
       selectedPlaceCollection = directionIndex == 0 ? 'Place' : 'Place 2';
       // Use the Firestore route name instead of the display name
-      String firestoreRouteName = _routeFirestoreNames[selectedRoute] ?? selectedRoute;
-      placesFuture = RouteService.fetchPlaces(
-        firestoreRouteName,
-        placeCollection: selectedPlaceCollection
-      );
+      String firestoreRouteName =
+          _routeFirestoreNames[selectedRoute] ?? selectedRoute;
+      placesFuture = RouteService.fetchPlaces(firestoreRouteName,
+          placeCollection: selectedPlaceCollection);
     });
   }
 
@@ -281,7 +280,8 @@ class _PreTicketState extends State<PreTicket> {
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
-      _showCustomSnackBar('No valid drop-off locations after selected pick-up.', 'warning');
+      _showCustomSnackBar(
+          'No valid drop-off locations after selected pick-up.', 'warning');
       return;
     }
     final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
@@ -361,32 +361,84 @@ class _PreTicketState extends State<PreTicket> {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
-    
+
     // Get screen dimensions for better responsive calculations
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Responsive sizing with better screen size adaptation
-    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final dropdownFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
-    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    
+    final titleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final routeFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final dropdownFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+    final locationTitleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+
     // Responsive heights based on screen size
-    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
-    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
-    
+    final expandedHeight = isMobile
+        ? (screenHeight * 0.18)
+        : isTablet
+            ? (screenHeight * 0.20)
+            : (screenHeight * 0.22);
+    final topPadding = isMobile
+        ? (screenHeight * 0.06)
+        : isTablet
+            ? (screenHeight * 0.07)
+            : (screenHeight * 0.08);
+
     // Responsive padding that scales with screen size
-    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
-    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    
+    final horizontalPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+    final verticalPadding = isMobile
+        ? (screenHeight * 0.01)
+        : isTablet
+            ? (screenHeight * 0.012)
+            : (screenHeight * 0.015);
+    final containerPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+    final cardPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+
     // Responsive grid configuration
-    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
-    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
-    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
-    
+    final gridCrossAxisCount = isMobile
+        ? 2
+        : isTablet
+            ? 3
+            : 4;
+    final gridSpacing = isMobile
+        ? (screenWidth * 0.02)
+        : isTablet
+            ? (screenWidth * 0.025)
+            : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile
+        ? 2.5
+        : isTablet
+            ? 3.0
+            : 3.5;
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -420,38 +472,20 @@ class _PreTicketState extends State<PreTicket> {
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: EdgeInsets.only(right: 10.0),
-                          child: DropdownButton<String>(
-                            value: selectedRoute,
-                            dropdownColor: const Color(0xFF007A8F),
-                            style: GoogleFonts.outfit(
-                                fontSize: dropdownFontSize, color: Colors.white),
-                            iconEnabledColor: Colors.white,
-                            underline: Container(),
-                            items: routeChoices
-                                .map((route) => DropdownMenuItem(
-                                      value: route,
-                                      child: Text(routeLabels[route]![0],
-                                          style:
-                                              TextStyle(color: Colors.white)),
-                                    ))
-                                .toList(),
-                            onChanged: _onRouteChanged,
-                          ),
-                        ),
                       ],
                     ),
                   ),
                   // Route directions display (clickable)
                   Padding(
                     padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding, vertical: verticalPadding),
+                        horizontal: horizontalPadding,
+                        vertical: verticalPadding),
                     child: GestureDetector(
                       onTap: _toggleDirection,
                       child: Container(
                         padding: EdgeInsets.symmetric(
-                            horizontal: containerPadding, vertical: verticalPadding),
+                            horizontal: containerPadding,
+                            vertical: verticalPadding),
                         decoration: BoxDecoration(
                           color: const Color(0xFF007A8F),
                           borderRadius: BorderRadius.circular(16),
@@ -489,7 +523,8 @@ class _PreTicketState extends State<PreTicket> {
             ),
           ),
           SliverPadding(
-            padding: EdgeInsets.only(top: isMobile ? (screenHeight * 0.02) : (screenHeight * 0.025)),
+            padding: EdgeInsets.only(
+                top: isMobile ? (screenHeight * 0.02) : (screenHeight * 0.025)),
           ),
           SliverToBoxAdapter(
             child: Align(
@@ -560,8 +595,12 @@ class _PreTicketState extends State<PreTicket> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: EdgeInsets.symmetric(
-                                    vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
-                                    horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)),
+                                    vertical: isMobile
+                                        ? (screenHeight * 0.01)
+                                        : (screenHeight * 0.012),
+                                    horizontal: isMobile
+                                        ? (screenWidth * 0.015)
+                                        : (screenWidth * 0.02)),
                               ),
                               onPressed: () =>
                                   _showToSelectionPage(item, myList),
@@ -571,7 +610,7 @@ class _PreTicketState extends State<PreTicket> {
                                   Text(
                                     item['name'] ?? '',
                                     style: GoogleFonts.outfit(
-                                        fontSize: isMobile ? 12 : 14, 
+                                        fontSize: isMobile ? 12 : 14,
                                         color: Colors.white),
                                     textAlign: TextAlign.center,
                                     maxLines: 2,
@@ -582,7 +621,7 @@ class _PreTicketState extends State<PreTicket> {
                                     Text(
                                       '${(item['km'] as num).toInt()} km',
                                       style: TextStyle(
-                                          fontSize: isMobile ? 10 : 12, 
+                                          fontSize: isMobile ? 10 : 12,
                                           color: Colors.white70),
                                     ),
                                   ],
@@ -594,7 +633,10 @@ class _PreTicketState extends State<PreTicket> {
                       },
                     ),
                     // Debug button to test route service
-                    SizedBox(height: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012)),
+                    SizedBox(
+                        height: isMobile
+                            ? (screenHeight * 0.01)
+                            : (screenHeight * 0.012)),
                   ],
                 ),
               ),
@@ -636,14 +678,16 @@ class _QuantitySelectionModalState extends State<_QuantitySelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
+          child: Text('Cancel',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0091AD),
           ),
           onPressed: () => Navigator.of(context).pop(quantity),
-          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+          child: Text('Confirm',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -668,7 +712,7 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
   void initState() {
     super.initState();
     selectedTypes = List.generate(widget.quantity, (index) => 'Regular');
-    
+
     // Automatically set the first passenger's fare type based on verified ID
     if (widget.verifiedIDType != null && widget.quantity > 0) {
       String autoFareType = _mapIDTypeToFareType(widget.verifiedIDType!);
@@ -749,14 +793,16 @@ class _FareTypeSelectionModalState extends State<_FareTypeSelectionModal> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
+          child: Text('Cancel',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0091AD),
           ),
           onPressed: () => Navigator.of(context).pop(selectedTypes),
-          child: Text('Confirm', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+          child: Text('Confirm',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -775,14 +821,16 @@ class _ConfirmationModal extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
+          child: Text('Cancel',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
             backgroundColor: Color(0xFF0091AD),
           ),
           onPressed: () => Navigator.of(context).pop(true),
-          child: Text('Yes', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+          child: Text('Yes',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
         ),
       ],
     );
@@ -798,7 +846,7 @@ class _ReceiptModal extends StatelessWidget {
   final List<String> fareTypes;
   final int directionIndex;
   final String selectedPlaceCollection;
-  
+
   // Map route to display names
   final Map<String, List<String>> routeLabels = {
     'Batangas': [
@@ -826,7 +874,7 @@ class _ReceiptModal extends StatelessWidget {
       'San Juan to SM Lipa',
     ],
   };
-  
+
   _ReceiptModal(
       {required this.route,
       required this.fromPlace,
@@ -887,8 +935,10 @@ class _ReceiptModal extends StatelessWidget {
       'type': 'preTicket', // Add type field for scanning compatibility
       'ticketType': 'preTicket',
       'route': route,
-      'direction': routeLabels[route]![directionIndex], // Add direction for validation
-      'placeCollection': selectedPlaceCollection, // Add place collection for validation
+      'direction':
+          routeLabels[route]![directionIndex], // Add direction for validation
+      'placeCollection':
+          selectedPlaceCollection, // Add place collection for validation
       'date': formattedDate,
       'time': formattedTime,
       'from': fromPlace['name'],
@@ -903,7 +953,8 @@ class _ReceiptModal extends StatelessWidget {
       'passengerFares': passengerFares,
     };
     return AlertDialog(
-      title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
+      title: Text('Receipt',
+          style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
       content: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -924,7 +975,8 @@ class _ReceiptModal extends StatelessWidget {
             Text('Base Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP',
                 style: GoogleFonts.outfit(fontSize: 14)),
             Text('Total Fare: ${totalAmount.toStringAsFixed(2)} PHP',
-                style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                style: GoogleFonts.outfit(
+                    fontSize: 14, fontWeight: FontWeight.w600)),
             Text('Quantity: $quantity',
                 style: GoogleFonts.outfit(fontSize: 14)),
             SizedBox(height: 16),
@@ -957,17 +1009,18 @@ class _ReceiptModal extends StatelessWidget {
           },
           child: Text('Show generated QR code',
               style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF0091AD),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF0091AD),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
+          child: Text('Close',
+              style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
       ],
     );
@@ -987,31 +1040,79 @@ class ToSelectionPage extends StatelessWidget {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
-    
+
     // Get screen dimensions for better responsive calculations
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Responsive sizing with better screen size adaptation
-    final titleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final routeFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final locationTitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    
+    final titleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final routeFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final locationTitleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+
     // Responsive heights based on screen size
-    final expandedHeight = isMobile ? (screenHeight * 0.18) : isTablet ? (screenHeight * 0.20) : (screenHeight * 0.22);
-    final topPadding = isMobile ? (screenHeight * 0.06) : isTablet ? (screenHeight * 0.07) : (screenHeight * 0.08);
-    
+    final expandedHeight = isMobile
+        ? (screenHeight * 0.18)
+        : isTablet
+            ? (screenHeight * 0.20)
+            : (screenHeight * 0.22);
+    final topPadding = isMobile
+        ? (screenHeight * 0.06)
+        : isTablet
+            ? (screenHeight * 0.07)
+            : (screenHeight * 0.08);
+
     // Responsive padding that scales with screen size
-    final horizontalPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    final verticalPadding = isMobile ? (screenHeight * 0.01) : isTablet ? (screenHeight * 0.012) : (screenHeight * 0.015);
-    final containerPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    final cardPadding = isMobile ? (screenWidth * 0.04) : isTablet ? (screenWidth * 0.05) : (screenWidth * 0.06);
-    
+    final horizontalPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+    final verticalPadding = isMobile
+        ? (screenHeight * 0.01)
+        : isTablet
+            ? (screenHeight * 0.012)
+            : (screenHeight * 0.015);
+    final containerPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+    final cardPadding = isMobile
+        ? (screenWidth * 0.04)
+        : isTablet
+            ? (screenWidth * 0.05)
+            : (screenWidth * 0.06);
+
     // Responsive grid configuration
-    final gridCrossAxisCount = isMobile ? 2 : isTablet ? 3 : 4;
-    final gridSpacing = isMobile ? (screenWidth * 0.02) : isTablet ? (screenWidth * 0.025) : (screenWidth * 0.03);
-    final gridAspectRatio = isMobile ? 2.5 : isTablet ? 3.0 : 3.5;
-    
+    final gridCrossAxisCount = isMobile
+        ? 2
+        : isTablet
+            ? 3
+            : 4;
+    final gridSpacing = isMobile
+        ? (screenWidth * 0.02)
+        : isTablet
+            ? (screenWidth * 0.025)
+            : (screenWidth * 0.03);
+    final gridAspectRatio = isMobile
+        ? 2.5
+        : isTablet
+            ? 3.0
+            : 3.5;
+
     final size = MediaQuery.of(context).size;
     return Scaffold(
       body: CustomScrollView(
@@ -1052,10 +1153,12 @@ class ToSelectionPage extends StatelessWidget {
                   // Non-clickable direction label
                   Padding(
                     padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding, vertical: verticalPadding),
+                        horizontal: horizontalPadding,
+                        vertical: verticalPadding),
                     child: Container(
                       padding: EdgeInsets.symmetric(
-                          horizontal: containerPadding, vertical: verticalPadding),
+                          horizontal: containerPadding,
+                          vertical: verticalPadding),
                       decoration: BoxDecoration(
                         color: const Color(0xFF007A8F),
                         borderRadius: BorderRadius.circular(16),
@@ -1145,8 +1248,12 @@ class ToSelectionPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             padding: EdgeInsets.symmetric(
-                                vertical: isMobile ? (screenHeight * 0.01) : (screenHeight * 0.012), 
-                                horizontal: isMobile ? (screenWidth * 0.015) : (screenWidth * 0.02)),
+                                vertical: isMobile
+                                    ? (screenHeight * 0.01)
+                                    : (screenHeight * 0.012),
+                                horizontal: isMobile
+                                    ? (screenWidth * 0.015)
+                                    : (screenWidth * 0.02)),
                           ),
                           onPressed: () => Navigator.of(context).pop(place),
                           child: Column(
@@ -1155,7 +1262,7 @@ class ToSelectionPage extends StatelessWidget {
                               Text(
                                 place['name'] ?? '',
                                 style: GoogleFonts.outfit(
-                                    fontSize: isMobile ? 12 : 14, 
+                                    fontSize: isMobile ? 12 : 14,
                                     color: Colors.white),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
@@ -1166,7 +1273,7 @@ class ToSelectionPage extends StatelessWidget {
                                 Text(
                                   '${(place['km'] as num).toInt()} km',
                                   style: TextStyle(
-                                      fontSize: isMobile ? 10 : 12, 
+                                      fontSize: isMobile ? 10 : 12,
                                       color: Colors.white70),
                                 ),
                               ],
@@ -1216,7 +1323,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -1304,17 +1411,16 @@ class QRCodeFullScreenPage extends StatelessWidget {
   Future<void> savePreTicket(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final now = DateTime.now(); // Use device local time
-    
+    final now = DateTime.now();
+
     print('🔍 savePreTicket - Starting save process');
     print('🔍 savePreTicket - User ID: ${user.uid}');
     print('🔍 savePreTicket - QR Data: $qrData');
-    
+
     // Calculate total fare from discount breakdown
     double totalFare = 0.0;
     if (discountBreakdown != null) {
       for (String breakdown in discountBreakdown!) {
-        // Extract fare amount from breakdown string like "Passenger 1: Student (20% off) — 20.80 PHP"
         final regex = RegExp(r'— ([\d.]+) PHP');
         final match = regex.firstMatch(breakdown);
         if (match != null) {
@@ -1322,26 +1428,26 @@ class QRCodeFullScreenPage extends StatelessWidget {
         }
       }
     }
-    
+
     final data = {
       'from': from,
       'to': to,
       'km': km,
       'fare': fare,
-      'totalFare': totalFare.toStringAsFixed(2), // Add total fare
+      'totalFare': totalFare.toStringAsFixed(2),
       'quantity': quantity,
       'qrData': qrData,
       'discountBreakdown': discountBreakdown,
-      'status': 'pending', // Add status field
+      'status': 'pending',
       'ticketType': 'preTicket',
-      'createdAt': FieldValue.serverTimestamp(), // Use Firestore server timestamp
-      'route': route, // Route from the pre-ticket creation
-      'direction': jsonDecode(qrData)['direction'], // Add direction for validation
-      'placeCollection': jsonDecode(qrData)['placeCollection'], // Add place collection for validation
+      'createdAt': FieldValue.serverTimestamp(),
+      'route': route,
+      'direction': jsonDecode(qrData)['direction'],
+      'placeCollection': jsonDecode(qrData)['placeCollection'],
     };
-    
+
     print('🔍 savePreTicket - Data to save: $data');
-    
+
     try {
       final docRef = await FirebaseFirestore.instance
           .collection('users')
@@ -1357,135 +1463,357 @@ class QRCodeFullScreenPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final qrSize = size.width * 0.6;
+    // Get responsive breakpoints
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    // Responsive sizing
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final sectionFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final bodyFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F8F8),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0091AD),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.black),
+          icon: Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('QR Code',
-            style: GoogleFonts.outfit(
-                color: const Color.fromARGB(255, 255, 255, 255), fontSize: 16)),
-        centerTitle: false,
+        title: Text(
+          'Pre-Ticket Confirmation',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontSize: titleFontSize,
+          ),
+        ),
+        centerTitle: true,
       ),
-      body: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(height: size.height * 0.04),
-            Center(
-              child: Container(
-                color: Colors.white,
-                padding: EdgeInsets.all(8),
-                child: QrImageView(
-                  data: qrData,
-                  size: qrSize,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.all(horizontalPadding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: 20),
+
+              // Instructions Section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border.all(color: Colors.blue.shade200),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Show your generated QR code to the conductor',
-              style:
-                  GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            SizedBox(height: 24),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Details:',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            color: Colors.blue.shade700, size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          'Next Steps',
                           style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w500, fontSize: 14)),
-                      SizedBox(height: 8),
-                      Text('From: $from',
-                          style: GoogleFonts.outfit(fontSize: 14)),
-                      Text('To: $to', style: GoogleFonts.outfit(fontSize: 14)),
-                      Text('KM: $km', style: GoogleFonts.outfit(fontSize: 14)),
-                      Text('Total Fare: $fare Pesos',
-                          style: GoogleFonts.outfit(fontSize: 14)),
-                      Text('Total Passengers: $quantity',
-                          style: GoogleFonts.outfit(fontSize: 14)),
-                      if (discountBreakdown != null) ...[
-                        SizedBox(height: 12),
-                        Text('Discounts:',
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w500, fontSize: 14)),
-                        ...discountBreakdown!.map((e) =>
-                            Text(e, style: GoogleFonts.outfit(fontSize: 14))),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: size.width * 0.35,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(32),
+                            fontSize: sectionFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
                         ),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(showConfirmButton ? 'Cancel' : 'Close',
-                          style: GoogleFonts.outfit(
-                              color: Colors.white, fontSize: 17)),
+                      ],
                     ),
-                  ),
-                  if (showConfirmButton) ...[
-                    SizedBox(width: 16),
-                    SizedBox(
-                      width: size.width * 0.35,
-                      height: 48,
-                      child: FutureBuilder<bool>(
-                        future: canCreatePreTicket(),
-                        builder: (context, snapshot) {
-                          final canCreate = snapshot.data ?? false;
-                          return ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.lightGreen[400],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(32),
-                              ),
-                            ),
-                            onPressed: canCreate
-                                ? () async {
-                                    await savePreTicket(context);
-                                    _showCustomSnackBar(context, 'Pre-ticket saved!', 'success');
-                                    Navigator.of(context).pop();
-                                  }
-                                : null,
-                            child: Text('Confirm',
-                                style: GoogleFonts.outfit(
-                                    color: Colors.white, fontSize: 17)),
-                          );
-                        },
+                    SizedBox(height: 12),
+                    Text(
+                      '1. Confirm your pre-ticket below\n'
+                      '2. Go to Settings → Pre-Ticket QRs\n'
+                      '3. Show your QR code to the conductor when boarding\n'
+                      '4. The conductor will scan your QR code\n'
+                      '5. Enjoy your trip!',
+                      style: GoogleFonts.outfit(
+                        fontSize: bodyFontSize,
+                        color: Colors.blue.shade800,
+                        height: 1.5,
                       ),
                     ),
                   ],
-                ],
+                ),
+              ),
+
+              SizedBox(height: 24),
+
+              // Trip Details Section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade300),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.shade200,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.receipt_long,
+                            color: Color(0xFF0091AD), size: 24),
+                        SizedBox(width: 8),
+                        Text(
+                          'Trip Details',
+                          style: GoogleFonts.outfit(
+                            fontSize: sectionFontSize,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0091AD),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    _buildDetailRow('Route', route, bodyFontSize),
+                    _buildDetailRow('From', from, bodyFontSize),
+                    _buildDetailRow('To', to, bodyFontSize),
+                    _buildDetailRow('Distance', '$km km', bodyFontSize),
+                    _buildDetailRow('Total Fare', '₱$fare', bodyFontSize),
+                    _buildDetailRow('Passengers', '$quantity', bodyFontSize),
+                  ],
+                ),
+              ),
+
+              if (discountBreakdown != null &&
+                  discountBreakdown!.isNotEmpty) ...[
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    border: Border.all(color: Colors.green.shade200),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.discount,
+                              color: Colors.green.shade700, size: 24),
+                          SizedBox(width: 8),
+                          Text(
+                            'Fare Breakdown',
+                            style: GoogleFonts.outfit(
+                              fontSize: sectionFontSize,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 12),
+                      ...discountBreakdown!.map((breakdown) => Padding(
+                            padding: EdgeInsets.only(bottom: 4),
+                            child: Text(
+                              breakdown,
+                              style: GoogleFonts.outfit(
+                                fontSize: bodyFontSize - 2,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          )),
+                    ],
+                  ),
+                ),
+              ],
+
+              SizedBox(height: 24),
+
+              // Status Information
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade200),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.pending_actions,
+                        color: Colors.orange.shade700, size: 24),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Your pre-ticket will be available in Settings → Pre-Ticket QRs after confirmation.',
+                        style: GoogleFonts.outfit(
+                          fontSize: bodyFontSize,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 30),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding, vertical: verticalPadding),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    minimumSize: Size(
+                        double.infinity,
+                        isMobile
+                            ? 45
+                            : isTablet
+                                ? 50
+                                : 55),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.outfit(
+                      color: Colors.white,
+                      fontSize: isMobile
+                          ? 16
+                          : isTablet
+                              ? 18
+                              : 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              if (showConfirmButton) ...[
+                SizedBox(width: 16),
+                Expanded(
+                  child: FutureBuilder<bool>(
+                    future: canCreatePreTicket(),
+                    builder: (context, snapshot) {
+                      final canCreate = snapshot.data ?? false;
+                      return ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.lightGreen[400],
+                          minimumSize: Size(
+                              double.infinity,
+                              isMobile
+                                  ? 45
+                                  : isTablet
+                                      ? 50
+                                      : 55),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: canCreate
+                            ? () async {
+                                await savePreTicket(context);
+                                _showCustomSnackBar(
+                                    context,
+                                    'Pre-ticket saved successfully!',
+                                    'success');
+
+                                // Navigate to home page after a short delay
+                                await Future.delayed(
+                                    Duration(milliseconds: 500));
+                                if (context.mounted) {
+                                  Navigator.of(context).pushNamedAndRemoveUntil(
+                                    '/home',
+                                    (route) => false,
+                                  );
+                                }
+                              }
+                            : null,
+                        child: Text(
+                          'Confirm',
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: isMobile
+                                ? 16
+                                : isTablet
+                                    ? 18
+                                    : 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, double fontSize) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              '$label:',
+              style: GoogleFonts.outfit(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade700,
               ),
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.outfit(
+                fontSize: fontSize,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -14,17 +14,16 @@ class ReservationConfirm extends StatefulWidget {
 }
 
 class _ReservationConfirmState extends State<ReservationConfirm> with TickerProviderStateMixin {
-  late Future<List<Map<String, dynamic>>> _bookingsFuture;
+  late Stream<List<Map<String, dynamic>>> _bookingsStream;
   late TabController _tabController;
-  String _selectedFilter = 'all'; // 'all', 'pending', 'paid', 'boarded', 'accomplished', 'cancelled'
+  String _selectedFilter = 'all';
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 6, vsync: this);
-    _bookingsFuture = _fetchAllBookings();
+    _bookingsStream = _fetchAllBookingsStream();
     
-    // Listen to tab changes
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -59,6 +58,40 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
     super.dispose();
   }
 
+  Stream<List<Map<String, dynamic>>> _fetchAllBookingsStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return Stream.value([]);
+
+    final col = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('preBookings');
+
+    // Use snapshots() for real-time updates
+    return col.snapshots().map((snapshot) {
+      final allBookings = snapshot.docs
+          .where((doc) =>
+              doc.data()['status'] == 'paid' ||
+              doc.data()['status'] == 'pending_payment' ||
+              doc.data()['status'] == 'boarded' ||
+              doc.data()['status'] == 'accomplished' ||
+              doc.data()['status'] == 'cancelled')
+          .toList()
+        ..sort((a, b) => (b.data()['createdAt'] as Timestamp)
+            .compareTo(a.data()['createdAt'] as Timestamp));
+
+      return allBookings.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+
+        // Debug logging
+        print('📋 Pre-booking ${doc.id}: status=${data['status']}');
+
+        return data;
+      }).toList();
+    });
+  }
+
   Future<List<Map<String, dynamic>>> _fetchAllBookings() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return [];
@@ -68,7 +101,6 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
         .doc(user.uid)
         .collection('preBookings');
 
-    // Get all pre-bookings and filter in memory to avoid index requirements
     final snapshot = await col.get();
 
     final allBookings = snapshot.docs
@@ -124,13 +156,12 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
 
     await col.doc(bookingId).delete();
     setState(() {
-      _bookingsFuture = _fetchAllBookings();
+      _bookingsStream = _fetchAllBookingsStream();
     });
   }
 
   void _showBookingDetails(Map<String, dynamic> booking) {
     if (booking['status'] == 'pending_payment') {
-      // For pending bookings, show a dialog to go back to payment
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -149,8 +180,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                // Navigate to the payment page with the booking details
+                Navigator.of(context).pop();
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
                     builder: (context) => PreBookSummaryPage(
@@ -191,7 +221,6 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
         ),
       );
     } else {
-      // For paid bookings, show the details page
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => BookingDetailsPage(
@@ -202,35 +231,38 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
     }
   }
 
-
   Color _getStatusColor(String status) {
-    if (status == 'pending_payment') {
-      return Colors.orange;
-    } else if (status == 'boarded') {
-      return Colors.blue;
-    } else if (status == 'paid') {
-      return Colors.green;
-    } else if (status == 'accomplished') {
-      return Colors.purple;
-    } else if (status == 'cancelled') {
-      return Colors.red;
+    switch (status) {
+      case 'pending_payment':
+        return Colors.orange;
+      case 'boarded':
+        return Colors.blue;
+      case 'paid':
+        return Colors.green;
+      case 'accomplished':
+        return Colors.purple;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
     }
-    return Colors.grey;
   }
 
   String _getStatusText(String status) {
-    if (status == 'pending_payment') {
-      return 'PENDING';
-    } else if (status == 'boarded') {
-      return 'BOARDED';
-    } else if (status == 'paid') {
-      return 'PAID';
-    } else if (status == 'accomplished') {
-      return 'ACCOMPLISHED';
-    } else if (status == 'cancelled') {
-      return 'CANCELLED';
+    switch (status) {
+      case 'pending_payment':
+        return 'PENDING';
+      case 'boarded':
+        return 'BOARDED';
+      case 'paid':
+        return 'PAID';
+      case 'accomplished':
+        return 'ACCOMPLISHED';
+      case 'cancelled':
+        return 'CANCELLED';
+      default:
+        return 'UNKNOWN';
     }
-    return 'UNKNOWN';
   }
 
   void _showCustomSnackBar(String message, String type) {
@@ -308,31 +340,13 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
-    // Responsive sizing
-    final appBarFontSize = isMobile
-        ? 16.0
-        : isTablet
-            ? 18.0
-            : 20.0;
-    final tabFontSize = isMobile
-        ? 12.0
-        : isTablet
-            ? 14.0
-            : 16.0;
-    final cardPadding = isMobile
-        ? 12.0
-        : isTablet
-            ? 16.0
-            : 20.0;
-    final horizontalPadding = isMobile
-        ? 16.0
-        : isTablet
-            ? 20.0
-            : 24.0;
+    final appBarFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final tabFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final cardPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -370,8 +384,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
           ],
         ),
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _bookingsFuture,
+      body: StreamBuilder<List<Map<String, dynamic>>>(
+        stream: _bookingsStream,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -383,13 +397,31 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
             controller: _tabController,
             children: List.generate(6, (index) {
               String filter = ['all', 'pending', 'paid', 'boarded', 'accomplished', 'cancelled'][index];
-              List<Map<String, dynamic>> bookings = _filterBookings(allBookings);
+              
+              // Filter bookings for current tab
+              List<Map<String, dynamic>> bookings;
+              if (filter == 'all') {
+                bookings = allBookings;
+              } else {
+                String statusToMatch;
+                switch (filter) {
+                  case 'pending':
+                    statusToMatch = 'pending_payment';
+                    break;
+                  case 'accomplished':
+                    statusToMatch = 'accomplished';
+                    break;
+                  default:
+                    statusToMatch = filter;
+                }
+                bookings = allBookings.where((b) => b['status'] == statusToMatch).toList();
+              }
               
               if (bookings.isEmpty) {
-                String emptyMessage = 'No reservations found.';
-                if (filter != 'all') {
-                  emptyMessage = 'No $filter reservations found.';
-                }
+                String emptyMessage = filter == 'all' 
+                    ? 'No reservations found.'
+                    : 'No $filter reservations found.';
+                    
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -578,7 +610,6 @@ class BookingDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Use the stored qrData from Firebase, which contains the proper JSON format
     final qrData = booking['qrData'] ?? '{}';
     final status = booking['status'] ?? 'paid';
     final isBoarded = status == 'boarded';
@@ -705,7 +736,9 @@ class BookingDetailsPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isBoarded ? Colors.blue[200]! : Colors.grey[300]!),
+                          border: Border.all(color: isCancelled ? Colors.red[200]! :
+                                            isAccomplished ? Colors.purple[200]! :
+                                            isBoarded ? Colors.blue[200]! : Colors.grey[300]!),
                         ),
                         child: isCancelled
                           ? Stack(

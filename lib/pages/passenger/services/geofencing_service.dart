@@ -3,6 +3,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
+import 'package:intl/intl.dart';
 import 'dart:async';
 
 class GeofencingService {
@@ -16,19 +17,25 @@ class GeofencingService {
   bool _isConductorMode = false;
   String? _conductorRoute;
   String? _conductorDocId;
-  
+
   // Configuration
-  static const double _geofenceRadius = 50.0; // 50 meters for more accurate detection
-  static const Duration _checkInterval = Duration(seconds: 30); // Increased to reduce excessive checks
-  static const double _locationAccuracyThreshold = 20.0; // Only process locations with accuracy better than 20m
-  static const Duration _minProcessingInterval = Duration(seconds: 10); // Minimum time between processing same destination
+  static const double _geofenceRadius =
+      250.0; // 250 meters for drop-off detection
+  static const Duration _checkInterval = Duration(seconds: 20);
+  static const double _locationAccuracyThreshold = 50.0;
+  static const Duration _minProcessingInterval = Duration(seconds: 10);
 
   // Add tracking for last processing times to prevent excessive processing
   final Map<String, DateTime> _lastProcessedDestinations = {};
 
   /// Start monitoring passenger location for geofencing
   Future<void> startMonitoring() async {
-    if (_isMonitoring) return;
+    // CRITICAL: Stop any existing monitoring first
+    if (_isMonitoring) {
+      print('⚠️ Geofencing already running, stopping first...');
+      stopMonitoring();
+      await Future.delayed(Duration(milliseconds: 500)); // Wait for cleanup
+    }
 
     try {
       // Check location permissions
@@ -46,15 +53,22 @@ class GeofencingService {
         return;
       }
 
+      // IMPORTANT: Set passenger mode flags BEFORE starting monitoring
+      _isConductorMode = false;
+      _conductorRoute = null;
+      _conductorDocId = null;
+
+      print('🚀 Starting PASSENGER mode geofencing...');
+      print('🔧 Mode check: _isConductorMode=$_isConductorMode');
+
       // Start location monitoring
       _locationSubscription = Geolocator.getPositionStream(
         locationSettings: LocationSettings(
           accuracy: LocationAccuracy.best,
-          distanceFilter: 5, // Update every 5 meters for more precise tracking
-          timeLimit: Duration(seconds: 10), // Time limit for location updates
+          distanceFilter: 5,
+          timeLimit: Duration(seconds: 10),
         ),
       ).listen((Position position) {
-        // Only process positions with good accuracy
         if (position.accuracy <= _locationAccuracyThreshold) {
           _checkGeofencing(position);
         }
@@ -67,7 +81,6 @@ class GeofencingService {
             desiredAccuracy: LocationAccuracy.best,
             timeLimit: Duration(seconds: 10),
           );
-          // Only process positions with good accuracy
           if (position.accuracy <= _locationAccuracyThreshold) {
             _checkGeofencing(position);
           }
@@ -77,15 +90,23 @@ class GeofencingService {
       });
 
       _isMonitoring = true;
-      print('✅ Geofencing monitoring started');
+      print('✅ Passenger geofencing monitoring started successfully');
+      print(
+          '🔧 Final state: _isMonitoring=$_isMonitoring, _isConductorMode=$_isConductorMode');
     } catch (e) {
-      print('Error starting geofencing: $e');
+      print('❌ Error starting passenger geofencing: $e');
     }
   }
 
   /// Start conductor-based geofencing monitoring
-  Future<void> startConductorMonitoring(String route, String conductorDocId) async {
-    if (_isMonitoring) return;
+  Future<void> startConductorMonitoring(
+      String route, String conductorDocId) async {
+    // CRITICAL: Stop any existing monitoring first
+    if (_isMonitoring) {
+      print('⚠️ Geofencing already running, stopping first...');
+      stopMonitoring();
+      await Future.delayed(Duration(milliseconds: 500)); // Wait for cleanup
+    }
 
     try {
       // Check location permissions
@@ -103,47 +124,69 @@ class GeofencingService {
         return;
       }
 
+      // IMPORTANT: Set conductor mode flags BEFORE starting monitoring
       _isConductorMode = true;
       _conductorRoute = route;
       _conductorDocId = conductorDocId;
+
+      print('🚀 Starting CONDUCTOR mode geofencing...');
+      print(
+          '🔧 Mode check: _isConductorMode=$_isConductorMode, route=$route, docId=$conductorDocId');
 
       // Start location monitoring
       _locationSubscription = Geolocator.getPositionStream(
         locationSettings: LocationSettings(
           accuracy: LocationAccuracy.best,
-          distanceFilter: 10, // Increased to reduce excessive updates
-          timeLimit: Duration(seconds: 15), // Increased time limit
+          distanceFilter: 10,
+          timeLimit: Duration(seconds: 15),
         ),
       ).listen((Position position) {
-        // Only process positions with good accuracy
+        print(
+            '📍 Geofencing: Received position update - lat: ${position.latitude}, lng: ${position.longitude}, accuracy: ${position.accuracy}m');
         if (position.accuracy <= _locationAccuracyThreshold) {
+          print(
+              '✅ Geofencing: Position accuracy acceptable (${position.accuracy}m <= ${_locationAccuracyThreshold}m), checking geofencing...');
           _checkConductorGeofencing(position);
+        } else {
+          print(
+              '⚠️ Geofencing: Position accuracy too poor (${position.accuracy}m > ${_locationAccuracyThreshold}m), skipping...');
         }
       });
 
       // Also check periodically for better reliability
       _geofencingTimer = Timer.periodic(_checkInterval, (timer) async {
         try {
-          // Clean up old processed destinations
+          print(
+              '⏰ Geofencing: Periodic check triggered (every ${_checkInterval.inSeconds}s)');
           _cleanupOldProcessedDestinations();
-          
+
           Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.best,
             timeLimit: Duration(seconds: 15),
           );
-          // Only process positions with good accuracy
+          print(
+              '📍 Geofencing: Periodic position - lat: ${position.latitude}, lng: ${position.longitude}, accuracy: ${position.accuracy}m');
           if (position.accuracy <= _locationAccuracyThreshold) {
+            print(
+                '✅ Geofencing: Periodic position accuracy acceptable, checking geofencing...');
             _checkConductorGeofencing(position);
+          } else {
+            print(
+                '⚠️ Geofencing: Periodic position accuracy too poor, skipping...');
           }
         } catch (e) {
-          print('Error getting current position: $e');
+          print('❌ Geofencing: Error getting current position: $e');
         }
       });
 
       _isMonitoring = true;
       print('✅ Conductor geofencing monitoring started for route: $route');
+      print(
+          '🔧 Geofencing config: radius=${_geofenceRadius}m, accuracy≤${_locationAccuracyThreshold}m, interval=${_checkInterval.inSeconds}s');
+      print(
+          '🔧 Final state: _isMonitoring=$_isMonitoring, _isConductorMode=$_isConductorMode');
     } catch (e) {
-      print('Error starting conductor geofencing: $e');
+      print('❌ Error starting conductor geofencing: $e');
     }
   }
 
@@ -155,35 +198,59 @@ class GeofencingService {
     _isConductorMode = false;
     _conductorRoute = null;
     _conductorDocId = null;
-    _lastProcessedDestinations.clear(); // Clear processed destinations
+    _lastProcessedDestinations.clear();
     print('🛑 Geofencing monitoring stopped');
   }
 
   /// Check if passenger has reached any destination (passenger mode)
   Future<void> _checkGeofencing(Position passengerPosition) async {
-    if (_isConductorMode) return; // Skip if in conductor mode
-    
+    // CRITICAL: Double-check we're not in conductor mode
+    if (_isConductorMode) {
+      print('⚠️ Skipping passenger geofencing - in conductor mode');
+      return;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      print('⚠️ No user logged in, skipping geofencing');
+      return;
+    }
 
     try {
-      // Get all active pre-tickets for the current user
+      print('🔍 Passenger geofencing check started');
+      print(
+          '📍 Position: ${passengerPosition.latitude}, ${passengerPosition.longitude}');
+
+      // 1. Check PRE-TICKETS - ONLY 'boarded' status
       final preTicketsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preTickets')
-          .where('status', whereIn: ['pending', 'boarded'])
+          .where('status', isEqualTo: 'boarded')
           .get();
+
+      print('🎫 Found ${preTicketsSnapshot.docs.length} boarded pre-tickets');
 
       for (var doc in preTicketsSnapshot.docs) {
         final ticket = doc.data();
         final destinationName = ticket['to'];
         final route = ticket['route'];
-        
+
+        print(
+            '🔍 Checking pre-ticket ${doc.id}: to=$destinationName, status=${ticket['status']}');
+
+        // Skip if already accomplished
+        if (ticket['status'] == 'accomplished' ||
+            ticket['dropOffTimestamp'] != null ||
+            ticket['geofenceStatus'] == 'completed') {
+          print('⏭️ Skipping pre-ticket ${doc.id} - already accomplished');
+          continue;
+        }
+
         if (destinationName != null && route != null) {
-          // Get destination coordinates
-          final destinationCoords = await _getDestinationCoordinates(destinationName, route);
-          
+          final destinationCoords =
+              await _getDestinationCoordinates(destinationName, route);
+
           if (destinationCoords != null) {
             final lat = destinationCoords['latitude'];
             final lng = destinationCoords['longitude'];
@@ -195,32 +262,50 @@ class GeofencingService {
                 lng,
               );
 
-              // If passenger is within geofence radius, mark as accomplished
+              print(
+                  '📍 Distance to $destinationName: ${distance.toStringAsFixed(1)}m');
+
               if (distance <= _geofenceRadius) {
-                await _markTicketAccomplished(doc.id, user.uid, passengerPosition);
-                print('🎯 Pre-ticket accomplished: Passenger reached ${destinationName} (${distance.toStringAsFixed(1)}m away)');
+                await _markTicketAccomplished(
+                    doc.id, user.uid, passengerPosition);
+                print(
+                    '🎯 Pre-ticket accomplished: Passenger reached ${destinationName} (${distance.toStringAsFixed(1)}m away)');
               }
             }
           }
         }
       }
 
-      // Also check pre-bookings
+      // 2. Check PRE-BOOKINGS - ONLY 'boarded' status
       final preBookingsSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preBookings')
-          .where('status', whereIn: ['paid', 'boarded'])
+          .where('status', isEqualTo: 'boarded')
           .get();
+
+      print('📚 Found ${preBookingsSnapshot.docs.length} boarded pre-bookings');
 
       for (var doc in preBookingsSnapshot.docs) {
         final booking = doc.data();
         final destinationName = booking['to'];
         final route = booking['route'];
-        
+
+        print(
+            '🔍 Checking pre-booking ${doc.id}: to=$destinationName, status=${booking['status']}');
+
+        // Skip if already accomplished
+        if (booking['status'] == 'accomplished' ||
+            booking['dropOffTimestamp'] != null ||
+            booking['geofenceStatus'] == 'completed') {
+          print('⏭️ Skipping pre-booking ${doc.id} - already accomplished');
+          continue;
+        }
+
         if (destinationName != null && route != null) {
-          final destinationCoords = await _getDestinationCoordinates(destinationName, route);
-          
+          final destinationCoords =
+              await _getDestinationCoordinates(destinationName, route);
+
           if (destinationCoords != null) {
             final lat = destinationCoords['latitude'];
             final lng = destinationCoords['longitude'];
@@ -232,27 +317,45 @@ class GeofencingService {
                 lng,
               );
 
+              print(
+                  '📍 Distance to $destinationName: ${distance.toStringAsFixed(1)}m');
+
               if (distance <= _geofenceRadius) {
-                await _markPreBookingAccomplished(doc.id, user.uid, passengerPosition);
-                print('🎯 Pre-booking accomplished: Passenger reached ${destinationName} (${distance.toStringAsFixed(1)}m away)');
+                await _markPreBookingAccomplished(
+                    doc.id, user.uid, passengerPosition);
+                print(
+                    '🎯 Pre-booking accomplished: Passenger reached ${destinationName} (${distance.toStringAsFixed(1)}m away)');
               }
             }
           }
         }
       }
+
+      print('✅ Passenger geofencing check completed');
     } catch (e) {
-      print('Error in passenger geofencing check: $e');
+      print('❌ Error in passenger geofencing check: $e');
     }
   }
 
   /// Check conductor geofencing for passenger drop-offs (conductor mode)
   Future<void> _checkConductorGeofencing(Position conductorPosition) async {
-    if (!_isConductorMode || _conductorRoute == null || _conductorDocId == null) return;
+    print(
+        '🔧 _checkConductorGeofencing called: _isConductorMode=$_isConductorMode, route=$_conductorRoute, docId=$_conductorDocId');
+
+    if (!_isConductorMode ||
+        _conductorRoute == null ||
+        _conductorDocId == null) {
+      print(
+          '❌ Geofencing check skipped - not in conductor mode or missing data');
+      return;
+    }
 
     try {
-      print('🔍 Checking conductor geofencing for route: $_conductorRoute at ${DateTime.now()}');
-      print('📍 Conductor position: ${conductorPosition.latitude}, ${conductorPosition.longitude}');
-      
+      print(
+          '🔍 Checking conductor geofencing for route: $_conductorRoute at ${DateTime.now()}');
+      print(
+          '📍 Conductor position: ${conductorPosition.latitude}, ${conductorPosition.longitude}');
+
       // Get all boarded passengers for this conductor
       final conductorDoc = await FirebaseFirestore.instance
           .collection('conductors')
@@ -266,141 +369,155 @@ class GeofencingService {
 
       final conductorData = conductorDoc.data() as Map<String, dynamic>;
       final currentPassengerCount = conductorData['passengerCount'] ?? 0;
+      final activeTripId = conductorData['activeTrip']?['tripId'];
 
       print('👥 Current passenger count: $currentPassengerCount');
+      print('🔍 Current active trip ID: $activeTripId');
 
       if (currentPassengerCount <= 0) {
         print('ℹ️ No passengers to check for drop-off');
         return;
       }
 
-      // Get all active tickets for this conductor from remittance collection
+      int totalDecremented = 0;
+      Map<String, List<Map<String, dynamic>>> ticketsByDestination = {};
+
+      // 1. COLLECT ALL MANUAL TICKETS grouped by destination
       final remittanceSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
           .collection('remittance')
           .get();
 
-      print('📋 Found ${remittanceSnapshot.docs.length} date documents in remittance');
-
-      int totalDecremented = 0;
-      Set<String> processedDestinations = {}; // Prevent duplicate processing in single check
+      print(
+          '📋 Found ${remittanceSnapshot.docs.length} date documents in remittance');
 
       for (var dateDoc in remittanceSnapshot.docs) {
+        final dateId = dateDoc.id;
         final ticketsCollection = dateDoc.reference.collection('tickets');
         final tickets = await ticketsCollection.get();
-
-        print('📅 Date ${dateDoc.id}: Found ${tickets.docs.length} tickets');
 
         for (var ticketDoc in tickets.docs) {
           final ticket = ticketDoc.data();
           final destinationName = ticket['to'];
           final isActive = ticket['active'] ?? false;
-          
-          print('🎫 Ticket ${ticketDoc.id}: to=$destinationName, active=$isActive');
-          
-          if (isActive && destinationName != null && !processedDestinations.contains(destinationName)) {
-            // Check if we've processed this destination recently to prevent excessive processing
-            final lastProcessed = _lastProcessedDestinations[destinationName];
-            if (lastProcessed != null && 
-                DateTime.now().difference(lastProcessed) < _minProcessingInterval) {
-              print('⏰ Skipping $destinationName - processed too recently');
-              continue; // Skip if processed too recently
-            }
-            
-            // Get destination coordinates
-            final destinationCoords = await _getDestinationCoordinates(destinationName, _conductorRoute!);
-            
-            if (destinationCoords != null) {
-              final lat = destinationCoords['latitude'];
-              final lng = destinationCoords['longitude'];
-              if (lat != null && lng != null) {
-                final distance = Geolocator.distanceBetween(
-                  conductorPosition.latitude,
-                  conductorPosition.longitude,
-                  lat,
-                  lng,
-                );
+          final ticketTripId = ticket['tripId'];
+          final status = ticket['status'] ?? '';
 
-                print('🎯 Destination $destinationName: ${distance.toStringAsFixed(1)}m away');
+          bool shouldProcess = isActive &&
+              destinationName != null &&
+              status != 'accomplished' &&
+              status != 'completed';
 
-                // Enhanced geofencing: Check if conductor is approaching and within radius
-                if (distance <= _geofenceRadius && await _isApproachingDestination(conductorPosition, lat, lng)) {
-                  final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
-                  await _markConductorTicketCompleted(ticketDoc.reference, quantity);
-                  totalDecremented += quantity;
-                  processedDestinations.add(destinationName);
-                  _lastProcessedDestinations[destinationName] = DateTime.now(); // Track processing time
-                  print('🎯 Conductor reached ${destinationName}: ${quantity} passenger(s) dropped off (${distance.toStringAsFixed(1)}m away)');
-                } else if (distance <= _geofenceRadius) {
-                  print('⚠️ Within geofence radius but not approaching destination');
-                }
-              }
-            } else {
-              print('❌ Could not get coordinates for destination: $destinationName');
+          bool tripIdMatches = false;
+          if (ticketTripId == null) {
+            tripIdMatches = true;
+          } else if (ticketTripId == activeTripId) {
+            tripIdMatches = true;
+          }
+
+          if (shouldProcess && tripIdMatches) {
+            if (!ticketsByDestination.containsKey(destinationName)) {
+              ticketsByDestination[destinationName] = [];
             }
+
+            ticketsByDestination[destinationName]!.add({
+              'type': 'manual',
+              'reference': ticketDoc.reference,
+              'dateId': dateId,
+              'quantity': (ticket['quantity'] as num?)?.toInt() ?? 1,
+              'ticketId': ticketDoc.id,
+            });
           }
         }
       }
 
-      // Also check pre-bookings and pre-tickets
+      // 2. ✅ FIXED: COLLECT PRE-BOOKINGS with better query and status checks
+      print('\n🔍 === STARTING PRE-BOOKINGS COLLECTION ===');
+
+      // Query for boarded pre-bookings
       final preBookingsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
           .collection('preBookings')
-          .where('status', isEqualTo: 'boarded')
+          .where('status', isEqualTo: 'boarded') // ✅ Only get boarded ones
           .get();
 
       print('📚 Found ${preBookingsSnapshot.docs.length} boarded pre-bookings');
 
       for (var doc in preBookingsSnapshot.docs) {
         final booking = doc.data();
-        final destinationName = booking['data']?['to'] ?? booking['to'];
-        final quantity = booking['data']?['quantity'] ?? 1;
-        
-        print('📖 Pre-booking ${doc.id}: to=$destinationName, quantity=$quantity');
-        
-        if (destinationName != null && !processedDestinations.contains(destinationName)) {
-          // Check if we've processed this destination recently
-          final lastProcessed = _lastProcessedDestinations[destinationName];
-          if (lastProcessed != null && 
-              DateTime.now().difference(lastProcessed) < _minProcessingInterval) {
-            print('⏰ Skipping pre-booking $destinationName - processed too recently');
-            continue; // Skip if processed too recently
-          }
-          
-          final destinationCoords = await _getDestinationCoordinates(destinationName, _conductorRoute!);
-          
-          if (destinationCoords != null) {
-            final lat = destinationCoords['latitude'];
-            final lng = destinationCoords['longitude'];
-            if (lat != null && lng != null) {
-              final distance = Geolocator.distanceBetween(
-                conductorPosition.latitude,
-                conductorPosition.longitude,
-                lat,
-                lng,
-              );
+        final bookingId = doc.id;
+        final destinationName = booking['to'];
+        final bookingTripId = booking['tripId'];
+        final currentStatus = booking['status'] ?? '';
+        final boardingStatus = booking['boardingStatus'] ?? '';
 
-              print('🎯 Pre-booking destination $destinationName: ${distance.toStringAsFixed(1)}m away');
+        print('\n🔍 Processing pre-booking: $bookingId');
+        print('   - Destination: $destinationName');
+        print('   - Status: $currentStatus');
+        print('   - BoardingStatus: $boardingStatus');
+        print('   - TripId: $bookingTripId vs Active: $activeTripId');
 
-              if (distance <= _geofenceRadius && await _isApproachingDestination(conductorPosition, lat, lng)) {
-                final qty = (quantity as num?)?.toInt() ?? 1;
-                await _markPreBookingCompleted(doc.reference, qty);
-                totalDecremented += qty;
-                processedDestinations.add(destinationName);
-                _lastProcessedDestinations[destinationName] = DateTime.now(); // Track processing time
-                print('🎯 Pre-booking completed: ${qty} passenger(s) dropped off at ${destinationName} (${distance.toStringAsFixed(1)}m away)');
-              } else if (distance <= _geofenceRadius) {
-                print('⚠️ Pre-booking within geofence radius but not approaching destination');
-              }
-            }
-          } else {
-            print('❌ Could not get coordinates for pre-booking destination: $destinationName');
+        // ✅ CRITICAL: Check if already completed
+        final hasDropOffTimestamp = booking['dropOffTimestamp'] != null;
+        final hasCompletedAt = booking['completedAt'] != null;
+        final hasAccomplishedAt = booking['accomplishedAt'] != null;
+        final geofenceStatus = booking['geofenceStatus'] ?? '';
+
+        print('   - hasDropOffTimestamp: $hasDropOffTimestamp');
+        print('   - hasCompletedAt: $hasCompletedAt');
+        print('   - hasAccomplishedAt: $hasAccomplishedAt');
+        print('   - geofenceStatus: $geofenceStatus');
+
+        // ✅ Skip if already completed
+        if (hasDropOffTimestamp ||
+            hasCompletedAt ||
+            hasAccomplishedAt ||
+            currentStatus == 'completed' ||
+            currentStatus == 'accomplished' ||
+            geofenceStatus == 'completed') {
+          print('   ⏭️ SKIPPING - Already completed');
+          continue;
+        }
+
+        // ✅ Check tripId compatibility
+        bool bookingTripMatches =
+            (bookingTripId == null || bookingTripId == activeTripId);
+
+        if (!bookingTripMatches) {
+          print('   ⏭️ SKIPPING - TripId mismatch');
+          continue;
+        }
+
+        // ✅ Get quantity
+        int quantity = 1;
+        if (booking['quantity'] != null) {
+          quantity = (booking['quantity'] as num).toInt();
+        }
+
+        print('   ✅ Pre-booking qualifies for geofencing!');
+        print('   - Quantity: $quantity');
+
+        if (destinationName != null) {
+          if (!ticketsByDestination.containsKey(destinationName)) {
+            ticketsByDestination[destinationName] = [];
           }
+
+          ticketsByDestination[destinationName]!.add({
+            'type': 'preBooking',
+            'reference': doc.reference,
+            'quantity': quantity,
+            'bookingId': bookingId,
+          });
+
+          print('   📦 Added to destination group: $destinationName');
         }
       }
 
+      print('\n🔍 === PRE-BOOKINGS COLLECTION COMPLETE ===\n');
+
+      // 3. COLLECT PRE-TICKETS grouped by destination
       final preTicketsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
@@ -413,124 +530,268 @@ class GeofencingService {
       for (var doc in preTicketsSnapshot.docs) {
         final ticket = doc.data();
         final destinationName = ticket['data']?['to'] ?? ticket['to'];
-        final quantity = ticket['data']?['quantity'] ?? 1;
-        
-        print('🎫 Pre-ticket ${doc.id}: to=$destinationName, quantity=$quantity');
-        
-        if (destinationName != null && !processedDestinations.contains(destinationName)) {
-          // Check if we've processed this destination recently
-          final lastProcessed = _lastProcessedDestinations[destinationName];
-          if (lastProcessed != null && 
-              DateTime.now().difference(lastProcessed) < _minProcessingInterval) {
-            print('⏰ Skipping pre-ticket $destinationName - processed too recently');
-            continue; // Skip if processed too recently
-          }
-          
-          final destinationCoords = await _getDestinationCoordinates(destinationName, _conductorRoute!);
-          
-          if (destinationCoords != null) {
-            final lat = destinationCoords['latitude'];
-            final lng = destinationCoords['longitude'];
-            if (lat != null && lng != null) {
-              final distance = Geolocator.distanceBetween(
-                conductorPosition.latitude,
-                conductorPosition.longitude,
-                lat,
-                lng,
-              );
+        final ticketTripId = ticket['tripId'];
 
-              print('🎯 Pre-ticket destination $destinationName: ${distance.toStringAsFixed(1)}m away');
+        bool ticketTripMatches =
+            (ticketTripId == null || ticketTripId == activeTripId);
 
-              if (distance <= _geofenceRadius && await _isApproachingDestination(conductorPosition, lat, lng)) {
-                final qty = (quantity as num?)?.toInt() ?? 1;
-                await _markPreTicketCompleted(doc.reference, qty);
-                totalDecremented += qty;
-                processedDestinations.add(destinationName);
-                _lastProcessedDestinations[destinationName] = DateTime.now(); // Track processing time
-                print('🎯 Pre-ticket completed: ${qty} passenger(s) dropped off at ${destinationName} (${distance.toStringAsFixed(1)}m away)');
-              } else if (distance <= _geofenceRadius) {
-                print('⚠️ Pre-ticket within geofence radius but not approaching destination');
-              }
-            }
-          } else {
-            print('❌ Could not get coordinates for pre-ticket destination: $destinationName');
+        if (!ticketTripMatches) {
+          print('⏭️ Skipping pre-ticket ${doc.id} - belongs to different trip');
+          continue;
+        }
+
+        final hasDropOffTimestamp = ticket['dropOffTimestamp'] != null;
+        final hasCompletedAt = ticket['completedAt'] != null;
+        final currentStatus = ticket['status'] ?? '';
+
+        if (hasDropOffTimestamp ||
+            hasCompletedAt ||
+            currentStatus == 'completed' ||
+            currentStatus == 'accomplished') {
+          print('⏭️ Skipping pre-ticket ${doc.id} - already completed');
+          continue;
+        }
+
+        int quantity = 1;
+        if (ticket['data']?['quantity'] != null) {
+          quantity = (ticket['data']['quantity'] as num).toInt();
+        } else if (ticket['quantity'] != null) {
+          quantity = (ticket['quantity'] as num).toInt();
+        }
+
+        if (destinationName != null) {
+          if (!ticketsByDestination.containsKey(destinationName)) {
+            ticketsByDestination[destinationName] = [];
           }
+
+          ticketsByDestination[destinationName]!.add({
+            'type': 'preTicket',
+            'reference': doc.reference,
+            'quantity': quantity,
+            'ticketId': doc.id,
+          });
+
+          print(
+              '📦 Grouped pre-ticket ${doc.id} to destination: $destinationName');
         }
       }
 
+      // ✅ NOW PROCESS ALL DESTINATIONS
+      print(
+          '\n🎯 === PROCESSING ${ticketsByDestination.length} DESTINATIONS ===\n');
+
+      for (var entry in ticketsByDestination.entries) {
+        final destinationName = entry.key;
+        final ticketsForDestination = entry.value;
+
+        print('\n🔍 Processing destination: $destinationName');
+        print('   Total tickets: ${ticketsForDestination.length}');
+
+        // Count by type
+        final manualCount =
+            ticketsForDestination.where((t) => t['type'] == 'manual').length;
+        final preBookingCount = ticketsForDestination
+            .where((t) => t['type'] == 'preBooking')
+            .length;
+        final preTicketCount =
+            ticketsForDestination.where((t) => t['type'] == 'preTicket').length;
+
+        print('   - Manual: $manualCount');
+        print('   - Pre-bookings: $preBookingCount');
+        print('   - Pre-tickets: $preTicketCount');
+
+        // Get coordinates for this destination
+        final destinationCoords =
+            await _getDestinationCoordinates(destinationName, _conductorRoute!);
+
+        if (destinationCoords == null) {
+          print(
+              '   ⚠️ Could not get coordinates, skipping all tickets to this destination');
+          continue;
+        }
+
+        final lat = destinationCoords['latitude'];
+        final lng = destinationCoords['longitude'];
+
+        if (lat == null || lng == null) {
+          print('   ⚠️ Invalid coordinates, skipping');
+          continue;
+        }
+
+        final distance = Geolocator.distanceBetween(
+          conductorPosition.latitude,
+          conductorPosition.longitude,
+          lat,
+          lng,
+        );
+
+        print(
+            '   📍 Distance: ${distance.toStringAsFixed(1)}m (threshold: ${_geofenceRadius}m)');
+
+        if (distance <= _geofenceRadius) {
+          print('   ✅ Within geofence radius!');
+
+          if (await _isApproachingDestination(conductorPosition, lat, lng)) {
+            print('   ✅ Conductor IS approaching destination!');
+            print(
+                '   🚀 PROCESSING ALL ${ticketsForDestination.length} ticket(s)');
+
+            // ✅ PROCESS ALL TICKETS TO THIS DESTINATION
+            for (var ticketData in ticketsForDestination) {
+              final type = ticketData['type'];
+              final reference = ticketData['reference'] as DocumentReference;
+              final quantity = ticketData['quantity'] as int;
+
+              if (type == 'manual') {
+                final dateId = ticketData['dateId'] as String;
+                final ticketId = ticketData['ticketId'] as String;
+
+                print(
+                    '      🚀 MARKING MANUAL TICKET: $ticketId (qty: $quantity)');
+                await _markConductorTicketCompleted(
+                    reference, quantity, dateId);
+                totalDecremented += quantity;
+                print('      ✅ Manual ticket $ticketId completed');
+              } else if (type == 'preBooking') {
+                final bookingId = ticketData['bookingId'] as String;
+
+                print(
+                    '      🚀 MARKING PRE-BOOKING: $bookingId (qty: $quantity)');
+                await _markPreBookingCompleted(reference, quantity);
+                totalDecremented += quantity;
+                print('      ✅ Pre-booking $bookingId completed');
+              } else if (type == 'preTicket') {
+                final ticketId = ticketData['ticketId'] as String;
+
+                print(
+                    '      🚀 MARKING PRE-TICKET: $ticketId (qty: $quantity)');
+                await _markPreTicketCompleted(reference, quantity);
+                totalDecremented += quantity;
+                print('      ✅ Pre-ticket $ticketId completed');
+              }
+            }
+
+            print(
+                '   ✅ Total decremented for $destinationName: ${ticketsForDestination.fold<int>(0, (sum, t) => sum + (t['quantity'] as int))}');
+          } else {
+            print('   ⏭️ NOT approaching (moving away from destination)');
+          }
+        } else {
+          print('   ⏭️ Not within geofence radius yet');
+        }
+      }
+
+      print('\n🎯 === GEOFENCING COMPLETE ===');
+      print('Total passengers to drop off: $totalDecremented');
+
+      // Update passenger count
       if (totalDecremented > 0) {
-        // Update conductor's passenger count
+        final newPassengerCount = (currentPassengerCount - totalDecremented)
+            .clamp(0, double.infinity)
+            .toInt();
+
         await FirebaseFirestore.instance
             .collection('conductors')
             .doc(_conductorDocId!)
             .update({
-          'passengerCount': FieldValue.increment(-totalDecremented),
+          'passengerCount': newPassengerCount,
           'lastDropOff': FieldValue.serverTimestamp(),
         });
-        
-        print('✅ Total passengers dropped off: $totalDecremented');
-        print('✅ Conductor passenger count updated');
-      } else {
-        print('ℹ️ No passengers dropped off in this geofencing check');
-      }
 
+        print('✅ Total passengers dropped off: $totalDecremented');
+        print(
+            '✅ Conductor passenger count updated: $currentPassengerCount → $newPassengerCount');
+      } else {
+        print('ℹ️ No passengers dropped off this check');
+      }
     } catch (e) {
-      print('Error in conductor geofencing check: $e');
+      print('❌ Error in conductor geofencing check: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
   /// Check if the conductor is actually approaching the destination
-  /// This helps prevent false positives when the bus is just passing by
-  Future<bool> _isApproachingDestination(Position currentPosition, double destLat, double destLng) async {
+  Future<bool> _isApproachingDestination(
+      Position currentPosition, double destLat, double destLng) async {
     try {
-      // Get the last known position from the conductor document
       final conductorDoc = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(_conductorDocId!)
           .get();
-      
-      if (!conductorDoc.exists) return true; // If no previous position, allow processing
-      
+
+      if (!conductorDoc.exists) {
+        print('⚠️ Conductor doc not found, assuming approaching');
+        return true; // If no previous position, assume approaching
+      }
+
       final conductorData = conductorDoc.data() as Map<String, dynamic>;
-      final lastPosition = conductorData['lastPosition'] as Map<String, dynamic>?;
-      
-      if (lastPosition == null) return true; // If no previous position, allow processing
-      
+      final lastPosition =
+          conductorData['lastPosition'] as Map<String, dynamic>?;
+
+      if (lastPosition == null) {
+        print('⚠️ No last position found, assuming approaching');
+        // Update current position as last position
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(_conductorDocId!)
+            .update({
+          'lastPosition': {
+            'latitude': currentPosition.latitude,
+            'longitude': currentPosition.longitude,
+            'timestamp': FieldValue.serverTimestamp(),
+          },
+        });
+        return true; // First time, assume approaching
+      }
+
       final lastLat = lastPosition['latitude'] as num?;
       final lastLng = lastPosition['longitude'] as num?;
-      
-      if (lastLat == null || lastLng == null) return true;
-      
-      // Calculate distances
+
+      if (lastLat == null || lastLng == null) {
+        print('⚠️ Invalid last position coordinates, assuming approaching');
+        return true;
+      }
+
+      // Calculate current distance to destination
       final currentDistance = Geolocator.distanceBetween(
         currentPosition.latitude,
         currentPosition.longitude,
         destLat,
         destLng,
       );
-      
+
+      // Calculate previous distance to destination
       final previousDistance = Geolocator.distanceBetween(
         lastLat.toDouble(),
         lastLng.toDouble(),
         destLat,
         destLng,
       );
-      
-      // Check if we're getting closer to the destination
-      // Allow some tolerance to account for GPS accuracy
-      final tolerance = 5.0; // 5 meters tolerance
-      final isApproaching = currentDistance < (previousDistance - tolerance);
-      
-      // Only update the last position if we're significantly different
+
+      // ✅ RELAXED TOLERANCE: Allow small variations due to GPS inaccuracy
+      final tolerance = 15.0; // Increased from 5.0 to 15.0 meters
+      final isApproaching = currentDistance < (previousDistance + tolerance);
+
+      print('📊 Approaching check:');
+      print('   Previous distance: ${previousDistance.toStringAsFixed(1)}m');
+      print('   Current distance: ${currentDistance.toStringAsFixed(1)}m');
+      print(
+          '   Difference: ${(previousDistance - currentDistance).toStringAsFixed(1)}m');
+      print('   Tolerance: ${tolerance}m');
+      print('   Result: ${isApproaching ? "APPROACHING ✅" : "MOVING AWAY ❌"}');
+
+      // Calculate how much conductor has moved since last check
       final positionChange = Geolocator.distanceBetween(
         currentPosition.latitude,
         currentPosition.longitude,
         lastLat.toDouble(),
         lastLng.toDouble(),
       );
-      
-      if (positionChange > 10.0) { // Only update if moved more than 10 meters
-        // Update the last position
+
+      // Update lastPosition if conductor has moved significantly (more than 10m)
+      if (positionChange > 10.0) {
+        print(
+            '📍 Updating lastPosition (moved ${positionChange.toStringAsFixed(1)}m)');
         await FirebaseFirestore.instance
             .collection('conductors')
             .doc(_conductorDocId!)
@@ -542,73 +803,92 @@ class GeofencingService {
           },
         });
       }
-      
+
       return isApproaching;
     } catch (e) {
-      print('Error checking if approaching destination: $e');
-      return true; // If there's an error, allow processing to be safe
+      print('❌ Error checking if approaching destination: $e');
+      return true; // On error, assume approaching to avoid blocking geofencing
     }
   }
 
   /// Get destination coordinates from route data or geocoding
-  Future<Map<String, double>?> _getDestinationCoordinates(String destinationName, String route) async {
+  Future<Map<String, double>?> _getDestinationCoordinates(
+      String destinationName, String route) async {
     try {
-      // Try to get coordinates from the route places first
-      final places = await RouteService.fetchPlaces(route, placeCollection: 'Place');
-      final places2 = await RouteService.fetchPlaces(route, placeCollection: 'Place 2');
-      
-      // Combine both collections
+      final places =
+          await RouteService.fetchPlaces(route, placeCollection: 'Place');
+      final places2 =
+          await RouteService.fetchPlaces(route, placeCollection: 'Place 2');
+
       final allPlaces = [...places, ...places2];
-      
-      // Find the destination place
+
+      print(
+          '🔍 Looking for coordinates for destination: "$destinationName" in route: $route');
+
       final destinationPlace = allPlaces.firstWhere(
         (place) => place['name'] == destinationName,
         orElse: () => {},
       );
-      
-      if (destinationPlace.isNotEmpty && destinationPlace['coordinates'] != null) {
-        final coords = destinationPlace['coordinates'];
-        if (coords is Map) {
-          final lat = coords['latitude'];
-          final lng = coords['longitude'];
-          if (lat != null && lng != null) {
-            try {
-              final latValue = (lat as num).toDouble();
-              final lngValue = (lng as num).toDouble();
-              return {
-                'latitude': latValue,
-                'longitude': lngValue,
-              };
-            } catch (e) {
-              print('Error converting coordinates: $e');
-            }
+
+      if (destinationPlace.isNotEmpty) {
+        print('✅ Found destination place: $destinationPlace');
+
+        final lat = destinationPlace['latitude'];
+        final lng = destinationPlace['longitude'];
+
+        if (lat != null && lng != null) {
+          try {
+            final latValue = (lat as num).toDouble();
+            final lngValue = (lng as num).toDouble();
+            print('✅ Extracted coordinates: lat=$latValue, lng=$lngValue');
+            return {
+              'latitude': latValue,
+              'longitude': lngValue,
+            };
+          } catch (e) {
+            print('❌ Error converting coordinates: $e');
           }
+        } else {
+          print('⚠️ Destination place found but coordinates are null');
         }
+      } else {
+        print('❌ Destination "$destinationName" not found in route data');
       }
-      
-      // If no coordinates found in route data, try geocoding
+
+      if (_isConductorMode) {
+        print(
+            '❌ No coordinates found in route data, skipping geocoding for conductor mode');
+        return null;
+      }
+
       try {
-        List<Location> locations = await locationFromAddress('$destinationName, Philippines');
+        print('⚠️ Falling back to geocoding for passenger mode...');
+        List<Location> locations =
+            await locationFromAddress('$destinationName, Philippines');
         if (locations.isNotEmpty) {
+          print(
+              '✅ Geocoding succeeded: lat=${locations.first.latitude}, lng=${locations.first.longitude}');
           return {
             'latitude': locations.first.latitude,
             'longitude': locations.first.longitude,
           };
         }
       } catch (e) {
-        print('Geocoding failed for $destinationName: $e');
+        print('❌ Geocoding failed for $destinationName: $e');
       }
-      
+
       return null;
     } catch (e) {
-      print('Error getting destination coordinates: $e');
+      print('❌ Error getting destination coordinates: $e');
       return null;
     }
   }
 
   /// Mark a ticket as accomplished (passenger mode)
-  Future<void> _markTicketAccomplished(String ticketId, String userId, Position position) async {
+  Future<void> _markTicketAccomplished(
+      String ticketId, String userId, Position position) async {
     try {
+      // Update in user's collection
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -617,21 +897,78 @@ class GeofencingService {
           .update({
         'status': 'accomplished',
         'accomplishedAt': DateTime.now(),
+        'dropOffTimestamp': FieldValue.serverTimestamp(),
         'accomplishedLocation': {
           'latitude': position.latitude,
           'longitude': position.longitude,
         },
+        'geofenceStatus': 'completed',
+        'tripCompleted': true,
       });
-      
-      print('✅ Ticket $ticketId marked as accomplished at ${position.latitude}, ${position.longitude}');
+
+      print('✅ Ticket $ticketId marked as accomplished in user collection');
+
+      // Try to update in conductor's collections if it exists
+      try {
+        // Search for this pre-ticket in conductor collections
+        final conductorsSnapshot =
+            await FirebaseFirestore.instance.collection('conductors').get();
+
+        for (var conductorDoc in conductorsSnapshot.docs) {
+          // Check in preTickets collection
+          final preTicketRef =
+              conductorDoc.reference.collection('preTickets').doc(ticketId);
+
+          final preTicketSnap = await preTicketRef.get();
+          if (preTicketSnap.exists) {
+            await preTicketRef.update({
+              'status': 'accomplished',
+              'completedAt': FieldValue.serverTimestamp(),
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+            });
+            print('✅ Updated pre-ticket in conductor preTickets collection');
+
+            // Also update in remittance if it exists
+            final now = DateTime.now();
+            final formattedDate =
+                "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+            final remittanceTickets = await conductorDoc.reference
+                .collection('remittance')
+                .doc(formattedDate)
+                .collection('tickets')
+                .where('documentId', isEqualTo: ticketId)
+                .get();
+
+            for (var remittanceTicket in remittanceTickets.docs) {
+              await remittanceTicket.reference.update({
+                'status': 'accomplished',
+                'active': false,
+                'completedAt': FieldValue.serverTimestamp(),
+              });
+              print('✅ Updated pre-ticket in remittance collection');
+            }
+
+            break;
+          }
+        }
+      } catch (e) {
+        print('⚠️ Could not update conductor collections: $e');
+      }
+
+      print('✅ Ticket $ticketId fully marked as accomplished');
     } catch (e) {
-      print('Error marking ticket as accomplished: $e');
+      print('❌ Error marking ticket as accomplished: $e');
     }
   }
 
   /// Mark a pre-booking as accomplished (passenger mode)
-  Future<void> _markPreBookingAccomplished(String bookingId, String userId, Position position) async {
+  Future<void> _markPreBookingAccomplished(
+      String bookingId, String userId, Position position) async {
     try {
+      // Update in user's collection
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
@@ -641,59 +978,402 @@ class GeofencingService {
         'status': 'accomplished',
         'boardingStatus': 'completed',
         'accomplishedAt': DateTime.now(),
+        'dropOffTimestamp': FieldValue.serverTimestamp(),
         'accomplishedLocation': {
           'latitude': position.latitude,
           'longitude': position.longitude,
         },
+        'geofenceStatus': 'completed',
+        'tripCompleted': true,
       });
-      
-      print('✅ Pre-booking $bookingId marked as accomplished at ${position.latitude}, ${position.longitude}');
+
+      print(
+          '✅ Pre-booking $bookingId marked as accomplished in user collection');
+
+      // Try to update in conductor's collections if it exists
+      try {
+        final conductorsSnapshot =
+            await FirebaseFirestore.instance.collection('conductors').get();
+
+        for (var conductorDoc in conductorsSnapshot.docs) {
+          // Check in preBookings collection
+          final preBookingRef =
+              conductorDoc.reference.collection('preBookings').doc(bookingId);
+
+          final preBookingSnap = await preBookingRef.get();
+          if (preBookingSnap.exists) {
+            await preBookingRef.update({
+              'status': 'accomplished',
+              'boardingStatus': 'accomplished',
+              'completedAt': FieldValue.serverTimestamp(),
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+            });
+            print('✅ Updated pre-booking in conductor preBookings collection');
+
+            // Also check scannedQRCodes collection
+            final scannedQRs = await conductorDoc.reference
+                .collection('scannedQRCodes')
+                .where('bookingId', isEqualTo: bookingId)
+                .get();
+
+            for (var scannedQR in scannedQRs.docs) {
+              await scannedQR.reference.update({
+                'status': 'accomplished',
+                'dropOffTimestamp': FieldValue.serverTimestamp(),
+                'geofenceStatus': 'completed',
+                'tripCompleted': true,
+              });
+            }
+
+            break;
+          }
+        }
+      } catch (e) {
+        print('⚠️ Could not update conductor collections: $e');
+      }
+
+      print('✅ Pre-booking $bookingId fully marked as accomplished');
     } catch (e) {
-      print('Error marking pre-booking as accomplished: $e');
+      print('❌ Error marking pre-booking as accomplished: $e');
     }
   }
 
   /// Mark conductor ticket as completed (conductor mode)
-  Future<void> _markConductorTicketCompleted(DocumentReference ticketRef, int quantity) async {
+  Future<void> _markConductorTicketCompleted(
+      DocumentReference ticketRef, int quantity, String dateId) async {
     try {
+      print(
+          '🔄 Starting to mark conductor ticket ${ticketRef.id} as accomplished...');
+
+      // Update the ticket to mark it as accomplished
       await ticketRef.update({
-        'active': false,
+        'active': false, // ✅ CRITICAL: Set to false to mark as accomplished
         'completedAt': FieldValue.serverTimestamp(),
-        'status': 'completed',
+        'status': 'accomplished',
+        'dropOffTimestamp': FieldValue.serverTimestamp(),
+        'geofenceStatus': 'completed',
+        'tripCompleted': true,
       });
-      
-      print('✅ Conductor ticket ${ticketRef.id} marked as completed for $quantity passenger(s)');
+
+      print(
+          '✅ Conductor ticket ${ticketRef.id} marked as accomplished for $quantity passenger(s)');
+      print(
+          '✅ Updated fields: active=false, status=accomplished, completedAt=NOW, dropOffTimestamp=NOW');
+
+      // ✅ CRITICAL FIX: Also update in dailyTrips collection
+      try {
+        print('🔄 Now updating ticket in dailyTrips collection...');
+
+        // Get conductor document to find current trip
+        final conductorDoc = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(_conductorDocId!)
+            .get();
+
+        if (conductorDoc.exists) {
+          // Get current trip number from dailyTrips
+          final dailyTripDoc = await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(_conductorDocId!)
+              .collection('dailyTrips')
+              .doc(dateId)
+              .get();
+
+          if (dailyTripDoc.exists) {
+            final dailyTripData = dailyTripDoc.data();
+            final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+            final tripCollection = 'trip$currentTrip';
+            final ticketId = ticketRef.id; // e.g., "ticket 5"
+
+            print(
+                '🔍 Looking for ticket in dailyTrips/$dateId/$tripCollection/tickets/tickets/$ticketId');
+
+            final dailyTripTicketRef = FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(_conductorDocId!)
+                .collection('dailyTrips')
+                .doc(dateId)
+                .collection(tripCollection)
+                .doc('tickets')
+                .collection('tickets')
+                .doc(ticketId);
+
+            final dailyTripTicketSnap = await dailyTripTicketRef.get();
+
+            if (dailyTripTicketSnap.exists) {
+              await dailyTripTicketRef.update({
+                'active': false,
+                'completedAt': FieldValue.serverTimestamp(),
+                'status': 'accomplished',
+                'dropOffTimestamp': FieldValue.serverTimestamp(),
+                'geofenceStatus': 'completed',
+                'tripCompleted': true,
+              });
+              print(
+                  '✅ Also updated manual ticket in dailyTrips/$dateId/$tripCollection/tickets/tickets/$ticketId');
+              print(
+                  '✅ DailyTrips ticket updated: active=false, status=accomplished');
+            } else {
+              print(
+                  '⚠️ Manual ticket NOT FOUND in dailyTrips structure at: dailyTrips/$dateId/$tripCollection/tickets/tickets/$ticketId');
+              print(
+                  '⚠️ This ticket may not appear as accomplished in some views');
+            }
+          } else {
+            print('⚠️ DailyTrip document not found for date: $dateId');
+          }
+        } else {
+          print('⚠️ Conductor document not found');
+        }
+      } catch (e) {
+        print('⚠️ Error updating dailyTrips manual ticket: $e');
+        print(
+            '⚠️ Remittance ticket was updated successfully, but dailyTrips may not reflect the change');
+        // Don't throw - remittance update succeeded
+      }
+
+      print(
+          '✅ _markConductorTicketCompleted completed successfully for ticket ${ticketRef.id}');
     } catch (e) {
-      print('Error marking conductor ticket as completed: $e');
+      print('❌ ERROR in _markConductorTicketCompleted: $e');
+      print('❌ Failed to mark conductor ticket ${ticketRef.id} as completed');
     }
   }
 
   /// Mark pre-booking as completed (conductor mode)
-  Future<void> _markPreBookingCompleted(DocumentReference bookingRef, int quantity) async {
+  Future<void> _markPreBookingCompleted(
+      DocumentReference bookingRef, int quantity) async {
     try {
+      print('\n🔄 === STARTING _markPreBookingCompleted ===');
+
+      // Get the booking data first
+      final bookingDoc = await bookingRef.get();
+      if (!bookingDoc.exists) {
+        print('❌ Pre-booking document not found');
+        return;
+      }
+
+      final bookingData = bookingDoc.data() as Map<String, dynamic>;
+      final userId = bookingData['userId'] ?? bookingData['data']?['userId'];
+      final bookingId = bookingDoc.id;
+      final destination = bookingData['to'] ?? bookingData['data']?['to'];
+
+      print('📋 Pre-booking details:');
+      print('   - ID: $bookingId');
+      print('   - UserID: $userId');
+      print('   - Destination: $destination');
+      print('   - Quantity: $quantity');
+
+      // ✅ STEP 1: Update conductor's preBookings collection
+      print('\n🔄 STEP 1: Updating conductor preBookings...');
       await bookingRef.update({
-        'status': 'completed',
-        'boardingStatus': 'completed',
+        'status': 'accomplished',
+        'boardingStatus': 'accomplished',
         'completedAt': FieldValue.serverTimestamp(),
+        'dropOffTimestamp': FieldValue.serverTimestamp(),
+        'dropOffLocation': destination,
+        'geofenceStatus': 'completed',
+        'tripCompleted': true,
+        'accomplishedAt': FieldValue.serverTimestamp(),
       });
-      
-      print('✅ Pre-booking ${bookingRef.id} marked as completed for $quantity passenger(s)');
+      print('   ✅ Conductor preBookings updated');
+
+      // ✅ STEP 2: Update user's preBookings collection
+      if (userId != null) {
+        print('\n🔄 STEP 2: Updating user preBookings...');
+        try {
+          final userPreBookingRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('preBookings')
+              .doc(bookingId);
+
+          final userPreBookingSnap = await userPreBookingRef.get();
+
+          if (userPreBookingSnap.exists) {
+            await userPreBookingRef.update({
+              'status': 'accomplished',
+              'boardingStatus': 'accomplished',
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'dropOffLocation': destination,
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+              'accomplishedAt': FieldValue.serverTimestamp(),
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+            print('   ✅ User preBookings updated successfully');
+          } else {
+            print('   ⚠️ User pre-booking document not found');
+          }
+        } catch (e) {
+          print('   ⚠️ Error updating user preBookings: $e');
+        }
+      } else {
+        print('\n⚠️ STEP 2 SKIPPED: No userId found');
+      }
+
+      // ✅ STEP 3: Update scannedQRCodes collection
+      if (_conductorDocId != null) {
+        print('\n🔄 STEP 3: Updating scannedQRCodes...');
+        try {
+          // Try multiple query methods
+          QuerySnapshot? scannedQRQuery;
+
+          // Method 1: Search by 'id' field
+          scannedQRQuery = await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(_conductorDocId!)
+              .collection('scannedQRCodes')
+              .where('id', isEqualTo: bookingId)
+              .limit(1)
+              .get();
+
+          // Method 2: Search by 'preBookingId' field
+          if (scannedQRQuery.docs.isEmpty) {
+            scannedQRQuery = await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(_conductorDocId!)
+                .collection('scannedQRCodes')
+                .where('preBookingId', isEqualTo: bookingId)
+                .limit(1)
+                .get();
+          }
+
+          // Method 3: Search by 'documentId' field
+          if (scannedQRQuery.docs.isEmpty) {
+            scannedQRQuery = await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(_conductorDocId!)
+                .collection('scannedQRCodes')
+                .where('documentId', isEqualTo: bookingId)
+                .limit(1)
+                .get();
+          }
+
+          if (scannedQRQuery.docs.isNotEmpty) {
+            await scannedQRQuery.docs.first.reference.update({
+              'status': 'accomplished',
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'dropOffLocation': destination,
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+            print('   ✅ ScannedQRCodes updated successfully');
+          } else {
+            print('   ⚠️ ScannedQR entry not found for booking $bookingId');
+          }
+        } catch (e) {
+          print('   ⚠️ Error updating scannedQRCodes: $e');
+        }
+      }
+
+      print('\n✅ === _markPreBookingCompleted FINISHED ===');
+      print(
+          '✅ Pre-booking $bookingId marked as accomplished for $quantity passenger(s)\n');
     } catch (e) {
-      print('Error marking pre-booking as completed: $e');
+      print('❌ ERROR in _markPreBookingCompleted: $e');
+      print('❌ Stack trace: ${StackTrace.current}');
     }
   }
 
   /// Mark pre-ticket as completed (conductor mode)
-  Future<void> _markPreTicketCompleted(DocumentReference ticketRef, int quantity) async {
+  Future<void> _markPreTicketCompleted(
+      DocumentReference ticketRef, int quantity) async {
     try {
+      final ticketDoc = await ticketRef.get();
+      if (!ticketDoc.exists) {
+        print('❌ Pre-ticket document not found');
+        return;
+      }
+
+      final ticketData = ticketDoc.data() as Map<String, dynamic>;
+      final userId = ticketData['userId'] ?? ticketData['data']?['userId'];
+      final ticketId = ticketDoc.id;
+      final destination = ticketData['to'] ?? ticketData['data']?['to'];
+
+      print(
+          '🔄 Marking pre-ticket as accomplished: userId=$userId, ticketId=$ticketId, destination=$destination');
+
+      // CRITICAL FIX: Update user's collection FIRST before conductor's
+      if (userId != null) {
+        try {
+          // Get the user's pre-ticket document first to verify it exists
+          final userPreTicketRef = FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .collection('preTickets')
+              .doc(ticketId);
+
+          final userPreTicketSnap = await userPreTicketRef.get();
+
+          if (userPreTicketSnap.exists) {
+            await userPreTicketRef.update({
+              'status': 'accomplished',
+              'dropOffTimestamp': FieldValue.serverTimestamp(),
+              'dropOffLocation': destination,
+              'geofenceStatus': 'completed',
+              'tripCompleted': true,
+              'accomplishedAt': FieldValue.serverTimestamp(), // Add this field
+            });
+            print(
+                '✅ Updated user preTickets collection for ticketId: $ticketId');
+          } else {
+            print(
+                '⚠️ User pre-ticket document not found: $ticketId for userId: $userId');
+
+            // Try to find it by matching qrData or other fields
+            final userPreTicketsQuery = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(userId)
+                .collection('preTickets')
+                .where('to', isEqualTo: destination)
+                .where('status', isEqualTo: 'boarded')
+                .limit(1)
+                .get();
+
+            if (userPreTicketsQuery.docs.isNotEmpty) {
+              final matchedDoc = userPreTicketsQuery.docs.first;
+              await matchedDoc.reference.update({
+                'status': 'accomplished',
+                'dropOffTimestamp': FieldValue.serverTimestamp(),
+                'dropOffLocation': destination,
+                'geofenceStatus': 'completed',
+                'tripCompleted': true,
+                'accomplishedAt': FieldValue.serverTimestamp(),
+              });
+              print(
+                  '✅ Found and updated user pre-ticket by matching destination');
+            } else {
+              print('❌ Could not find matching user pre-ticket document');
+            }
+          }
+        } catch (e) {
+          print('⚠️ Error updating user preTickets collection: $e');
+          // Don't return - continue to update conductor's collection
+        }
+      } else {
+        print('⚠️ No userId found in pre-ticket data');
+      }
+
+      // Now update conductor's preTickets collection
       await ticketRef.update({
-        'status': 'completed',
+        'status': 'accomplished',
         'completedAt': FieldValue.serverTimestamp(),
+        'dropOffTimestamp': FieldValue.serverTimestamp(),
+        'dropOffLocation': destination,
+        'geofenceStatus': 'completed',
+        'tripCompleted': true,
       });
-      
-      print('✅ Pre-ticket ${ticketRef.id} marked as completed for $quantity passenger(s)');
+
+      print('✅ Updated conductor preTickets collection');
+
+      print(
+          '✅ Pre-ticket $ticketId marked as accomplished for $quantity passenger(s)');
     } catch (e) {
-      print('Error marking pre-ticket as completed: $e');
+      print('❌ Error marking pre-ticket as completed: $e');
     }
   }
 
@@ -701,17 +1381,17 @@ class GeofencingService {
   void _cleanupOldProcessedDestinations() {
     final now = DateTime.now();
     final keysToRemove = <String>[];
-    
+
     _lastProcessedDestinations.forEach((destination, lastProcessed) {
       if (now.difference(lastProcessed) > Duration(minutes: 5)) {
         keysToRemove.add(destination);
       }
     });
-    
+
     for (final key in keysToRemove) {
       _lastProcessedDestinations.remove(key);
     }
-    
+
     if (keysToRemove.isNotEmpty) {
       print('🧹 Cleaned up ${keysToRemove.length} old processed destinations');
     }

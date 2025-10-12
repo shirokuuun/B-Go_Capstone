@@ -256,243 +256,229 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
-      body: Stack(
-        children: [
-          Container(
-            height: MediaQuery.of(context).size.height * 0.38,
-            decoration: BoxDecoration(
-              color: Color(0xFFE5E9F0),
-            ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                double maxLogoWidth = 400.0; // Adjust this value as needed
-                double logoWidth = logoSize;
-                math.min(constraints.maxWidth * 0.4, maxLogoWidth);
-                // Use Center to make sure the logo always stays in the middle, even if alignment changes
-                return Transform.translate(
-                  offset: Offset(0, -20),
-                  child: Center(
-                    child: Image.asset(
-                      'assets/batrasco-logo.png',
-                      width: logoWidth,
-                      fit: BoxFit.contain,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Logo section - now scrollable
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+              Image.asset(
+                'assets/batrasco-logo.png',
+                width: logoSize,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+
+              // Registration form content
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "Hello!",
+                          style: GoogleFonts.outfit(
+                            fontSize: titleFontSize,
+                          ),
+                        ),
+                        Text(
+                          "Register Your Phone Number!",
+                          style: GoogleFonts.outfit(
+                            fontSize: subtitleFontSize,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SingleChildScrollView(
-              child: Container(
-                margin: EdgeInsets.only(
-                    top: MediaQuery.of(context).size.height * 0.24),
-                width: double.infinity,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding, 
-                    vertical: isMobile ? 32.0 : isTablet ? 36.0 : 40.0,
-                  ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(height: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
-                    Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Phone number field
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFE5E9F0),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            "Hello!",
-                            style: GoogleFonts.outfit(
-                              fontSize: titleFontSize,
+                          Padding(
+                            padding: EdgeInsets.only(
+                                left: containerPadding * 0.8, right: containerPadding * 0.2),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: selectedCountryCode,
+                                items: countries.map((country) {
+                                  return DropdownMenuItem<String>(
+                                    value: country['code'],
+                                    child: Text(country['code']!,
+                                        style: GoogleFonts.outfit(
+                                            fontWeight: FontWeight.w500,
+                                            fontSize: textFieldFontSize)),
+                                  );
+                                }).toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    selectedCountryCode = value!;
+                                  });
+                                },
+                              ),
                             ),
                           ),
-                          Text(
-                            "Register Your Phone Number!",
-                            style: GoogleFonts.outfit(
-                              fontSize: subtitleFontSize,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black,
+                          Expanded(
+                            child: TextField(
+                              controller: phoneController,
+                              keyboardType: TextInputType.phone,
+                              enabled: true,
+                              style: GoogleFonts.outfit(
+                                color: Colors.black,
+                                fontSize: textFieldFontSize,
+                              ),
+                              decoration: InputDecoration(
+                                border: InputBorder.none,
+                                hintText: "Phone Number",
+                                hintStyle: GoogleFonts.outfit(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: hintFontSize,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    SizedBox(height: fieldSpacing),
-                    // --- All the rest of the registration content goes here, directly in this Column ---
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Color(0xFFE5E9F0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade400,
-                            width: 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                  left: containerPadding * 0.8, right: containerPadding * 0.2),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  value: selectedCountryCode,
-                                  items: countries.map((country) {
-                                    return DropdownMenuItem<String>(
-                                      value: country['code'],
-                                      child: Text(country['code']!,
-                                          style: GoogleFonts.outfit(
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: textFieldFontSize)),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      selectedCountryCode = value!;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: TextField(
-                                controller: phoneController,
-                                keyboardType: TextInputType.phone,
-                                enabled: true,
-                                style: GoogleFonts.outfit(
-                                  color: Colors.black,
-                                  fontSize: textFieldFontSize,
-                                ),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  hintText: "Phone Number",
-                                  hintStyle: GoogleFonts.outfit(
-                                    color: Colors.black54,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: hintFontSize,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: fieldSpacing),
+                  ),
+                  SizedBox(height: fieldSpacing),
 
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: agreedToTerms,
-                            onChanged: (bool? value) {
-                              setState(() {
-                                agreedToTerms = value ?? false;
-                              });
-                            },
-                          ),
-                          Flexible(
-                            child: RichText(
-                              text: TextSpan(
-                                style: GoogleFonts.outfit(
-                                    color: Colors.black,
-                                    fontSize: hintFontSize),
-                                children: [
-                                  TextSpan(
-                                    text: 'I agree to the ',
-                                  ),
-                                  WidgetSpan(
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
-                                          ),
-                                        );
-                                      },
-                                      child: Text(
-                                        'Terms and Conditions',
-                                        style: GoogleFonts.outfit(
-                                          color: Colors.blue,
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: hintFontSize,
+                  // Terms and conditions checkbox
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: agreedToTerms,
+                          onChanged: (bool? value) {
+                            setState(() {
+                              agreedToTerms = value ?? false;
+                            });
+                          },
+                        ),
+                        Flexible(
+                          child: RichText(
+                            text: TextSpan(
+                              style: GoogleFonts.outfit(
+                                  color: Colors.black,
+                                  fontSize: hintFontSize),
+                              children: [
+                                TextSpan(
+                                  text: 'I agree to the ',
+                                ),
+                                WidgetSpan(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
                                         ),
+                                      );
+                                    },
+                                    child: Text(
+                                      'Terms and Conditions',
+                                      style: GoogleFonts.outfit(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: hintFontSize,
                                       ),
                                     ),
                                   ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: fieldSpacing),
+                  
+                  // Send OTP button
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: phoneController.text.trim().isNotEmpty 
+                                  ? Color(0xFF0091AD) 
+                                  : Colors.grey,
+                              minimumSize: Size(double.infinity, buttonHeight),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: agreedToTerms ? _sendOTP : null,
+                            child: Text(
+                              'Send OTP',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: buttonFontSize,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ),
-                        ],
+                  ),
+                  
+                  SizedBox(height: isMobile ? 50.0 : isTablet ? 60.0 : 70.0),
+                  
+                  // Login link
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Already have an account?',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w500,
+                          fontSize: registerFontSize,
+                        ),
                       ),
-                    ),
-                    SizedBox(height: fieldSpacing),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
-                      child: _isLoading
-                          ? const Center(
-                              child: CircularProgressIndicator())
-                          : ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: phoneController.text.trim().isNotEmpty 
-                                    ? Color(0xFF0091AD) 
-                                    : Colors.grey,
-                                minimumSize: Size(double.infinity, buttonHeight),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: agreedToTerms
-                                  ? _sendOTP
-                                  : null,
-                              child: Text(
-                                'Send OTP',
-                                style: GoogleFonts.outfit(
-                                  color: Colors.white,
-                                  fontSize: buttonFontSize,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                    ),
-                    SizedBox(height: isMobile ? 290.0 : isTablet ? 300.0 : 305.0),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'Already have an account?',
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pushReplacementNamed(context, '/login');
+                        },
+                        child: Text(
+                          ' Login',
                           style: GoogleFonts.outfit(
+                            color: Colors.blue,
                             fontWeight: FontWeight.w500,
                             fontSize: registerFontSize,
                           ),
                         ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacementNamed(context, '/login');
-                          },
-                          child: Text(
-                            ' Login',
-                            style: GoogleFonts.outfit(
-                              color: Colors.blue,
-                              fontWeight: FontWeight.w500,
-                              fontSize: registerFontSize,
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                  ],
-                ),
+                      )
+                    ],
+                  ),
+                  
+                  // Add bottom padding
+                  SizedBox(height: isMobile ? 30.0 : 40.0),
+                ],
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

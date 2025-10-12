@@ -3,8 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:b_go/pages/conductor/conductor_departure.dart';
 import 'package:b_go/pages/conductor/sos.dart';
-import 'package:b_go/pages/conductor/remittance_service.dart';
 import 'package:b_go/pages/conductor/passenger_status_service.dart';
+import 'package:b_go/services/direction_validation_service.dart';
+import 'package:b_go/services/thermal_printer_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,7 +35,10 @@ class _ConductorFromState extends State<ConductorFrom> {
   String selectedPlaceCollection = 'Place';
   late List<Map<String, String>> routeDirections;
   
-  // Map display names to Firestore document names
+  // Thermal Printer Service
+  final ThermalPrinterService _printerService = ThermalPrinterService();
+  final Map<String, bool> _printingStates = {};
+
   final Map<String, String> _routeFirestoreNames = {
     'Batangas': 'Batangas',
     'Rosario': 'Rosario',
@@ -53,7 +57,180 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   @override
   void dispose() {
+    _printerService.disconnectPrinter();
     super.dispose();
+  }
+
+  String getRouteLabel(String placeCollection) {
+    final route = widget.route.trim();
+
+    if (route == 'Rosario') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Rosario';
+        case 'Place 2':
+          return 'Rosario - SM City Lipa';
+      }
+    } else if (route == 'Batangas') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Batangas City';
+        case 'Place 2':
+          return 'Batangas City - SM City Lipa';
+      }
+    } else if (route == 'Mataas na Kahoy') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - SM City Lipa';
+      }
+    } else if (route == 'Mataas Na Kahoy Palengke') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'Lipa Palengke - Mataas na Kahoy';
+        case 'Place 2':
+          return 'Mataas na Kahoy - Lipa Palengke';
+      }
+    } else if (route == 'Tiaong') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - Tiaong';
+        case 'Place 2':
+          return 'Tiaong - SM City Lipa';
+      }
+    } else if (route == 'San Juan') {
+      switch (placeCollection) {
+        case 'Place':
+          return 'SM City Lipa - San Juan';
+        case 'Place 2':
+          return 'San Juan - SM City Lipa';
+      }
+    }
+
+    return 'Unknown Route';
+  }
+
+  Future<void> _printManualTicket(Map<String, dynamic> ticket) async {
+    final ticketId = ticket['id'] as String;
+    
+    setState(() {
+      _printingStates[ticketId] = true;
+    });
+
+    try {
+      // If not connected to printer, show connection dialog
+      if (!_printerService.isConnected) {
+        await ThermalPrinterService.showPrinterConnectionDialog(
+          context,
+          (ip, port) async {
+            final connected = await _printerService.connectPrinter(ip, port);
+            if (!connected) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to connect to printer'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              setState(() {
+                _printingStates[ticketId] = false;
+              });
+              return;
+            }
+            
+            // Now print after successful connection
+            await _performPrint(ticket, ticketId);
+          },
+        );
+      } else {
+        // Already connected, just print
+        await _performPrint(ticket, ticketId);
+      }
+    } catch (e) {
+      print('Error printing: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        _printingStates[ticketId] = false;
+      });
+    }
+  }
+
+  Future<void> _performPrint(Map<String, dynamic> ticket, String ticketId) async {
+    try {
+      // Extract ticket data
+      final from = ticket['from']?.toString() ?? 'N/A';
+      final to = ticket['to']?.toString() ?? 'N/A';
+      final fromKm = ticket['fromKm']?.toString() ?? ticket['startKm']?.toString() ?? '0';
+      final toKm = ticket['toKm']?.toString() ?? ticket['endKm']?.toString() ?? '0';
+      
+      String baseFare = '0.00';
+      final fareData = ticket['farePerPassenger'];
+      if (fareData != null) {
+        if (fareData is List && fareData.isNotEmpty) {
+          baseFare = fareData.first.toString();
+        } else if (fareData is num) {
+          baseFare = fareData.toStringAsFixed(2);
+        } else if (fareData is String) {
+          baseFare = fareData;
+        }
+      }
+
+      final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
+      final totalFare = ticket['totalFare']?.toString() ?? '0.00';
+      final discountAmount = ticket['discountAmount']?.toString() ?? '0.00';
+      
+      List<String>? discountBreakdown;
+      if (ticket['discountBreakdown'] != null) {
+        discountBreakdown = List<String>.from(
+          (ticket['discountBreakdown'] as List).map((e) => e.toString())
+        );
+      }
+
+      // Print receipt
+      final success = await _printerService.printManualTicket(
+        route: getRouteLabel(selectedPlaceCollection),
+        from: from,
+        to: to,
+        fromKm: fromKm,
+        toKm: toKm,
+        baseFare: baseFare,
+        quantity: quantity,
+        totalFare: totalFare,
+        discountAmount: discountAmount,
+        discountBreakdown: discountBreakdown,
+      );
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt printed successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to print receipt'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } finally {
+      setState(() {
+        _printingStates[ticketId] = false;
+      });
+    }
   }
 
   void _initializeRouteDirections() {
@@ -97,7 +274,7 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   Future<void> _checkActiveTrip() async {
     if (!mounted) return;
-    
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
@@ -115,7 +292,8 @@ class _ConductorFromState extends State<ConductorFrom> {
         if (activeTrip != null && activeTrip['isActive'] == true) {
           if (mounted) {
             setState(() {
-              selectedPlaceCollection = activeTrip['placeCollection'] ?? 'Place';
+              selectedPlaceCollection =
+                  activeTrip['placeCollection'] ?? 'Place';
             });
           }
         }
@@ -124,16 +302,15 @@ class _ConductorFromState extends State<ConductorFrom> {
       print('Error checking active trip: $e');
     }
 
-    // Initialize places future after determining the correct collection
     if (!mounted) return;
-    
+
     print('🔍 ConductorFrom: Route: "${widget.route}"');
     print('🔍 ConductorFrom: Selected collection: "$selectedPlaceCollection"');
-    
-    // Use the Firestore route name instead of the display name
-    String firestoreRouteName = _routeFirestoreNames[widget.route] ?? widget.route;
+
+    String firestoreRouteName =
+        _routeFirestoreNames[widget.route] ?? widget.route;
     print('🔍 ConductorFrom: Firestore route name: "$firestoreRouteName"');
-    
+
     if (mounted) {
       setState(() {
         placesFuture = RouteService.fetchPlaces(firestoreRouteName,
@@ -145,22 +322,22 @@ class _ConductorFromState extends State<ConductorFrom> {
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
       List<Map<String, dynamic>> allPlaces) async {
     if (!mounted) return;
-    
+
     int fromIndex = allPlaces.indexOf(fromPlace);
     List<Map<String, dynamic>> toPlaces = allPlaces.sublist(fromIndex + 1);
     if (toPlaces.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
               content:
                   Text('No valid drop-off locations after selected pick-up.')),
         );
       }
       return;
     }
-    
+
     if (mounted) {
-      final toPlace = await Navigator.of(context).push<Map<String, dynamic>>(
+      await Navigator.of(context).push<Map<String, dynamic>>(
         MaterialPageRoute(
           builder: (context) => _ToSelectionPageConductor(
             toPlaces: toPlaces,
@@ -171,8 +348,44 @@ class _ConductorFromState extends State<ConductorFrom> {
           ),
         ),
       );
-      // No further action needed here; navigation handled in _ToSelectionPageConductor
     }
+  }
+
+  void _openQRScanner() async {
+    if (await Permission.camera.request().isGranted) {
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => QRScanPage(),
+        ),
+      );
+      if (result == true) {
+        _refreshPassengerCount();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('QR code scanned and stored successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else if (result == false) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to process QR code.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Camera permission is required to scan QR codes.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _refreshPassengerCount() {
+    setState(() {});
   }
 
   @override
@@ -188,7 +401,6 @@ class _ConductorFromState extends State<ConductorFrom> {
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
-                  // App bar content
                   Padding(
                     padding: const EdgeInsets.only(top: 50.0),
                     child: Row(
@@ -219,116 +431,84 @@ class _ConductorFromState extends State<ConductorFrom> {
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 10.0),
-                          child: Row(
-                            children: [
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => SOSPage(
-                                        route: widget.route,
-                                        placeCollection:
-                                            selectedPlaceCollection,
-                                      ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => SOSPage(
+                                      route: widget.route,
+                                      placeCollection: selectedPlaceCollection,
                                     ),
-                                  );
-                                },
-                                child: SizedBox(
-                                  width: 40,
-                                  height: 40,
-                                  child: Image.asset(
-                                    'assets/sos-button.png',
-                                    fit: BoxFit.contain,
                                   ),
-                                ),
+                                );
+                              },
+                              icon: const Icon(
+                                Icons.sos,
+                                color: Colors.red,
+                                size: 24.0,
                               ),
-                              SizedBox(width: 20),
-                              GestureDetector(
-                                onTap: () async {
-                                  if (await Permission.camera
-                                      .request()
-                                      .isGranted) {
-                                    final result =
-                                        await Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                          builder: (context) => QRScanPage()),
-                                    );
-                                    if (result == true) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'QR code scanned and stored successfully!')),
-                                      );
-                                    } else if (result == false) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                            content: Text(
-                                                'Failed to process QR code.')),
-                                      );
-                                    }
-                                  } else {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              'Camera permission is required to scan QR codes.')),
-                                    );
-                                  }
-                                },
-                                child: SizedBox(
-                                  width: 40,
-                                  height: 30,
-                                  child: Image.asset(
-                                    'assets/photo-camera.png',
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
+                              tooltip: 'SOS',
+                            ),
+                            IconButton(
+                              onPressed: _openQRScanner,
+                              icon: const Icon(
+                                Icons.qr_code_scanner,
+                                color: Colors.white,
+                                size: 24.0,
                               ),
-                            ],
-                          ),
+                              tooltip: 'Scan QR Code',
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  // Route directions display (not clickable during active trip)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
-                    child: Container(
+                  Flexible(
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF007A8F),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.swap_horiz, color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              routeDirections.firstWhere((r) =>
-                                  r['collection'] ==
-                                  selectedPlaceCollection)['label']!,
-                              style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                          horizontal: 16.0, vertical: 4.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A8F),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz,
+                                color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                routeDirections.firstWhere((r) =>
+                                    r['collection'] ==
+                                    selectedPlaceCollection)['label']!,
+                                style: GoogleFonts.outfit(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width < 360
+                                          ? 14
+                                          : 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -336,13 +516,14 @@ class _ConductorFromState extends State<ConductorFrom> {
               ),
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.only(top: 20.0),
+          const SliverPadding(
+            padding: EdgeInsets.only(top: 20.0),
           ),
           SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final screenHeight = MediaQuery.of(context).size.height;
+                final screenWidth = MediaQuery.of(context).size.width;
                 final appBarHeight = 130.0;
                 final topPadding = MediaQuery.of(context).padding.top;
 
@@ -384,10 +565,10 @@ class _ConductorFromState extends State<ConductorFrom> {
                           const Center(child: CircularProgressIndicator())
                         else
                           FutureBuilder<List<Map<String, dynamic>>>(
-                            key: ValueKey('places_future_${widget.route}_$selectedPlaceCollection'),
+                            key: ValueKey(
+                                'places_future_${widget.route}_$selectedPlaceCollection'),
                             future: placesFuture,
                             builder: (context, snapshot) {
-                              // Add safety check for mounted state
                               if (!mounted) {
                                 return const SizedBox.shrink();
                               }
@@ -398,33 +579,60 @@ class _ConductorFromState extends State<ConductorFrom> {
                               } else if (snapshot.hasError) {
                                 return Center(
                                     child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                                        const SizedBox(height: 16),
-                                        Text('Error: ${snapshot.error}'),
-                                        const SizedBox(height: 16),
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              // Reinitialize the future
-                                              String firestoreRouteName = _routeFirestoreNames[widget.route] ?? widget.route;
-                                              placesFuture = RouteService.fetchPlaces(firestoreRouteName,
-                                                  placeCollection: selectedPlaceCollection);
-                                            });
-                                          },
-                                          child: const Text('Retry'),
-                                        ),
-                                      ],
-                                    ));
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline,
+                                        size: 48, color: Colors.red),
+                                    const SizedBox(height: 16),
+                                    Text('Error: ${snapshot.error}'),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          String firestoreRouteName =
+                                              _routeFirestoreNames[
+                                                      widget.route] ??
+                                                  widget.route;
+                                          placesFuture =
+                                              RouteService.fetchPlaces(
+                                                  firestoreRouteName,
+                                                  placeCollection:
+                                                      selectedPlaceCollection);
+                                        });
+                                      },
+                                      child: const Text('Retry'),
+                                    ),
+                                  ],
+                                ));
                               } else if (!snapshot.hasData ||
                                   snapshot.data == null ||
                                   snapshot.data!.isEmpty) {
                                 return const Center(
                                     child: Text('No places found.'));
                               }
-                              
+
                               final myList = snapshot.data!;
+                              final isSmallScreen = screenWidth < 360;
+                              final isMediumScreen = screenWidth < 400;
+
+                              double aspectRatio;
+                              double fontSize;
+                              double kmFontSize;
+
+                              if (isSmallScreen) {
+                                aspectRatio = 1.8;
+                                fontSize = 12;
+                                kmFontSize = 10;
+                              } else if (isMediumScreen) {
+                                aspectRatio = 2.0;
+                                fontSize = 13;
+                                kmFontSize = 11;
+                              } else {
+                                aspectRatio = 2.2;
+                                fontSize = 14;
+                                kmFontSize = 12;
+                              }
+
                               return GridView.builder(
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
@@ -446,29 +654,36 @@ class _ConductorFromState extends State<ConductorFrom> {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       padding: const EdgeInsets.symmetric(
-                                          vertical: 8, horizontal: 4),
+                                          vertical: 4, horizontal: 4),
                                     ),
                                     onPressed: () =>
                                         _showToSelectionPage(item, myList),
                                     child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          item['name'] ?? '',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 14,
-                                            color: Colors.white,
+                                        Flexible(
+                                          child: Text(
+                                            item['name'] ?? '',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: fontSize,
+                                              color: Colors.white,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          textAlign: TextAlign.center,
                                         ),
-                                        if (item['km'] != null)
+                                        if (item['km'] != null) ...[
+                                          const SizedBox(height: 2),
                                           Text(
                                             '${(item['km'] as num).toInt()} km',
-                                            style: const TextStyle(
-                                              fontSize: 12,
+                                            style: TextStyle(
+                                              fontSize: kmFontSize,
                                               color: Colors.white70,
                                             ),
                                           ),
+                                        ],
                                       ],
                                     ),
                                   );
@@ -488,10 +703,8 @@ class _ConductorFromState extends State<ConductorFrom> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
-                
-                // Manually Ticketed Passengers Section
                 const Padding(
-                  padding: EdgeInsets.only(left: 10),
+                  padding: EdgeInsets.only(left: 26),
                   child: Text(
                     "Manually Ticketed Passengers:",
                     style: TextStyle(
@@ -502,153 +715,210 @@ class _ConductorFromState extends State<ConductorFrom> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                FutureBuilder<List<Map<String, dynamic>>>(
-                  key: const ValueKey('manual_tickets_future'),
-                  future: _getManualTickets(),
-                  builder: (context, snapshot) {
-                    // Add safety check for mounted state
-                    if (!mounted) {
-                      return const SizedBox.shrink();
-                    }
-                    
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    } else if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else if (!snapshot.hasData || snapshot.data == null || snapshot.data!.isEmpty) {
-                      return Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: const Center(
-                          child: Text(
-                            'No manually ticketed passengers yet',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    
-                    final manualTickets = snapshot.data!;
-                    return ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: manualTickets.length,
-                      itemBuilder: (context, index) {
-                        final ticket = manualTickets[index];
-                        final status = ticket['status'] ?? 'boarded';
-                        final isAccomplished = status == 'accomplished';
-                        
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: FutureBuilder<List<Map<String, dynamic>>>(
+                    key: const ValueKey('manual_tickets_future'),
+                    future: _getManualTickets(),
+                    builder: (context, snapshot) {
+                      if (!mounted) {
+                        return const SizedBox.shrink();
+                      }
+
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else if (!snapshot.hasData ||
+                          snapshot.data == null ||
+                          snapshot.data!.isEmpty) {
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: isAccomplished ? Colors.green[50] : Colors.blue[50],
+                            color: Colors.grey[100],
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isAccomplished ? Colors.green[300]! : Colors.blue[300]!,
-                              width: 1,
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'No manually ticketed passengers yet',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                        );
+                      }
+
+                      final manualTickets = snapshot.data!;
+                      return ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: manualTickets.length,
+                        itemBuilder: (context, index) {
+                          final ticket = manualTickets[index];
+                          final ticketId = ticket['id'] as String;
+                          final status = ticket['status'] ?? 'boarded';
+                          final isAccomplished = status == 'accomplished';
+                          final isPrinting = _printingStates[ticketId] ?? false;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isAccomplished
+                                  ? Colors.green[50]
+                                  : Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isAccomplished
+                                    ? Colors.green[300]!
+                                    : Colors.blue[300]!,
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '${ticket['from']} → ${ticket['to']}',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Passengers: ${ticket['quantity']}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Fare: ₱${ticket['totalFare']}',
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Column(
                                       children: [
-                                        Text(
-                                          '${ticket['from']} → ${ticket['to']}',
-                                          style: GoogleFonts.outfit(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.black87,
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isAccomplished
+                                                ? Colors.green[100]
+                                                : Colors.blue[100],
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            isAccomplished
+                                                ? 'ACCOMPLISHED'
+                                                : 'BOARDED',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: isAccomplished
+                                                  ? Colors.green[700]
+                                                  : Colors.blue[700],
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Passengers: ${ticket['quantity']}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black54,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          'Fare: ₱${ticket['totalFare']}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.black54,
-                                          ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            // Print button
+                                            ElevatedButton(
+                                              onPressed: isPrinting
+                                                  ? null
+                                                  : () => _printManualTicket(ticket),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    const Color(0xFF0091AD),
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 12,
+                                                  vertical: 8,
+                                                ),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                minimumSize: const Size(40, 36),
+                                              ),
+                                              child: isPrinting
+                                                  ? const SizedBox(
+                                                      width: 16,
+                                                      height: 16,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                        color: Colors.white,
+                                                        strokeWidth: 2,
+                                                      ),
+                                                    )
+                                                  : const Icon(Icons.print,
+                                                      size: 18),
+                                            ),
+                                            if (!isAccomplished) ...[
+                                              const SizedBox(width: 8),
+                                              ElevatedButton(
+                                                onPressed: () =>
+                                                    _markTicketAccomplished(
+                                                        ticket),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      Colors.green[600],
+                                                  foregroundColor: Colors.white,
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 8,
+                                                  ),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(20),
+                                                  ),
+                                                ),
+                                                child: const Text(
+                                                  'Mark Done',
+                                                  style: TextStyle(fontSize: 11),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
                                         ),
                                       ],
                                     ),
-                                  ),
-                                  Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isAccomplished 
-                                              ? Colors.green[100] 
-                                              : Colors.blue[100],
-                                          borderRadius: BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          isAccomplished ? 'ACCOMPLISHED' : 'BOARDED',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: isAccomplished 
-                                                ? Colors.green[700] 
-                                                : Colors.blue[700],
-                                          ),
-                                        ),
-                                      ),
-                                      if (!isAccomplished) ...[
-                                        const SizedBox(height: 8),
-                                        ElevatedButton(
-                                          onPressed: () => _markTicketAccomplished(ticket),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green[600],
-                                            foregroundColor: Colors.white,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 8,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(20),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Mark Accomplished',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    );
-                  },
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -656,130 +926,118 @@ class _ConductorFromState extends State<ConductorFrom> {
         ],
       ),
     );
-
   }
-  
-  // Helper method to get manually ticketed passengers
+
   Future<List<Map<String, dynamic>>> _getManualTickets() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return [];
-      
+
       final conductorDoc = await FirebaseFirestore.instance
           .collection('conductors')
           .where('uid', isEqualTo: user.uid)
           .limit(1)
           .get();
-      
+
       if (conductorDoc.docs.isEmpty) return [];
-      
+
       final conductorId = conductorDoc.docs.first.id;
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      
+
       return await RouteService.getManualTickets(conductorId, today);
     } catch (e) {
       print('Error fetching manual tickets: $e');
       return [];
     }
   }
-  
-Future<void> _markTicketAccomplished(Map<String, dynamic> ticket) async {
-  if (!mounted) return;
-  
-  try {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    
-    final conductorDoc = await FirebaseFirestore.instance
-        .collection('conductors')
-        .where('uid', isEqualTo: user.uid)
-        .limit(1)
-        .get();
-    
-    if (conductorDoc.docs.isEmpty) return;
-    
-    final conductorId = conductorDoc.docs.first.id;
-    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final ticketId = ticket['id'] as String;
-    final quantity = ticket['quantity'] as int;
-    final from = ticket['from'] as String;
-    final to = ticket['to'] as String;
-    
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Passenger Drop-off'),
-        content: Text(
-          'Mark $quantity passenger(s) from $from to $to as accomplished?\n\nThis will decrease the passenger count by $quantity.'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[600],
-              foregroundColor: Colors.white,
+
+  Future<void> _markTicketAccomplished(Map<String, dynamic> ticket) async {
+    if (!mounted) return;
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorDoc.docs.isEmpty) return;
+
+      final conductorId = conductorDoc.docs.first.id;
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final ticketId = ticket['id'] as String;
+      final quantity = ticket['quantity'] as int;
+      final from = ticket['from'] as String;
+      final to = ticket['to'] as String;
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Confirm Passenger Drop-off'),
+          content: Text(
+              'Mark $quantity passenger(s) from $from to $to as accomplished?\n\nThis will decrease the passenger count by $quantity.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
             ),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed == true && mounted) {
-      // Use the PassengerStatusService to handle the accomplishment
-      // Import: import 'package:b_go/pages/conductor/passenger_status_service.dart';
-      await PassengerStatusService.markManualTicketAccomplished(
-        conductorId: conductorId,
-        date: today,
-        ticketId: ticketId,
-        quantity: quantity,
-        from: from,
-        to: to,
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[600],
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
       );
-      
-      // Refresh the UI
-      if (mounted) {
-        setState(() {});
+
+      if (confirmed == true && mounted) {
+        await PassengerStatusService.markManualTicketAccomplished(
+          conductorId: conductorId,
+          date: today,
+          ticketId: ticketId,
+          quantity: quantity,
+          from: from,
+          to: to,
+        );
+
+        if (mounted) {
+          setState(() {});
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '$quantity passenger(s) from $from to $to marked as accomplished. Passenger count decreased by $quantity.',
+              ),
+              backgroundColor: Colors.green[600],
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+
+        print(
+            'Manual ticket accomplished: $ticketId, decremented passenger count by $quantity');
       }
-      
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '$quantity passenger(s) from $from to $to marked as accomplished. Passenger count decreased by $quantity.',
-            ),
-            backgroundColor: Colors.green[600],
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
       }
-      
-      print('Manual ticket accomplished: $ticketId, decremented passenger count by $quantity');
+      print('Error marking ticket accomplished: $e');
     }
-  } catch (e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
-    }
-    print('Error marking ticket accomplished: $e');
   }
-}
-
-// Also add this import at the top of your conductor_from.dart file:
-// import 'package:b_go/pages/conductor/passenger_status_service.dart';// Updated method for conductor_from.dart
-// Replace your existing _markTicketAccomplished method with this:
-
-
 }
 
 class _ToSelectionPageConductor extends StatelessWidget {
@@ -788,6 +1046,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
   final String role;
   final Map<String, dynamic> fromPlace;
   final String placeCollection;
+
   const _ToSelectionPageConductor({
     Key? key,
     required this.toPlaces,
@@ -834,7 +1093,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
         case 'Place 2':
           return 'Tiaong - SM City Lipa';
       }
-    } else if (r == ' San Juan') {
+    } else if (r == 'San Juan') {
       switch (placeCollection) {
         case 'Place':
           return 'SM City Lipa - San Juan';
@@ -848,6 +1107,28 @@ class _ToSelectionPageConductor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final screenWidth = size.width;
+    final isSmallScreen = screenWidth < 360;
+    final isMediumScreen = screenWidth < 400;
+
+    double aspectRatio;
+    double fontSize;
+    double kmFontSize;
+
+    if (isSmallScreen) {
+      aspectRatio = 1.8;
+      fontSize = 12;
+      kmFontSize = 10;
+    } else if (isMediumScreen) {
+      aspectRatio = 2.0;
+      fontSize = 13;
+      kmFontSize = 11;
+    } else {
+      aspectRatio = 2.2;
+      fontSize = 15;
+      kmFontSize = 11;
+    }
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -859,7 +1140,6 @@ class _ToSelectionPageConductor extends StatelessWidget {
             flexibleSpace: FlexibleSpaceBar(
               background: Column(
                 children: [
-                  // App bar content
                   Padding(
                     padding: const EdgeInsets.only(top: 50.0),
                     child: Row(
@@ -884,39 +1164,43 @@ class _ToSelectionPageConductor extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Route directions display (not clickable)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16.0, vertical: 8.0),
-                    child: Container(
+                  Flexible(
+                    child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF007A8F),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            blurRadius: 6,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.swap_horiz, color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              getRouteLabel(route, placeCollection),
-                              style: GoogleFonts.outfit(
-                                fontSize: 18,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
+                          horizontal: 16.0, vertical: 4.0),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF007A8F),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.swap_horiz,
+                                color: Colors.white, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                getRouteLabel(route, placeCollection),
+                                style: GoogleFonts.outfit(
+                                  fontSize: screenWidth < 360 ? 14 : 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -972,7 +1256,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
                           crossAxisCount: 2,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
-                          childAspectRatio: 2.2,
+                          childAspectRatio: aspectRatio,
                         ),
                         itemCount: toPlaces.length,
                         itemBuilder: (context, index) {
@@ -985,10 +1269,9 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               padding: const EdgeInsets.symmetric(
-                                  vertical: 8, horizontal: 4),
+                                  vertical: 4, horizontal: 4),
                             ),
                             onPressed: () async {
-                              final to = place['name'];
                               final endKm = place['km'];
 
                               if (fromPlace['km'] >= endKm) {
@@ -1044,11 +1327,9 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                       List<String>.from(
                                           discountResult['fareTypes']);
 
-                                  // Check passenger count limit before proceeding
                                   final user =
                                       FirebaseAuth.instance.currentUser;
                                   if (user != null) {
-                                    // Check capacity before creating ticket
                                     final conductorDoc = await FirebaseFirestore
                                         .instance
                                         .collection('conductors')
@@ -1059,18 +1340,65 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                     if (conductorDoc.docs.isNotEmpty) {
                                       final conductorData =
                                           conductorDoc.docs.first.data();
+                                      final conductorDocId =
+                                          conductorDoc.docs.first.id;
                                       final currentPassengerCount =
                                           conductorData['passengerCount'] ?? 0;
-                                      final newPassengerCount =
+
+                                      final activeTripId =
+                                          conductorData['activeTrip']
+                                              ?['tripId'];
+                                      final preBookingsQuery =
+                                          activeTripId != null
+                                              ? await FirebaseFirestore.instance
+                                                  .collection('conductors')
+                                                  .doc(conductorDocId)
+                                                  .collection('preBookings')
+                                                  .where('tripId',
+                                                      isEqualTo: activeTripId)
+                                                  .get()
+                                              : await FirebaseFirestore.instance
+                                                  .collection('conductors')
+                                                  .doc(conductorDocId)
+                                                  .collection('preBookings')
+                                                  .get();
+
+                                      int preBookedPassengers = 0;
+                                      if (preBookingsQuery.docs.isNotEmpty) {
+                                        preBookedPassengers =
+                                            preBookingsQuery.docs.where((doc) {
+                                          final data = doc.data();
+                                          final isForCurrentTrip =
+                                              activeTripId == null ||
+                                                  data['tripId'] ==
+                                                      activeTripId ||
+                                                  data['tripId'] == null;
+                                          return data['route'] == route &&
+                                              (data['status'] == 'paid' ||
+                                                  data['status'] ==
+                                                      'pending_payment') &&
+                                              data['boardingStatus'] !=
+                                                  'boarded' &&
+                                              isForCurrentTrip;
+                                        }).fold<int>(0, (sum, doc) {
+                                          final data = doc.data();
+                                          return sum +
+                                              ((data['quantity'] as int?) ?? 1);
+                                        });
+                                      }
+
+                                      final totalPassengers =
                                           currentPassengerCount +
-                                              result['quantity'];
+                                              preBookedPassengers;
+                                      final newPassengerCount =
+                                          totalPassengers + result['quantity'];
 
                                       if (newPassengerCount > 27) {
                                         ScaffoldMessenger.of(context)
                                             .showSnackBar(
                                           SnackBar(
                                             content: Text(
-                                                'Cannot add ${result['quantity']} passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount'),
+                                                'Cannot add ${result['quantity']} passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount boarded + $preBookedPassengers pre-booked = $totalPassengers total'),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
@@ -1083,7 +1411,7 @@ class _ToSelectionPageConductor extends StatelessWidget {
                                       await RouteService.saveTrip(
                                     route: route,
                                     from: fromPlace['name'],
-                                    to: to,
+                                    to: place['name'],
                                     startKm: fromPlace['km'],
                                     endKm: endKm,
                                     quantity: result['quantity'],
@@ -1114,18 +1442,26 @@ class _ToSelectionPageConductor extends StatelessWidget {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  place['name'] ?? '',
-                                  style: GoogleFonts.outfit(
-                                      fontSize: 15, color: Colors.white),
-                                  textAlign: TextAlign.center,
+                                Flexible(
+                                  child: Text(
+                                    place['name'] ?? '',
+                                    style: GoogleFonts.outfit(
+                                        fontSize: fontSize,
+                                        color: Colors.white),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
-                                if (place['km'] != null)
+                                if (place['km'] != null) ...[
+                                  const SizedBox(height: 2),
                                   Text(
                                     '${(place['km'] as num).toInt()} km',
                                     style: TextStyle(
-                                        fontSize: 11, color: Colors.white70),
+                                        fontSize: kmFontSize,
+                                        color: Colors.white70),
                                   ),
+                                ],
                               ],
                             ),
                           );
@@ -1152,78 +1488,58 @@ class _QRScanPageState extends State<QRScanPage> {
   bool _isProcessing = false;
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
+        backgroundColor: Color(0xFF0091AD),
+        foregroundColor: Colors.white,
+      ),
       body: MobileScanner(
         onDetect: (capture) async {
-          // Prevent multiple executions
-          if (_isProcessing || !mounted) {
-            print('QR scan already in progress or widget disposed, ignoring duplicate detection');
+          if (_isProcessing) {
+            print('QR scan already in progress, ignoring duplicate detection');
             return;
           }
 
-          if (mounted) {
-            setState(() {
-              _isProcessing = true;
-            });
-          }
+          setState(() {
+            _isProcessing = true;
+          });
 
           final barcode = capture.barcodes.first;
           final qrData = barcode.rawValue;
-          print('🔍 QR Scan Debug - Raw barcode value: $qrData');
-          print('🔍 QR Scan Debug - Barcode type: ${barcode.type}');
-          print('🔍 QR Scan Debug - Barcode format: ${barcode.format}');
 
           if (qrData != null && qrData.isNotEmpty) {
             try {
-              print('🔄 Processing QR scan: $qrData');
               final data = parseQRData(qrData);
-              print('✅ Successfully parsed QR data: $data');
               await storePreTicketToFirestore(data);
-              print('✅ Successfully stored to Firestore');
-              if (mounted) {
-                Navigator.of(context).pop(true);
-              }
+              Navigator.of(context).pop(true);
             } catch (e) {
-              print('❌ Error processing QR scan: $e');
-              // Show error message to conductor
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
-                    backgroundColor: Colors.red,
-                    duration: Duration(seconds: 5),
-                  ),
-                );
-                Navigator.of(context).pop(false);
-              }
-            } finally {
-              if (mounted) {
-                setState(() {
-                  _isProcessing = false;
-                });
-              }
-            }
-          } else {
-            print('❌ QR data is null or empty');
-            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Invalid QR code: No data detected'),
+                  content: Text(
+                      'Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
                   backgroundColor: Colors.red,
-                  duration: Duration(seconds: 3),
+                  duration: Duration(seconds: 5),
                 ),
               );
+              Navigator.of(context).pop(false);
+            } finally {
               setState(() {
                 _isProcessing = false;
               });
             }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Invalid QR code: No data detected'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            setState(() {
+              _isProcessing = false;
+            });
           }
         },
       ),
@@ -1232,659 +1548,552 @@ class _QRScanPageState extends State<QRScanPage> {
 }
 
 Map<String, dynamic> parseQRData(String qrData) {
-  print('🔍 ParseQRData - Raw QR data: $qrData');
-  print('🔍 ParseQRData - Data length: ${qrData.length}');
-  print('🔍 ParseQRData - Data type: ${qrData.runtimeType}');
-
   try {
-    // First try to parse as JSON
-    final result = Map<String, dynamic>.from(jsonDecode(qrData));
-    print('✅ ParseQRData - Successfully parsed as JSON: $result');
-    print('🔍 ParseQRData - Type field: ${result['type']}');
-    print('🔍 ParseQRData - Route field: ${result['route']}');
-    return result;
+    final Map<String, dynamic> data = jsonDecode(qrData);
+    return data;
   } catch (e) {
-    print('⚠️ ParseQRData - JSON parsing failed: $e');
-
-    // Check if it's a simple string format (like the old PREBOOK_ format)
-    if (qrData.startsWith('PREBOOK_')) {
-      print('🔍 ParseQRData - Detected PREBOOK_ format, converting to JSON');
-      final parts = qrData.split('_');
-      if (parts.length >= 6) {
-        final result = {
-          'type': 'preBooking',
-          'id': parts[1],
-          'route': parts[2],
-          'from': parts[3],
-          'to': parts[4],
-          'quantity': int.tryParse(parts[5]) ?? 1,
-        };
-        print(
-            '✅ ParseQRData - Successfully converted PREBOOK_ format: $result');
-        return result;
-      }
-    }
-
-    print('🔍 ParseQRData - Trying Dart Map literal format');
-    // If JSON parsing fails, try to parse Dart Map literal format
-    final result = _parseDartMapLiteral(qrData);
-    print('✅ ParseQRData - Successfully parsed as Dart Map literal: $result');
-    return result;
+    throw Exception('Invalid QR code format: $e');
   }
-}
-
-Map<String, dynamic> _parseDartMapLiteral(String qrData) {
-  // Remove outer braces
-  String data = qrData.trim();
-  if (data.startsWith('{') && data.endsWith('}')) {
-    data = data.substring(1, data.length - 1);
-  }
-
-  Map<String, dynamic> result = {};
-
-  // Split by commas, but be careful about commas inside values
-  List<String> pairs = [];
-  int braceCount = 0;
-  int startIndex = 0;
-
-  for (int i = 0; i < data.length; i++) {
-    if (data[i] == '{')
-      braceCount++;
-    else if (data[i] == '}')
-      braceCount--;
-    else if (data[i] == ',' && braceCount == 0) {
-      pairs.add(data.substring(startIndex, i).trim());
-      startIndex = i + 1;
-    }
-  }
-  // Add the last pair
-  if (startIndex < data.length) {
-    pairs.add(data.substring(startIndex).trim());
-  }
-
-  for (String pair in pairs) {
-    if (pair.isEmpty) continue;
-
-    // Find the first colon
-    int colonIndex = pair.indexOf(':');
-    if (colonIndex == -1) continue;
-
-    String key = pair.substring(0, colonIndex).trim();
-    String value = pair.substring(colonIndex + 1).trim();
-
-    // Parse the value
-    dynamic parsedValue = _parseValue(value);
-    result[key] = parsedValue;
-  }
-
-  return result;
-}
-
-dynamic _parseValue(String value) {
-  // Remove quotes if present
-  if ((value.startsWith("'") && value.endsWith("'")) ||
-      (value.startsWith('"') && value.endsWith('"'))) {
-    return value.substring(1, value.length - 1);
-  }
-
-  // Try to parse as number - be more careful about this
-  // First try exact integer parsing
-  if (int.tryParse(value) != null) {
-    return int.parse(value);
-  }
-
-  // Then try double parsing
-  if (double.tryParse(value) != null) {
-    double parsed = double.parse(value);
-    // If it's a whole number, return as int
-    if (parsed == parsed.toInt()) {
-      return parsed.toInt();
-    }
-    return parsed;
-  }
-
-  // Try to parse as boolean
-  if (value.toLowerCase() == 'true') return true;
-  if (value.toLowerCase() == 'false') return false;
-
-  // Try to parse as list
-  if (value.startsWith('[') && value.endsWith(']')) {
-    String listContent = value.substring(1, value.length - 1);
-    List<String> items = listContent.split(',').map((e) => e.trim()).toList();
-    return items.map((item) => _parseValue(item)).toList();
-  }
-
-  // Return as string
-  return value;
 }
 
 Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
-  // Debug: Print the parsed data to see what we're working with
-  print('Parsed QR data: $data');
-
-  final route = data['route'];
-  final type = data['type'] ??
-      'preTicket'; // Default to preTicket for backward compatibility
-
-  // Get conductor information first to validate route
   final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    throw Exception('User not authenticated');
-  }
+  if (user == null) throw Exception('User not authenticated');
+
+  final qrDataString = jsonEncode(data);
+  final quantity = data['quantity'] ?? 1;
 
   final conductorDoc = await FirebaseFirestore.instance
       .collection('conductors')
       .where('uid', isEqualTo: user.uid)
-      .limit(1)
       .get();
 
   if (conductorDoc.docs.isEmpty) {
-    throw Exception('Conductor not found');
+    throw Exception('Conductor profile not found');
   }
 
   final conductorData = conductorDoc.docs.first.data();
   final conductorRoute = conductorData['route'];
+  final route = data['route'];
 
-  print('Conductor route: $conductorRoute');
-  print('QR route: $route');
-  print('QR type: $type');
-
-  // Validate that the conductor can scan this QR code
   if (conductorRoute != route) {
     throw Exception(
-        'Invalid route. You are a $conductorRoute conductor but trying to scan a $route $type. Only $conductorRoute $type can be scanned.');
+        'Invalid route. You are a $conductorRoute conductor but trying to scan a $route ticket. Only $conductorRoute tickets can be scanned.');
   }
 
-  // Check passenger count limit before proceeding
+  final conductorDocId = conductorDoc.docs.first.id;
   final currentPassengerCount = conductorData['passengerCount'] ?? 0;
 
-  // Improved quantity parsing
-  dynamic rawQuantity = data['quantity'];
-  int quantity = 1; // Default value
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+  final preBookingsQuery = activeTripId != null
+      ? await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .where('tripId', isEqualTo: activeTripId)
+          .get()
+      : await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .get();
 
-  if (rawQuantity != null) {
-    if (rawQuantity is int) {
-      quantity = rawQuantity;
-    } else if (rawQuantity is double) {
-      quantity = rawQuantity.toInt();
-    } else if (rawQuantity is String) {
-      int? parsedInt = int.tryParse(rawQuantity);
-      if (parsedInt != null) {
-        quantity = parsedInt;
-      } else {
-        String cleanQuantity = rawQuantity.replaceAll(RegExp(r'[^\d.]'), '');
-        if (cleanQuantity.isNotEmpty) {
-          double? parsed = double.tryParse(cleanQuantity);
-          if (parsed != null) {
-            quantity = parsed.toInt();
-          }
-        }
-      }
-    }
+  int preBookedPassengers = 0;
+  if (preBookingsQuery.docs.isNotEmpty) {
+    preBookedPassengers = preBookingsQuery.docs.where((doc) {
+      final data = doc.data();
+      final isForCurrentTrip = activeTripId == null ||
+          data['tripId'] == activeTripId ||
+          data['tripId'] == null;
+      return data['route'] == route &&
+          (data['status'] == 'paid' || data['status'] == 'pending_payment') &&
+          data['boardingStatus'] != 'boarded' &&
+          isForCurrentTrip;
+    }).fold<int>(0, (sum, doc) {
+      final data = doc.data();
+      return sum + ((data['quantity'] as int?) ?? 1);
+    });
   }
 
-  print('Current passenger count: $currentPassengerCount');
-  print('Parsed quantity: $quantity');
-
-  final newPassengerCount = currentPassengerCount + quantity;
+  final totalPassengers = currentPassengerCount + preBookedPassengers;
+  final newPassengerCount = totalPassengers + quantity;
 
   if (newPassengerCount > 27) {
     throw Exception(
-        'Cannot add $quantity passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount');
+        'Cannot add $quantity passengers. Bus capacity limit (27) would be exceeded. Current: $currentPassengerCount boarded + $preBookedPassengers pre-booked = $totalPassengers total');
   }
 
+  final type = data['type'] ?? '';
   if (type == 'preBooking') {
-    print('🔍 Processing pre-booking with type: $type');
-    await _processPreBooking(data, user, conductorDoc, quantity);
+    await _processPreBooking(data, user, conductorDoc, quantity, qrDataString);
   } else {
-    print('🔍 Processing pre-ticket with type: $type');
-    await _processPreTicket(data, user, conductorDoc, quantity);
+    if (type == 'preTicket') {
+      final passengerDirection = data['direction'];
+      final passengerPlaceCollection = data['placeCollection'];
+
+      if (passengerDirection != null && passengerPlaceCollection != null) {
+        final isDirectionCompatible = await DirectionValidationService
+            .validateDirectionCompatibilityByCollection(
+          passengerRoute: route,
+          passengerPlaceCollection: passengerPlaceCollection,
+          conductorUid: user.uid,
+        );
+
+        if (!isDirectionCompatible) {
+          final activeTrip = conductorData['activeTrip'];
+          final conductorDirection = activeTrip?['direction'] ?? 'Unknown';
+
+          throw Exception(
+              'Direction mismatch! Your ticket is for "$passengerDirection" but the conductor is currently on "$conductorDirection" trip. Please wait for the correct direction or contact the conductor.');
+        }
+      }
+    }
+
+    await _processPreTicket(data, user, conductorDoc, quantity, qrDataString);
   }
 }
 
+// ✅ UPDATED _processPreTicket WITH userId FIX
 Future<void> _processPreTicket(Map<String, dynamic> data, User user,
-    QuerySnapshot conductorDoc, int quantity) async {
-  final qrDataString = jsonEncode(data);
+    QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
+  final preTicketsQuery = await FirebaseFirestore.instance
+      .collectionGroup('preTickets')
+      .where('qrData', isEqualTo: qrDataString)
+      .where('status', isEqualTo: 'pending')
+      .get();
 
-  print('🔍 _processPreTicket - Searching for qrData: $qrDataString');
-  print('🔍 _processPreTicket - qrData length: ${qrDataString.length}');
-
-  // Get all preTickets with matching qrData (single where clause only)
-  QuerySnapshot existingPreTicketQuery;
-  try {
-    existingPreTicketQuery = await FirebaseFirestore.instance
-        .collectionGroup('preTickets')
-        .where('qrData', isEqualTo: qrDataString)
-        .get();
-  } catch (e) {
-    print('❌ Collection group query failed: $e');
-    print('🔄 Trying alternative approach...');
-
-    // Try to get all preTickets and filter in memory
-    existingPreTicketQuery =
-        await FirebaseFirestore.instance.collectionGroup('preTickets').get();
-  }
-
-  print(
-      '🔍 _processPreTicket - Found ${existingPreTicketQuery.docs.length} documents');
-
-  // Filter documents in memory to avoid compound index requirement
-  DocumentSnapshot? pendingPreTicket;
-  bool hasBoarded = false;
-
-  for (var doc in existingPreTicketQuery.docs) {
-    final docData = doc.data() as Map<String, dynamic>?;
-    if (docData == null) continue;
-
-    print(
-        '🔍 _processPreTicket - Document ${doc.id}: status = ${docData['status']}, qrData = ${docData['qrData']}');
-
-    // Check if this document matches our qrData
-    final docQrData = docData['qrData'];
-    if (docQrData != qrDataString) {
-      print('🔍 _processPreTicket - QR data mismatch, skipping');
-      continue;
-    }
-
-    final status = docData['status'];
-    if (status == 'boarded') {
-      hasBoarded = true;
-      break;
-    } else if (status == 'pending' && pendingPreTicket == null) {
-      pendingPreTicket = doc;
-    }
-  }
-
-  if (hasBoarded) {
-    throw Exception('This pre-ticket has already been scanned and boarded.');
-  }
-
-  if (pendingPreTicket == null) {
+  if (preTicketsQuery.docs.isEmpty) {
     throw Exception('No pending pre-ticket found with this QR code.');
   }
 
-  print('Found pending pre-ticket: ${pendingPreTicket.id}');
+  final pendingPreTicket = preTicketsQuery.docs.first;
+  final preTicketData = pendingPreTicket.data();
 
-  // Update pre-ticket status to "boarded"
-  print('🔄 Updating pre-ticket status to boarded');
+  // ✅ CRITICAL FIX: Get userId from the pre-ticket
+  final userId = preTicketData['userId'];
+
+  print('🔍 Pre-ticket userId: $userId');
+  print('🔍 Pre-ticket data: $preTicketData');
+
+  if (userId == null) {
+    print('⚠️ WARNING: Pre-ticket userId is null!');
+  }
+
+  if (preTicketData['status'] == 'boarded') {
+    throw Exception('This pre-ticket has already been scanned and boarded.');
+  }
+
+  final conductorDocId = conductorDoc.docs.first.id;
+  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+  final now = DateTime.now();
+  final formattedDate =
+      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
   await pendingPreTicket.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
+    'tripId': activeTripId,
   });
-  print('✅ Successfully updated pre-ticket status to boarded');
 
-  // Store scanned QR data in conductor's preTickets collection
-  final conductorDocId = conductorDoc.docs.first.id;
-  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
-  final busName =
-      (conductorData['busNumber'] as dynamic?)?.toString() ?? 'unknown';
-
-  print('🔄 Storing scanned QR data in conductor collection');
+  // ✅ Store in conductor's preTickets collection WITH userId
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
       .collection('preTickets')
-      .add({
+      .doc(pendingPreTicket.id)
+      .set({
     'qrData': qrDataString,
     'originalDocumentId': pendingPreTicket.id,
     'originalCollection': pendingPreTicket.reference.parent.path,
     'scannedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
-    'qr': true, // Indicates this came from QR scan
+    'qr': true,
     'status': 'boarded',
-    'data': data, // Store the parsed QR data
-  });
-  print('✅ Successfully stored QR data in conductor collection');
-
-  // Increment passenger count
-  print('🔄 About to increment passenger count by $quantity');
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .update({'passengerCount': FieldValue.increment(quantity)});
-  print('✅ Successfully incremented passenger count by $quantity');
-
-  // Create trip record in route-level collection
-  await _createTripRecord(data, pendingPreTicket.id, user, 'preTicket');
-
-  // Create conductor ticket record
-  await _createConductorTicketRecord(
-      data, pendingPreTicket.id, user, conductorDocId, 'preTicket');
-}
-
-Future<void> _processPreBooking(Map<String, dynamic> data, User user,
-    QuerySnapshot conductorDoc, int quantity) async {
-  final qrDataString = jsonEncode(data);
-
-  print('🔍 _processPreBooking - Searching for qrData: $qrDataString');
-  print('🔍 _processPreBooking - qrData length: ${qrDataString.length}');
-
-  // Try collection group query first
-  QuerySnapshot existingPreBookingQuery;
-  try {
-    existingPreBookingQuery = await FirebaseFirestore.instance
-        .collectionGroup('preBookings')
-        .where('qrData', isEqualTo: qrDataString)
-        .where('status', isEqualTo: 'paid')
-        .get();
-    print('✅ Collection group query successful');
-  } catch (e) {
-    print('❌ Collection group query failed: $e');
-    print('🔄 Trying alternative approach...');
-
-    // Wait a moment for index to be built (if it's a timing issue)
-    await Future.delayed(Duration(seconds: 2));
-
-    try {
-      existingPreBookingQuery = await FirebaseFirestore.instance
-          .collectionGroup('preBookings')
-          .where('qrData', isEqualTo: qrDataString)
-          .where('status', isEqualTo: 'paid')
-          .get();
-      print('✅ Collection group query successful after delay');
-    } catch (e2) {
-      print('❌ Collection group query still failed after delay: $e2');
-      print('🔄 Using fallback approach...');
-
-      // Fallback: Get all preBookings and filter in memory
-      existingPreBookingQuery =
-          await FirebaseFirestore.instance.collectionGroup('preBookings').get();
-    }
-  }
-
-  print(
-      '🔍 _processPreBooking - Found ${existingPreBookingQuery.docs.length} documents');
-
-  // Since we're querying for status == 'paid' directly, we should find the document
-  DocumentSnapshot? paidPreBooking;
-  bool hasBoarded = false;
-
-  for (var doc in existingPreBookingQuery.docs) {
-    final docData = doc.data() as Map<String, dynamic>?;
-    if (docData == null) continue;
-
-    print(
-        '🔍 _processPreBooking - Document ${doc.id}: status = ${docData['status']}');
-
-    // Check if this document matches our qrData
-    final docQrData = docData['qrData'];
-    if (docQrData != qrDataString) {
-      print('🔍 _processPreBooking - QR data mismatch, skipping');
-      continue;
-    }
-
-    // Since we're querying for 'paid' status, we should find the document
-    if (paidPreBooking == null) {
-      paidPreBooking = doc;
-    }
-  }
-
-  if (paidPreBooking == null) {
-    throw Exception(
-        'No paid pre-booking found with this QR code. Please ensure payment is completed.');
-  }
-
-  // Check if this pre-booking has already been boarded
-  final preBookingData = paidPreBooking.data() as Map<String, dynamic>;
-  if (preBookingData['status'] == 'boarded' ||
-      preBookingData['boardingStatus'] == 'boarded') {
-    throw Exception('This pre-booking has already been scanned and boarded.');
-  }
-
-  print('Found paid pre-booking: ${paidPreBooking.id}');
-
-  // Update pre-booking status to "boarded"
-  print('🔄 Updating pre-booking status to boarded');
-  await paidPreBooking.reference.update({
-    'status': 'boarded',
-    'boardedAt': FieldValue.serverTimestamp(),
-    'scannedBy': user.uid,
-    'scannedAt': FieldValue.serverTimestamp(),
-    'boardingStatus': 'boarded', // Add explicit boarding status
-  });
-  print('✅ Successfully updated pre-booking status to boarded');
-
-  // Store scanned QR data in conductor's preBookings collection
-  final conductorDocId = conductorDoc.docs.first.id;
-  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
-  final busName =
-      (conductorData['busNumber'] as dynamic?)?.toString() ?? 'unknown';
-
-  print('🔄 Storing scanned QR data in conductor collection');
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .collection('preBookings')
-      .add({
-    'qrData': qrDataString,
-    'originalDocumentId': paidPreBooking.id,
-    'originalCollection': paidPreBooking.reference.parent.path,
-    'scannedAt': FieldValue.serverTimestamp(),
-    'scannedBy': user.uid,
-    'qr': true, // Indicates this came from QR scan
-    'status': 'boarded',
-    'boardingStatus': 'boarded', // Add explicit boarding status
-    'data': data, // Store the parsed QR data
-  });
-  print('✅ Successfully stored QR data in conductor collection');
-
-  // Increment passenger count
-  print('🔄 About to increment passenger count by $quantity');
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .update({'passengerCount': FieldValue.increment(quantity)});
-  print('✅ Successfully incremented passenger count by $quantity');
-
-  // Create trip record in route-level collection
-  await _createTripRecord(data, paidPreBooking.id, user, 'preBooking');
-
-  // Create conductor ticket record
-  await _createConductorTicketRecord(
-      data, paidPreBooking.id, user, conductorDocId, 'preBooking');
-}
-
-Future<void> _createTripRecord(Map<String, dynamic> data, String documentId,
-    User user, String type) async {
-  final route = data['route'];
-  final tripsCollection = FirebaseFirestore.instance
-      .collection('trips')
-      .doc(route)
-      .collection('trips');
-
-  final snapshot = await tripsCollection.get();
-  int maxTripNumber = 0;
-  for (var doc in snapshot.docs) {
-    final tripName = doc.id;
-    final parts = tripName.split(' ');
-    if (parts.length == 2 && int.tryParse(parts[1]) != null) {
-      final num = int.parse(parts[1]);
-      if (num > maxTripNumber) maxTripNumber = num;
-    }
-  }
-  final tripNumber = maxTripNumber + 1;
-  final tripDocName = "trip $tripNumber";
-
-  await tripsCollection.doc(tripDocName).set({
+    'data': data,
+    'tripId': activeTripId,
     'from': data['from'],
     'to': data['to'],
-    'startKm': data['fromKm'],
-    'endKm': data['toKm'],
-    'totalKm': (data['toKm'] as num) - (data['fromKm'] as num),
-    'timestamp': FieldValue.serverTimestamp(),
-    'active': true,
-    'quantity': data['quantity'],
-    'discountAmount': '',
-    'farePerPassenger': data['fare'],
-    'totalFare': data['amount'],
-    'fareTypes': data['fareTypes'],
-    'discountBreakdown': data['discountBreakdown'],
-    'documentId': documentId,
-    'documentType': type,
-    'scannedBy': user.uid,
-    'status': 'boarded', // Add status for QR-scanned tickets
-    'ticketType': 'qr', // Distinguish from manual tickets
+    'quantity': quantity,
+    'userId': userId, // ✅ CRITICAL: Save the userId here
+    'totalFare': data['totalFare'] ?? data['amount'] ?? data['fare'],
+    'route': data['route'],
+    'direction': data['direction'],
   });
 
-  print('✅ Successfully created trip record: $tripDocName for $type');
-}
+  print('✅ Saved pre-ticket with userId: $userId');
 
-Future<void> _createConductorTicketRecord(Map<String, dynamic> data,
-    String documentId, User user, String conductorDocId, String type) async {
   try {
-    final now = DateTime.now();
-    final formattedDate = DateFormat('yyyy-MM-dd').format(now);
+    final ticketNumber =
+        await _getNextTicketNumber(conductorDocId, formattedDate);
+    final ticketDocId = 'ticket $ticketNumber';
 
-    // Ensure the date document exists
+    final remittanceData = {
+      'active': true,
+      'discountAmount': '0.00',
+      'discountBreakdown': data['discountBreakdown'] ?? [],
+      'documentId': pendingPreTicket.id,
+      'documentType': 'preTicket',
+      'endKm': data['toKm'] ?? 0,
+      'farePerPassenger': data['passengerFares'] ?? [data['fare']],
+      'from': data['from'],
+      'quantity': quantity,
+      'scannedBy': user.uid,
+      'startKm': data['fromKm'] ?? 0,
+      'status': 'boarded',
+      'ticketType': 'preTicket',
+      'timestamp': FieldValue.serverTimestamp(),
+      'to': data['to'],
+      'totalFare':
+          (data['totalFare'] ?? data['amount'] ?? data['fare'] ?? '0.00')
+              .toString(),
+      'totalKm': (data['toKm'] ?? 0) - (data['fromKm'] ?? 0),
+      'route': data['route'],
+      'direction': data['direction'],
+      'conductorId': conductorDocId,
+      'tripId': activeTripId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'scannedAt': FieldValue.serverTimestamp(),
+      'boardedAt': FieldValue.serverTimestamp(),
+      'userId': userId, // ✅ Also save userId in remittance
+    };
+
     await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorDocId)
         .collection('remittance')
         .doc(formattedDate)
-        .set({'createdAt': FieldValue.serverTimestamp()},
-            SetOptions(merge: true));
+        .collection('tickets')
+        .doc(ticketDocId)
+        .set(remittanceData);
 
-    final ticketsCollection = FirebaseFirestore.instance
+    await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorDocId)
         .collection('remittance')
         .doc(formattedDate)
-        .collection('tickets');
+        .set({
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastUpdated': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-    // Compute next ticket number
-    final ticketsSnapshot = await ticketsCollection.get();
-    int maxTicketNumber = 0;
-    for (var doc in ticketsSnapshot.docs) {
-      final name = doc.id;
-      final parts = name.split(' ');
-      if (parts.length == 2 && int.tryParse(parts[1]) != null) {
-        final n = int.parse(parts[1]);
-        if (n > maxTicketNumber) maxTicketNumber = n;
-      }
-    }
-    final nextTicketNumber = maxTicketNumber + 1;
-    final conductorTicketDocName = 'ticket $nextTicketNumber';
+    print(
+        '✅ Pre-ticket saved to remittance/tickets collection as $ticketDocId');
+  } catch (e) {
+    print('❌ Error saving pre-ticket to remittance: $e');
+  }
 
-    // Prepare values based on QR data
-    final num startKm = (data['fromKm'] as num);
-    final num endKm = (data['toKm'] as num);
-    final num totalKm = endKm - startKm;
-    final int qty = data['quantity'] as int;
-    final double baseFare = (data['fare'] as num).toDouble();
-    final double totalFare = (data['amount'] as num).toDouble();
-    final double discountAmount = (baseFare * qty) - totalFare;
-    final List<dynamic> passengerFaresDyn = (data['passengerFares'] as List?) ??
-        List.generate(qty, (_) => baseFare);
-    final List<String> passengerFares =
-        passengerFaresDyn.map((e) => (e as num).toStringAsFixed(2)).toList();
-    final List<dynamic>? discountBreakdown = data['discountBreakdown'] as List?;
+  try {
+    final dailyTripDoc = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('dailyTrips')
+        .doc(formattedDate)
+        .get();
 
-    await ticketsCollection.doc(conductorTicketDocName).set({
-      'from': data['from'],
-      'to': data['to'],
-      'startKm': startKm,
-      'endKm': endKm,
-      'totalKm': totalKm,
-      'timestamp': FieldValue.serverTimestamp(),
-      'active': true,
-      'quantity': qty,
-      'farePerPassenger': passengerFares,
-      'totalFare': totalFare.toStringAsFixed(2),
-      'discountAmount': discountAmount.toStringAsFixed(2),
-      'discountBreakdown': discountBreakdown,
-      'documentId': documentId,
-      'documentType': type,
-      'scannedBy': user.uid,
-      'status': 'boarded', // Add status for QR-scanned tickets
-      'ticketType': 'qr', // Distinguish from manual tickets
-    });
+    if (dailyTripDoc.exists) {
+      final dailyTripData = dailyTripDoc.data();
+      final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+      final tripCollection = 'trip$currentTrip';
 
-    // Also save to daily trip structure (trip1 or trip2)
-    try {
-      final dailyTripDoc = await FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorDocId)
           .collection('dailyTrips')
           .doc(formattedDate)
+          .collection(tripCollection)
+          .doc('preTickets')
+          .collection('preTickets')
+          .doc(pendingPreTicket.id)
+          .set({
+        'from': data['from'],
+        'to': data['to'],
+        'quantity': quantity,
+        'totalFare': data['totalFare'] ?? data['amount'] ?? data['fare'],
+        'status': 'boarded',
+        'scannedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'tripId': activeTripId,
+        'qrData': qrDataString,
+        'userId': userId, // ✅ Save userId in dailyTrips too
+        'route': data['route'],
+        'direction': data['direction'],
+      });
+
+      print('✅ Pre-ticket saved to dailyTrips collection');
+    }
+  } catch (e) {
+    print('❌ Error saving pre-ticket to dailyTrips: $e');
+  }
+
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+
+  print(
+      '✅ Pre-ticket processed successfully. Incremented passengerCount by $quantity');
+}
+
+Future<int> _getNextTicketNumber(
+    String conductorId, String formattedDate) async {
+  try {
+    final ticketsSnapshot = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(formattedDate)
+        .collection('tickets')
+        .get();
+
+    return ticketsSnapshot.docs.length + 1;
+  } catch (e) {
+    print('❌ Error getting next ticket number: $e');
+    return 1;
+  }
+}
+
+Future<void> _processPreBooking(Map<String, dynamic> data, User user,
+    QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
+  final conductorDocId = conductorDoc.docs.first.id;
+  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+
+  print('\n🔍 === STARTING PRE-BOOKING SCAN PROCESS ===');
+  print('🔍 Conductor ID: $conductorDocId');
+  print('🔍 Active Trip ID: $activeTripId');
+  print('🔍 QR Data: $data');
+
+  DocumentSnapshot? paidPreBooking;
+  Map<String, dynamic>? preBookingData;
+  String? bookingId;
+  String? userId;
+
+  // ✅ STRATEGY 1: Search by booking ID
+  final dataBookingId = data['bookingId'] ?? data['id'];
+  if (dataBookingId != null) {
+    print('🔍 Strategy 1: Searching by booking ID: $dataBookingId');
+
+    try {
+      final directBooking = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .doc(dataBookingId)
           .get();
 
-      if (dailyTripDoc.exists) {
-        final dailyTripData = dailyTripDoc.data();
-        final currentTrip = dailyTripData?['currentTrip'] ?? 1;
-        final tripCollection = 'trip$currentTrip';
+      if (directBooking.exists) {
+        final bookingData = directBooking.data()!;
+        final bookingStatus = bookingData['status'] ?? '';
+        print('🔍 Found booking: status=$bookingStatus');
 
-        await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorDocId)
-            .collection('dailyTrips')
-            .doc(formattedDate)
-            .collection(tripCollection)
-            .doc('tickets')
-            .collection('tickets')
-            .doc(conductorTicketDocName)
-            .set({
-          'from': data['from'],
-          'to': data['to'],
-          'startKm': startKm,
-          'endKm': endKm,
-          'totalKm': totalKm,
-          'timestamp': FieldValue.serverTimestamp(),
-          'active': true,
-          'quantity': qty,
-          'farePerPassenger': passengerFares,
-          'totalFare': totalFare.toStringAsFixed(2),
-          'discountAmount': discountAmount.toStringAsFixed(2),
-          'discountBreakdown': discountBreakdown,
-          'documentId': documentId,
-          'documentType': type,
-          'scannedBy': user.uid,
-          'status': 'boarded', // Add status for QR-scanned tickets
-          'ticketType': 'qr', // Distinguish from manual tickets
-        });
+        // ✅ Accept both 'paid' and 'boarded' status
+        if (bookingStatus == 'paid' || bookingStatus == 'boarded') {
+          paidPreBooking = directBooking;
+          preBookingData = bookingData;
+          bookingId = dataBookingId;
+          userId = bookingData['userId'];
+          print('✅ Found valid pre-booking by ID');
+        }
       }
     } catch (e) {
-      print('Failed to save to daily trip structure: $e');
-      // Continue with normal operation even if daily trip structure fails
+      print('⚠️ Error searching by booking ID: $e');
     }
-
-    // Calculate and save remittance summary
-    Map<String, dynamic>? remittanceSummary;
-    try {
-      remittanceSummary = await RemittanceService.calculateDailyRemittance(
-          conductorDocId, formattedDate);
-      await RemittanceService.saveRemittanceSummary(
-          conductorDocId, formattedDate, remittanceSummary);
-      print('✅ Remittance summary updated for $formattedDate');
-    } catch (e) {
-      print('Error updating remittance summary: $e');
-    }
-
-    // Also update the remittance summary in the daily trip document
-    if (remittanceSummary != null) {
-      try {
-        await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorDocId)
-            .collection('dailyTrips')
-            .doc(formattedDate)
-            .update({
-          'ticketCount': remittanceSummary['ticketCount'],
-          'totalPassengers': remittanceSummary['totalPassengers'],
-          'totalFare': remittanceSummary['totalFare'],
-          'totalFareFormatted': remittanceSummary['totalFareFormatted'],
-          'lastRemittanceUpdate': FieldValue.serverTimestamp(),
-        });
-        print('✅ Daily trip remittance summary updated');
-      } catch (e) {
-        print('Error updating daily trip remittance summary: $e');
-      }
-    }
-
-    print(
-        '✅ Also created conductor ticket record: $conductorTicketDocName for $formattedDate ($type)');
-  } catch (e) {
-    print('❌ Failed to create conductor ticket record: $e');
   }
+
+  // ✅ STRATEGY 2: Search by QR data string
+  if (paidPreBooking == null) {
+    print('🔍 Strategy 2: Searching by QR data string');
+    try {
+      final preBookingsQuery = await FirebaseFirestore.instance
+          .collectionGroup('preBookings')
+          .where('qrData', isEqualTo: qrDataString)
+          .get();
+
+      print('🔍 Found ${preBookingsQuery.docs.length} matching QR codes');
+
+      for (var doc in preBookingsQuery.docs) {
+        final docData = doc.data();
+        final docStatus = docData['status'] ?? '';
+        final docRoute = docData['route'] ?? '';
+
+        print('🔍 Checking doc ${doc.id}: status=$docStatus, route=$docRoute');
+
+        if (docRoute == data['route'] &&
+            (docStatus == 'paid' || docStatus == 'boarded')) {
+          paidPreBooking = doc;
+          preBookingData = docData;
+          bookingId = doc.id;
+          userId = docData['userId'];
+          print('✅ Found valid pre-booking by QR data');
+          break;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error searching by QR data: $e');
+    }
+  }
+
+  // ✅ STRATEGY 3: Search by route details
+  if (paidPreBooking == null && data['from'] != null && data['to'] != null) {
+    print('🔍 Strategy 3: Searching by from/to/quantity');
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('preBookings')
+          .where('from', isEqualTo: data['from'])
+          .where('to', isEqualTo: data['to'])
+          .where('quantity', isEqualTo: quantity)
+          .get();
+
+      for (var doc in query.docs) {
+        final docData = doc.data();
+        final docStatus = docData['status'] ?? '';
+
+        if (docStatus == 'paid' || docStatus == 'boarded') {
+          paidPreBooking = doc;
+          preBookingData = docData;
+          bookingId = doc.id;
+          userId = docData['userId'];
+          print('✅ Found valid pre-booking by route details');
+          break;
+        }
+      }
+    } catch (e) {
+      print('⚠️ Error searching by route details: $e');
+    }
+  }
+
+  if (paidPreBooking == null || preBookingData == null) {
+    print('❌ No pre-booking found after all search strategies');
+    throw Exception(
+        'No paid pre-booking found with this QR code. Please ensure payment is completed.');
+  }
+
+  // ✅ Get userId if not found yet
+  if (userId == null) {
+    userId = preBookingData['userId'] ?? data['userId'];
+  }
+
+  print('✅ Processing pre-booking: $bookingId');
+  print('✅ User ID: $userId');
+
+  // ✅ CRITICAL FIX: Update status from "paid" → "boarded" in original location
+  await paidPreBooking.reference.update({
+    'status': 'boarded', // ✅ CRITICAL: Change from "paid" to "boarded"
+    'boardingStatus': 'boarded',
+    'boardedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'tripId': activeTripId,
+  });
+  print('✅ Updated original pre-booking to "boarded"');
+
+  // ✅ Update in conductor's preBookings collection (if exists)
+  try {
+    final conductorPreBookingRef = FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('preBookings')
+        .doc(bookingId);
+
+    final conductorPreBookingSnap = await conductorPreBookingRef.get();
+    if (conductorPreBookingSnap.exists) {
+      await conductorPreBookingRef.update({
+        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'boardingStatus': 'boarded',
+        'boardedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'scannedAt': FieldValue.serverTimestamp(),
+        'qr': true,
+        'tripId': activeTripId,
+      });
+      print('✅ Updated conductor preBookings to "boarded"');
+    } else {
+      // ✅ If doesn't exist, create it as "boarded"
+      await conductorPreBookingRef.set({
+        ...preBookingData,
+        'status': 'boarded',
+        'boardingStatus': 'boarded',
+        'boardedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'scannedAt': FieldValue.serverTimestamp(),
+        'qr': true,
+        'tripId': activeTripId,
+        'userId': userId,
+        'from': data['from'] ?? preBookingData['from'],
+        'to': data['to'] ?? preBookingData['to'],
+        'quantity': quantity,
+        'route': data['route'] ?? preBookingData['route'],
+      }, SetOptions(merge: true));
+      print('✅ Created conductor preBookings as "boarded"');
+    }
+  } catch (e) {
+    print('⚠️ Error updating conductor preBooking: $e');
+  }
+
+  // ✅ Update in user's preBookings collection
+  if (userId != null) {
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('preBookings')
+          .doc(bookingId)
+          .update({
+        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'boardingStatus': 'boarded',
+        'boardedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'scannedAt': FieldValue.serverTimestamp(),
+        'tripId': activeTripId,
+      });
+      print('✅ Updated user preBookings to "boarded"');
+    } catch (e) {
+      print('⚠️ Failed to update user preBooking: $e');
+    }
+  }
+
+  // ✅ Add to scannedQRCodes collection as "boarded"
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('scannedQRCodes')
+      .add({
+    'type': 'preBooking',
+    'bookingId': bookingId,
+    'preBookingId': bookingId, // ✅ For query compatibility
+    'id': bookingId, // ✅ For query compatibility
+    'documentId': bookingId, // ✅ For query compatibility
+    'qrData': qrDataString,
+    'originalDocumentId': paidPreBooking.id,
+    'originalCollection': paidPreBooking.reference.parent.path,
+    'scannedAt': FieldValue.serverTimestamp(),
+    'scannedBy': user.uid,
+    'data': data,
+    'tripId': activeTripId,
+    'from': data['from'] ?? preBookingData['from'],
+    'to': data['to'] ?? preBookingData['to'],
+    'quantity': quantity,
+    'userId': userId, // ✅ Include userId
+    'totalFare':
+        data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
+    'route': data['route'] ?? preBookingData['route'],
+    'status': 'boarded', // ✅ CRITICAL: Start as "boarded"
+    'boardingStatus': 'boarded',
+  });
+  print('✅ Added to scannedQRCodes as "boarded"');
+
+  // ✅ Increment passenger count
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+  print('✅ Incremented passengerCount by $quantity');
+
+  print('✅ === PRE-BOOKING SCAN COMPLETE ===');
+  print('✅ Pre-booking $bookingId is now "boarded" and ready for geofencing\n');
 }

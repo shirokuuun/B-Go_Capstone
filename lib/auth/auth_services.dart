@@ -67,11 +67,12 @@ class AuthServices {
     
     // Update user in Firestore if they exist and email is verified
     if (user != null && user.emailVerified) {
-      await _firestore.collection('users').doc(user.uid).update({
+      await _firestore.collection('users').doc(user.uid).set({
+        'email': user.email,
         'authMethod': 'email',
         'isEmailVerified': true, // Update verification status
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
     }
     
     return credential;

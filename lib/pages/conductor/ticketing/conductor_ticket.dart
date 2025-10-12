@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:b_go/pages/conductor/ticketing/conductor_from.dart';
+import 'package:b_go/services/thermal_printer_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -12,19 +13,23 @@ class ConductorTicket extends StatefulWidget {
   final String placeCollection;
   final String date;
 
-  ConductorTicket(
-      {Key? key,
-      required this.route,
-      required this.ticketDocName,
-      required this.placeCollection,
-      required this.date})
-      : super(key: key);
+  const ConductorTicket({
+    Key? key,
+    required this.route,
+    required this.ticketDocName,
+    required this.placeCollection,
+    required this.date,
+  }) : super(key: key);
 
   @override
   State<ConductorTicket> createState() => _ConductorTicketState();
 }
 
 class _ConductorTicketState extends State<ConductorTicket> {
+  final ThermalPrinterService _printerService = ThermalPrinterService();
+  bool _isPrinting = false;
+  bool _hasAttemptedAutoPrint = false; // ✅ Flag to prevent multiple auto-print attempts
+
   String getRouteLabel(String placeCollection) {
     final route = widget.route;
 
@@ -85,6 +90,12 @@ class _ConductorTicketState extends State<ConductorTicket> {
     fetchLatestTrip();
   }
 
+  @override
+  void dispose() {
+    _printerService.disconnectPrinter();
+    super.dispose();
+  }
+
   void fetchLatestTrip() async {
     setState(() {
       isLoading = true;
@@ -98,10 +109,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
       print('TicketDocName: ${widget.ticketDocName}');
       print('PlaceCollection: ${widget.placeCollection}');
 
-      // Try multiple approaches to fetch the trip data
       Map<String, dynamic>? tripData;
 
-      // Approach 1: Try the original RouteService.fetchTrip
       try {
         tripData = await RouteService.fetchTrip(
             widget.route, widget.date, widget.ticketDocName);
@@ -112,12 +121,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
         print('⚠️ RouteService.fetchTrip failed: $e');
       }
 
-      // Approach 2: If RouteService failed, try direct Firestore query
       if (tripData == null || tripData.isEmpty) {
         tripData = await fetchTripDirectly();
       }
 
-      // Approach 3: Try fetching from conductor's remittance collection
       if (tripData == null || tripData.isEmpty) {
         tripData = await fetchFromConductorRemittance();
       }
@@ -131,6 +138,14 @@ class _ConductorTicketState extends State<ConductorTicket> {
         setState(() {
           errorMessage = 'No trip data found. This might be a QR scan ticket.';
         });
+      } else {
+        // ✅ AUTO-PRINT: Trigger automatic printing after data loads
+        if (!_hasAttemptedAutoPrint) {
+          _hasAttemptedAutoPrint = true;
+          // Add a small delay to ensure UI is ready
+          await Future.delayed(const Duration(milliseconds: 500));
+          _printReceipt();
+        }
       }
     } catch (e) {
       print('❌ Error fetching trip: $e');
@@ -145,7 +160,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
     try {
       print('🔄 Trying direct Firestore query...');
 
-      // Try fetching from trips collection
       final tripsDoc = await FirebaseFirestore.instance
           .collection('trips')
           .doc(widget.route)
@@ -158,7 +172,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
         return tripsDoc.data();
       }
 
-      // Try fetching from trips with date structure
       final tripsWithDate = await FirebaseFirestore.instance
           .collection('trips')
           .doc(widget.route)
@@ -186,7 +199,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return null;
 
-      // Get conductor document
       final conductorQuery = await FirebaseFirestore.instance
           .collection('conductors')
           .where('uid', isEqualTo: user.uid)
@@ -198,7 +210,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
       final conductorId = conductorQuery.docs.first.id;
       final formattedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Try to fetch the latest ticket from remittance
       final ticketsQuery = await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
@@ -218,6 +229,138 @@ class _ConductorTicketState extends State<ConductorTicket> {
     } catch (e) {
       print('❌ Fetch from conductor remittance failed: $e');
       return null;
+    }
+  }
+
+  Future<void> _printReceipt() async {
+    if (latestTrip == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No receipt data available to print'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isPrinting = true;
+    });
+
+    try {
+      // If not connected to printer, show connection dialog
+      if (!_printerService.isConnected) {
+        await ThermalPrinterService.showPrinterConnectionDialog(
+          context,
+          (ip, port) async {
+            final connected = await _printerService.connectPrinter(ip, port);
+            if (!connected) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to connect to printer'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+              setState(() {
+                _isPrinting = false;
+              });
+              return;
+            }
+            
+            // Now print after successful connection
+            await _performPrint();
+          },
+        );
+      } else {
+        // Already connected, just print
+        await _performPrint();
+      }
+    } catch (e) {
+      print('Error printing: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      setState(() {
+        _isPrinting = false;
+      });
+    }
+  }
+
+  Future<void> _performPrint() async {
+    try {
+      // Extract receipt data
+      final from = latestTrip?['from']?.toString() ?? 'N/A';
+      final to = latestTrip?['to']?.toString() ?? 'N/A';
+      final startKm = latestTrip?['startKm']?.toString() ?? '0';
+      final endKm = latestTrip?['endKm']?.toString() ?? '0';
+      
+      String baseFare = '0.00';
+      final fareData = latestTrip?['farePerPassenger'];
+      if (fareData != null) {
+        if (fareData is List && fareData.isNotEmpty) {
+          baseFare = fareData.first.toString();
+        } else if (fareData is num) {
+          baseFare = fareData.toStringAsFixed(2);
+        } else if (fareData is String) {
+          baseFare = fareData;
+        }
+      }
+
+      final quantity = (latestTrip?['quantity'] as num?)?.toInt() ?? 1;
+      final totalFare = latestTrip?['totalFare']?.toString() ?? '0.00';
+      final discountAmount = latestTrip?['discountAmount']?.toString() ?? '0.00';
+      
+      List<String>? discountBreakdown;
+      if (latestTrip?['discountBreakdown'] != null) {
+        discountBreakdown = List<String>.from(
+          (latestTrip!['discountBreakdown'] as List).map((e) => e.toString())
+        );
+      }
+
+      // Print receipt
+      final success = await _printerService.printManualTicket(
+        route: getRouteLabel(widget.placeCollection),
+        from: from,
+        to: to,
+        fromKm: startKm,
+        toKm: endKm,
+        baseFare: baseFare,
+        quantity: quantity,
+        totalFare: totalFare,
+        discountAmount: discountAmount,
+        discountBreakdown: discountBreakdown,
+      );
+
+      if (mounted) {
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Receipt printed successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to print receipt'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } finally {
+      setState(() {
+        _isPrinting = false;
+      });
     }
   }
 
@@ -327,7 +470,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                             ),
                           );
                         },
-                        icon: Icon(Icons.add, color: Colors.white),
+                        icon: const Icon(Icons.add, color: Colors.white),
                         label: Text(
                           'New Ticket',
                           style: GoogleFonts.outfit(
@@ -336,7 +479,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                           ),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Color(0xFF0091AD),
+                          backgroundColor: const Color(0xFF0091AD),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 24.0, vertical: 12.0),
                           shape: RoundedRectangleBorder(
@@ -345,7 +488,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         ),
                       ),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     Center(
                       child: _buildTicketContent(),
                     ),
@@ -363,10 +506,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
     if (isLoading) {
       return Column(
         children: [
-          CircularProgressIndicator(
+          const CircularProgressIndicator(
             valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             'Loading ticket data...',
             style: GoogleFonts.outfit(
@@ -394,7 +537,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
               color: Colors.orange.shade600,
               size: 48,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               errorMessage!,
               style: GoogleFonts.outfit(
@@ -403,11 +546,11 @@ class _ConductorTicketState extends State<ConductorTicket> {
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: fetchLatestTrip,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF0091AD),
+                backgroundColor: const Color(0xFF0091AD),
               ),
               child: Text(
                 'Retry',
@@ -433,7 +576,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
   }
 
   Widget _buildReceiptCard() {
-    // Safely extract data with null checks and defaults
     final List<dynamic>? discountBreakdown = latestTrip?['discountBreakdown'];
     final timestamp = latestTrip?['timestamp'];
 
@@ -463,7 +605,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
     final startKm = latestTrip?['startKm']?.toString() ?? 'N/A';
     final endKm = latestTrip?['endKm']?.toString() ?? 'N/A';
 
-    // Handle different fare formats
     String baseFare = 'N/A';
     final fareData = latestTrip?['farePerPassenger'];
     if (fareData != null) {
@@ -487,7 +628,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               color: Colors.black12,
               blurRadius: 16,
@@ -499,12 +640,40 @@ class _ConductorTicketState extends State<ConductorTicket> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Receipt',
-                style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0091AD))),
-            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Receipt',
+                    style: GoogleFonts.outfit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0091AD))),
+                // ✅ Show printing status indicator
+                if (_isPrinting)
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Printing...',
+                        style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          color: const Color(0xFF0091AD),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
             _buildReceiptRow('Route:', getRouteLabel(widget.placeCollection)),
             _buildReceiptRow('Date:', formattedDate),
             _buildReceiptRow('Time:', formattedTime),
@@ -515,11 +684,11 @@ class _ConductorTicketState extends State<ConductorTicket> {
             _buildReceiptRow('Base Fare', baseFare),
             _buildReceiptRow('Quantity:', quantity),
             _buildReceiptRow('Total Amount:', '$totalFare PHP', isTotal: true),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text('Discounts:',
                 style: GoogleFonts.outfit(
                     fontWeight: FontWeight.w500, fontSize: 16)),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             if (discountBreakdown != null && discountBreakdown.isNotEmpty)
               ...discountBreakdown.map((e) => Padding(
                     padding: const EdgeInsets.only(left: 16.0, bottom: 4.0),
@@ -533,7 +702,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
                     style: GoogleFonts.outfit(fontSize: 15)),
               ),
             if (discountAmount != '0.00' && discountAmount != 'N/A') ...[
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.only(left: 16.0),
                 child: Text(
@@ -574,7 +743,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-                color: isTotal ? Color(0xFF0091AD) : null,
+                color: isTotal ? const Color(0xFF0091AD) : null,
               ),
             ),
           ),

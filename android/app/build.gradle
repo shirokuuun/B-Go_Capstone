@@ -22,6 +22,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+        coreLibraryDesugaringEnabled true
     }
 
     kotlinOptions {
@@ -37,12 +38,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled true
 
         manifestPlaceholders = [
             GOOGLE_MAPS_API_KEY: localProps['GOOGLE_MAPS_ANDROID_KEY'],
             applicationName: ".MainActivity"
         ]
-        
+
         // Disable reCAPTCHA for Firebase Auth
         resValue "string", "firebase_auth_use_app_verification", "false"
     }
@@ -52,10 +54,22 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so flutter run --release works.
             signingConfig = signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    implementation 'androidx.multidex:multidex:2.0.1'
 }

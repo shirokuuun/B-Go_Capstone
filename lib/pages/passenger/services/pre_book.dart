@@ -22,10 +22,12 @@ class PreBook extends StatefulWidget {
   @override
   State<PreBook> createState() => _PreBookState();
 
-  // Static method to handle trip end processing for pre-bookings
-  static Future<void> processTripEndForPreBookings(String conductorId, String date, String? tripId) async {
+// Static method to handle trip end processing for pre-bookings
+  static Future<void> processTripEndForPreBookings(
+      String conductorId, String date, String? tripId) async {
     try {
-      print('🔄 PreBook: Processing trip end for pre-bookings - Conductor: $conductorId, Date: $date, Trip: $tripId');
+      print(
+          '🔄 PreBook: Processing trip end for pre-bookings - Conductor: $conductorId, Date: $date, Trip: $tripId');
 
       // Get all pre-bookings for this conductor's active trip
       QuerySnapshot preBookingsSnapshot;
@@ -43,29 +45,88 @@ class PreBook extends StatefulWidget {
             .collection('conductors')
             .doc(conductorId)
             .collection('preBookings')
-            .where('createdAt', isGreaterThanOrEqualTo: DateTime.parse('$date 00:00:00'))
+            .where('createdAt',
+                isGreaterThanOrEqualTo: DateTime.parse('$date 00:00:00'))
             .where('createdAt', isLessThan: DateTime.parse('$date 23:59:59'))
             .get();
       }
 
-      print('🔄 PreBook: Found ${preBookingsSnapshot.docs.length} pre-bookings to process');
+      print(
+          '🔄 PreBook: Found ${preBookingsSnapshot.docs.length} pre-bookings to process');
+
+      int accomplishedCount = 0;
+      int cancelledCount = 0;
+      int skippedCount = 0;
 
       for (var preBookingDoc in preBookingsSnapshot.docs) {
         final preBookingData = preBookingDoc.data();
         final preBookingId = preBookingDoc.id;
-        final originalUserId = (preBookingData as Map<String, dynamic>?)?['userId'] as String?;
-        final status = preBookingData?['status'] as String?;
+        final originalUserId =
+            (preBookingData as Map<String, dynamic>?)?['userId'] as String?;
+        final currentStatus = preBookingData?['status'] as String?;
+
+        print(
+            '📋 PreBook: Processing booking $preBookingId - current status: $currentStatus');
+
+        // CRITICAL: Skip if already accomplished by geofencing
+        if (currentStatus == 'accomplished' ||
+            preBookingData?['dropOffTimestamp'] != null ||
+            preBookingData?['geofenceStatus'] == 'completed' ||
+            preBookingData?['tripCompleted'] == true) {
+          print(
+              '✅ PreBook: Skipping $preBookingId - already accomplished by geofencing (status=$currentStatus, dropOffTimestamp=${preBookingData?['dropOffTimestamp'] != null}, geofenceStatus=${preBookingData?['geofenceStatus']})');
+          accomplishedCount++;
+          continue;
+        }
+
+        // CRITICAL: Skip if already completed or cancelled
+        if (currentStatus == 'completed' || currentStatus == 'cancelled') {
+          print('⏭️ PreBook: Skipping $preBookingId - already $currentStatus');
+          skippedCount++;
+          continue;
+        }
 
         // Check if this is a boarded pre-booking that should be moved to remittance
-        if (status == 'boarded') {
-          // Move boarded pre-booking to remittance collection
+        if (currentStatus == 'boarded') {
+          print(
+              '🚫 PreBook: Cancelling $preBookingId - passenger did not drop off (userId=$originalUserId)');
+
+          // Move boarded pre-booking to remittance collection with cancelled status
           await _moveBoardedPreBookingToRemittance(
             conductorId,
             date,
             preBookingId,
             preBookingData as Map<String, dynamic>,
+            isCancelled: true,
           );
-        } else {
+
+          // Update passenger's pre-booking to cancelled status
+          if (originalUserId != null) {
+            try {
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(originalUserId)
+                  .collection('preBookings')
+                  .doc(preBookingId)
+                  .update({
+                'status': 'cancelled',
+                'cancelledAt': FieldValue.serverTimestamp(),
+                'cancelledReason': 'Trip ended before drop-off',
+                'tripEnded': true,
+              });
+              print(
+                  '✅ PreBook: Updated passenger pre-booking $preBookingId to cancelled');
+            } catch (e) {
+              print('⚠️ PreBook: Could not update passenger pre-booking: $e');
+            }
+          }
+
+          cancelledCount++;
+        } else if (currentStatus == 'paid') {
+          // For paid but not boarded pre-bookings, also cancel them
+          print(
+              '🚫 PreBook: Cancelling $preBookingId - paid but never boarded (userId=$originalUserId)');
+
           // Mark as cancelled in conductor's preBookings collection
           await FirebaseFirestore.instance
               .collection('conductors')
@@ -93,7 +154,8 @@ class PreBook extends StatefulWidget {
                 'cancelledReason': 'Trip ended - no show',
                 'tripEnded': true,
               });
-              print('✅ PreBook: Updated passenger pre-booking to cancelled');
+              print(
+                  '✅ PreBook: Updated passenger pre-booking $preBookingId to cancelled');
             } catch (e) {
               print('⚠️ PreBook: Could not update passenger pre-booking: $e');
             }
@@ -107,21 +169,28 @@ class PreBook extends StatefulWidget {
             preBookingData as Map<String, dynamic>,
             isCancelled: true,
           );
+
+          cancelledCount++;
+        } else {
+          print('⚠️ PreBook: Unknown status for $preBookingId: $currentStatus');
+          skippedCount++;
         }
       }
 
-      print('✅ PreBook: Successfully processed trip end for pre-bookings');
+      print('✅ PreBook: Trip end processing complete:');
+      print('   - Accomplished (preserved): $accomplishedCount');
+      print('   - Cancelled (no drop-off): $cancelledCount');
+      print('   - Skipped (already processed): $skippedCount');
     } catch (e) {
       print('❌ PreBook: Error processing trip end for pre-bookings: $e');
+      rethrow;
     }
   }
 
-  // Helper method to move boarded pre-booking to remittance collection
-  static Future<void> _moveBoardedPreBookingToRemittance(
-      String conductorId,
-      String date,
-      String preBookingId,
-      Map<String, dynamic> preBookingData) async {
+// Helper method to move boarded pre-booking to remittance collection
+  static Future<void> _moveBoardedPreBookingToRemittance(String conductorId,
+      String date, String preBookingId, Map<String, dynamic> preBookingData,
+      {bool isCancelled = false}) async {
     try {
       // Get the next ticket number for this date
       final ticketNumber = await _getNextTicketNumberStatic(conductorId, date);
@@ -129,7 +198,7 @@ class PreBook extends StatefulWidget {
 
       // Prepare remittance data in the same format as pre-tickets
       final remittanceData = {
-        'active': true,
+        'active': false, // Set to false since trip ended
         'discountAmount': '0.00', // Default for pre-bookings
         'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
         'documentId': preBookingId,
@@ -140,12 +209,13 @@ class PreBook extends StatefulWidget {
         'quantity': preBookingData['quantity'],
         'scannedBy': preBookingData['scannedBy'] ?? conductorId,
         'startKm': preBookingData['fromKm'],
-        'status': 'boarded', // Keep as boarded since passenger was on the bus
+        'status': isCancelled ? 'cancelled' : 'boarded',
         'ticketType': 'preBooking',
         'timestamp': FieldValue.serverTimestamp(),
         'to': preBookingData['to'],
         'totalFare': preBookingData['totalFare'],
-        'totalKm': (preBookingData['toKm'] as num) - (preBookingData['fromKm'] as num),
+        'totalKm':
+            (preBookingData['toKm'] as num) - (preBookingData['fromKm'] as num),
         // Additional fields for consistency
         'route': preBookingData['route'],
         'direction': preBookingData['direction'],
@@ -156,6 +226,11 @@ class PreBook extends StatefulWidget {
         'createdAt': preBookingData['createdAt'],
         'boardedAt': preBookingData['boardedAt'],
         'scannedAt': preBookingData['scannedAt'],
+        if (isCancelled) ...{
+          'cancelledAt': FieldValue.serverTimestamp(),
+          'cancelledReason': 'Trip ended before drop-off',
+          'tripEnded': true,
+        },
       };
 
       // Save pre-booking data to tickets subcollection
@@ -174,9 +249,9 @@ class PreBook extends StatefulWidget {
           .doc(conductorId)
           .collection('remittance')
           .doc(date)
-          .update({
+          .set({
         'lastUpdated': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       // Remove from active preBookings collection
       await FirebaseFirestore.instance
@@ -186,14 +261,16 @@ class PreBook extends StatefulWidget {
           .doc(preBookingId)
           .delete();
 
-      print('✅ PreBook: Moved boarded pre-booking $preBookingId to tickets subcollection as $ticketDocId');
+      print(
+          '✅ PreBook: Moved ${isCancelled ? 'cancelled' : 'boarded'} pre-booking $preBookingId to tickets subcollection as $ticketDocId');
     } catch (e) {
       print('❌ PreBook: Error moving boarded pre-booking to remittance: $e');
     }
   }
 
   // Static helper method to get next ticket number for a date
-  static Future<int> _getNextTicketNumberStatic(String conductorId, String formattedDate) async {
+  static Future<int> _getNextTicketNumberStatic(
+      String conductorId, String formattedDate) async {
     try {
       final ticketsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
@@ -211,11 +288,8 @@ class PreBook extends StatefulWidget {
   }
 
   // Helper method to move pre-booking to trip end collections
-  static Future<void> _movePreBookingToTripEndCollections(
-      String conductorId,
-      String date,
-      String preBookingId,
-      Map<String, dynamic> preBookingData,
+  static Future<void> _movePreBookingToTripEndCollections(String conductorId,
+      String date, String preBookingId, Map<String, dynamic> preBookingData,
       {bool isCancelled = false}) async {
     try {
       // Prepare ticket data for trip end collections
@@ -253,7 +327,8 @@ class PreBook extends StatefulWidget {
       };
 
       // Move to dailyTrips tickets collection
-      await _moveToDailyTripsTickets(conductorId, date, preBookingId, ticketData);
+      await _moveToDailyTripsTickets(
+          conductorId, date, preBookingId, ticketData);
 
       // Remove from active preBookings collection
       await FirebaseFirestore.instance
@@ -263,18 +338,16 @@ class PreBook extends StatefulWidget {
           .doc(preBookingId)
           .delete();
 
-      print('✅ PreBook: Moved pre-booking $preBookingId to trip end collections');
+      print(
+          '✅ PreBook: Moved pre-booking $preBookingId to trip end collections');
     } catch (e) {
       print('❌ PreBook: Error moving pre-booking to trip end collections: $e');
     }
   }
 
   // Helper method to move pre-booking to dailyTrips tickets collection
-  static Future<void> _moveToDailyTripsTickets(
-      String conductorId,
-      String date,
-      String preBookingId,
-      Map<String, dynamic> ticketData) async {
+  static Future<void> _moveToDailyTripsTickets(String conductorId, String date,
+      String preBookingId, Map<String, dynamic> ticketData) async {
     try {
       final dailyTripDoc = await FirebaseFirestore.instance
           .collection('conductors')
@@ -897,7 +970,13 @@ class _PreBookState extends State<PreBook> {
                             SizedBox(width: isMobile ? 12 : 16),
                             Expanded(
                               child: Text(
-                                routeLabels[selectedRoute]![directionIndex],
+                                selectedConductor != null
+                                    ? (selectedConductor!['activeTrip']
+                                            ?['direction'] ??
+                                        routeLabels[selectedRoute]![
+                                            directionIndex])
+                                    : routeLabels[selectedRoute]![
+                                        directionIndex],
                                 style: GoogleFonts.outfit(
                                     fontSize: routeFontSize,
                                     color: Colors.white,
@@ -1830,6 +1909,14 @@ class _ReceiptModal extends StatelessWidget {
       'tripId': selectedConductor?['activeTrip']?['tripId'],
     };
 
+    // Debug logging to see what coordinates we have
+    print('💾 PreBook: fromPlace data: $fromPlace');
+    print('💾 PreBook: toPlace data: $toPlace');
+    print(
+        '💾 PreBook: fromPlace latitude/longitude: ${fromPlace['latitude']}, ${fromPlace['longitude']}');
+    print(
+        '💾 PreBook: toPlace latitude/longitude: ${toPlace['latitude']}, ${toPlace['longitude']}');
+
     final data = {
       'route': route,
       'direction': directionLabel,
@@ -1869,7 +1956,8 @@ class _ReceiptModal extends StatelessWidget {
 
     print('💾 PreBook: Complete booking data: $data');
     print('💾 PreBook: Selected conductor: $selectedConductor');
-    print('💾 PreBook: Trip ID: ${selectedConductor?['activeTrip']?['tripId']}');
+    print(
+        '💾 PreBook: Trip ID: ${selectedConductor?['activeTrip']?['tripId']}');
 
     try {
       print('💾 PreBook: Attempting to save booking to Firebase...');
@@ -1888,9 +1976,25 @@ class _ReceiptModal extends StatelessWidget {
       print(
           '✅ PreBook: Document path: users/${user.uid}/preBookings/${docRef.id}');
 
+      // Update qrData to include the booking ID
+      qrData['bookingId'] = docRef.id;
+      qrData['id'] = docRef.id;
+      final updatedQrDataString = jsonEncode(qrData);
+
+      // Update the document with the new qrData that includes the booking ID
+      await docRef.update({
+        'qrData': updatedQrDataString,
+      });
+
+      print('✅ PreBook: Updated QR data with booking ID: ${docRef.id}');
+
+      // Update data map for conductor collections
+      data['qrData'] = updatedQrDataString;
+
       // If conductor is selected, also save to conductor's collections
       if (selectedConductor != null && selectedConductor!['id'] != null) {
-        await _saveToConductorCollections(docRef.id, data, baseFare, totalAmount);
+        await _saveToConductorCollections(
+            docRef.id, data, baseFare, totalAmount);
       }
 
       // Verify the booking was actually saved by reading it back
@@ -1911,22 +2015,22 @@ class _ReceiptModal extends StatelessWidget {
   }
 
   // Helper method to save pre-booking to conductor's collections
-  Future<void> _saveToConductorCollections(
-      String bookingId,
-      Map<String, dynamic> data,
-      double baseFare,
-      double totalAmount) async {
+  Future<void> _saveToConductorCollections(String bookingId,
+      Map<String, dynamic> data, double baseFare, double totalAmount) async {
     if (selectedConductor == null || selectedConductor!['id'] == null) {
-      print('⚠️ PreBook: No conductor selected, skipping conductor collections');
+      print(
+          '⚠️ PreBook: No conductor selected, skipping conductor collections');
       return;
     }
 
     final conductorId = selectedConductor!['id'];
     final now = DateTime.now();
-    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final formattedDate =
+        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
     try {
-      print('💾 PreBook: Saving to conductor collections for conductor: $conductorId');
+      print(
+          '💾 PreBook: Saving to conductor collections for conductor: $conductorId');
 
       // Prepare ticket data for conductor collections
       final ticketData = {
@@ -1941,7 +2045,8 @@ class _ReceiptModal extends StatelessWidget {
         'farePerPassenger': data['passengerFares'],
         'totalFare': totalAmount.toStringAsFixed(2),
         'discountBreakdown': data['discountBreakdown'],
-        'status': 'pending_payment', // Will be updated to 'boarded' when scanned
+        'status':
+            'pending_payment', // Will be updated to 'boarded' when scanned
         'ticketType': 'preBooking', // Distinguish from manual tickets
         'preBookingId': bookingId,
         'userId': data['userId'],
@@ -1969,13 +2074,14 @@ class _ReceiptModal extends StatelessWidget {
       print('✅ PreBook: Saved to conductor preBookings collection');
 
       // 2. Save to dailyTrips collection
-      await _saveToDailyTrips(conductorId, formattedDate, bookingId, ticketData);
+      await _saveToDailyTrips(
+          conductorId, formattedDate, bookingId, ticketData);
 
       // 3. Save to remittance collection
-      await _saveToRemittance(conductorId, formattedDate, bookingId, ticketData);
+      await _saveToRemittance(
+          conductorId, formattedDate, bookingId, ticketData);
 
       print('✅ PreBook: Successfully saved to all conductor collections');
-
     } catch (e) {
       print('❌ PreBook: Error saving to conductor collections: $e');
       // Don't throw error here to avoid breaking the main save process
@@ -1983,11 +2089,8 @@ class _ReceiptModal extends StatelessWidget {
   }
 
   // Helper method to save to dailyTrips collection
-  Future<void> _saveToDailyTrips(
-      String conductorId,
-      String formattedDate,
-      String bookingId,
-      Map<String, dynamic> ticketData) async {
+  Future<void> _saveToDailyTrips(String conductorId, String formattedDate,
+      String bookingId, Map<String, dynamic> ticketData) async {
     try {
       // Get current trip number from dailyTrips document
       final dailyTripDoc = await FirebaseFirestore.instance
@@ -2016,7 +2119,8 @@ class _ReceiptModal extends StatelessWidget {
 
         print('✅ PreBook: Saved to dailyTrips collection (trip$currentTrip)');
       } else {
-        print('⚠️ PreBook: Daily trip document not found for date: $formattedDate');
+        print(
+            '⚠️ PreBook: Daily trip document not found for date: $formattedDate');
       }
     } catch (e) {
       print('❌ PreBook: Error saving to dailyTrips: $e');
@@ -2024,14 +2128,12 @@ class _ReceiptModal extends StatelessWidget {
   }
 
   // Helper method to save to remittance collection
-  Future<void> _saveToRemittance(
-      String conductorId,
-      String formattedDate,
-      String bookingId,
-      Map<String, dynamic> ticketData) async {
+  Future<void> _saveToRemittance(String conductorId, String formattedDate,
+      String bookingId, Map<String, dynamic> ticketData) async {
     try {
       // Get the next ticket number for this date
-      final ticketNumber = await _getNextTicketNumber(conductorId, formattedDate);
+      final ticketNumber =
+          await _getNextTicketNumber(conductorId, formattedDate);
       final ticketDocId = 'ticket $ticketNumber';
 
       // Prepare pre-booking data in the same format as pre-tickets
@@ -2045,9 +2147,10 @@ class _ReceiptModal extends StatelessWidget {
         'farePerPassenger': ticketData['passengerFares'] ?? [],
         'from': ticketData['from'],
         'quantity': ticketData['quantity'],
-        'scannedBy': conductorId,
+        // DO NOT set scannedBy here - it should only be set when QR is actually scanned
         'startKm': ticketData['fromKm'],
-        'status': 'pending_payment', // Will be updated to 'boarded' when scanned
+        'status':
+            'pending_payment', // Will be updated to 'paid' when payment confirmed, 'boarded' when scanned
         'ticketType': 'preBooking',
         'timestamp': FieldValue.serverTimestamp(),
         'to': ticketData['to'],
@@ -2084,14 +2187,16 @@ class _ReceiptModal extends StatelessWidget {
         'lastUpdated': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      print('✅ PreBook: Saved pre-booking data to tickets subcollection as $ticketDocId');
+      print(
+          '✅ PreBook: Saved pre-booking data to tickets subcollection as $ticketDocId');
     } catch (e) {
       print('❌ PreBook: Error saving to remittance: $e');
     }
   }
 
   // Helper method to get next ticket number for a date
-  Future<int> _getNextTicketNumber(String conductorId, String formattedDate) async {
+  Future<int> _getNextTicketNumber(
+      String conductorId, String formattedDate) async {
     try {
       final ticketsSnapshot = await FirebaseFirestore.instance
           .collection('conductors')
@@ -2107,7 +2212,6 @@ class _ReceiptModal extends StatelessWidget {
       return 1; // Default to 1 if error
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -2320,7 +2424,8 @@ class PreBookSummaryPage extends StatefulWidget {
   State<PreBookSummaryPage> createState() => _PreBookSummaryPageState();
 }
 
-class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBindingObserver {
+class _PreBookSummaryPageState extends State<PreBookSummaryPage>
+    with WidgetsBindingObserver {
   late Timer _timer;
   late Timer _paymentStatusTimer;
   late DateTime _deadline;
@@ -2331,10 +2436,11 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
   void initState() {
     super.initState();
     // Use passed deadline or create new one
-    _deadline = widget.paymentDeadline ?? DateTime.now().add(Duration(minutes: 10));
+    _deadline =
+        widget.paymentDeadline ?? DateTime.now().add(Duration(minutes: 10));
     _startTimer();
     _startPaymentStatusCheck();
-    
+
     // Add app lifecycle observer for background/foreground handling
     WidgetsBinding.instance.addObserver(this);
   }
@@ -2392,7 +2498,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    
+
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
@@ -2416,10 +2522,10 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
   void dispose() {
     _timer.cancel();
     _paymentStatusTimer.cancel();
-    
+
     // Remove app lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
-    
+
     // Don't stop real-time location tracking when page is disposed
     // The location service should continue running for the conductor to see real-time updates
     // It will be stopped when the passenger is scanned by the conductor
@@ -2431,7 +2537,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
       // Delete the booking from Firestore
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        _showCustomSnackBar('User not authenticated. Please try again.', 'error');
+        _showCustomSnackBar(
+            'User not authenticated. Please try again.', 'error');
         return;
       }
 
@@ -2443,7 +2550,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
           .delete();
 
       _showCustomSnackBar('Pre-booking cancelled and deleted!', 'success');
-      
+
       // Navigate back to home page by popping all pages until we reach the home page
       Navigator.of(context).pushNamedAndRemoveUntil(
         '/home',
@@ -2684,8 +2791,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title:
-              Text('Confirm Payment', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
+          title: Text('Confirm Payment',
+              style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
           content: Text(
             'This will pay your pre book ticket. Continue?',
             style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600]),
@@ -2693,7 +2800,9 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel', style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
+              child: Text('Cancel',
+                  style: GoogleFonts.outfit(
+                      fontSize: 14, color: Colors.grey[600])),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(true),
@@ -2717,15 +2826,21 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
           await _updatePreBookingStatusToPaid();
 
           // Start real-time location tracking for the paid booking
-          print('🚀 Starting real-time location tracking for booking: ${widget.bookingId}');
-          final trackingStarted = await _locationService.startTracking(widget.bookingId);
-          
+          print(
+              '🚀 Starting real-time location tracking for booking: ${widget.bookingId}');
+          final trackingStarted =
+              await _locationService.startTracking(widget.bookingId);
+
           if (trackingStarted) {
             print('✅ Real-time location tracking started successfully');
-            _showCustomSnackBar('Booking has been paid successfully! Real-time location tracking started.', 'success');
+            _showCustomSnackBar(
+                'Booking has been paid successfully! Real-time location tracking started.',
+                'success');
           } else {
             print('❌ Failed to start real-time location tracking');
-            _showCustomSnackBar('Booking has been paid successfully! Location tracking may not be available.', 'success');
+            _showCustomSnackBar(
+                'Booking has been paid successfully! Location tracking may not be available.',
+                'success');
           }
 
           Future.delayed(Duration(seconds: 2), () {
@@ -2754,7 +2869,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
 
-      print('💾 PreBook: Updating pre-booking status to paid for booking: ${widget.bookingId}');
+      print(
+          '💾 PreBook: Updating pre-booking status to paid for booking: ${widget.bookingId}');
 
       // Update in user's preBookings collection
       await FirebaseFirestore.instance
@@ -2780,7 +2896,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
         if (conductorQuery.docs.isNotEmpty) {
           final conductorId = conductorQuery.docs.first.id;
           final now = DateTime.now();
-          final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+          final formattedDate =
+              "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
           // Update in conductor's preBookings collection
           await FirebaseFirestore.instance
@@ -2800,7 +2917,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
           // Update in remittance collection
           await _updateRemittanceStatus(conductorId, formattedDate, 'paid');
 
-          print('✅ PreBook: Successfully updated all conductor collections to paid status');
+          print(
+              '✅ PreBook: Successfully updated all conductor collections to paid status');
         }
       }
 
@@ -2811,7 +2929,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
   }
 
   // Helper method to update status in dailyTrips collection
-  Future<void> _updateDailyTripsStatus(String conductorId, String formattedDate, String status) async {
+  Future<void> _updateDailyTripsStatus(
+      String conductorId, String formattedDate, String status) async {
     try {
       final dailyTripDoc = await FirebaseFirestore.instance
           .collection('conductors')
@@ -2848,7 +2967,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
   }
 
   // Helper method to update status in remittance collection
-  Future<void> _updateRemittanceStatus(String conductorId, String formattedDate, String status) async {
+  Future<void> _updateRemittanceStatus(
+      String conductorId, String formattedDate, String status) async {
     try {
       await FirebaseFirestore.instance
           .collection('conductors')
@@ -2868,7 +2988,6 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage> with WidgetsBin
       print('❌ PreBook: Error updating remittance status: $e');
     }
   }
-
 
   void _showCustomSnackBar(String message, String type) {
     Color backgroundColor;

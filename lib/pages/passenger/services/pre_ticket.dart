@@ -885,6 +885,7 @@ class _ReceiptModal extends StatelessWidget {
 
     final qrData = {
       'type': 'preTicket', // Add type field for scanning compatibility
+      'ticketType': 'preTicket',
       'route': route,
       'direction': routeLabels[route]![directionIndex], // Add direction for validation
       'placeCollection': selectedPlaceCollection, // Add place collection for validation
@@ -1332,6 +1333,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
       'qrData': qrData,
       'discountBreakdown': discountBreakdown,
       'status': 'pending', // Add status field
+      'ticketType': 'preTicket',
       'createdAt': FieldValue.serverTimestamp(), // Use Firestore server timestamp
       'route': route, // Route from the pre-ticket creation
       'direction': jsonDecode(qrData)['direction'], // Add direction for validation

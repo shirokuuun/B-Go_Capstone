@@ -117,11 +117,6 @@ class ThermalPrinterService {
     
     // Logo will be printed separately by native code
     // Text content starts here
-    receipt.writeln('================================');
-    receipt.writeln('         BATRASCO');
-    receipt.writeln('       Bus Receipt');
-    receipt.writeln('================================');
-    receipt.writeln('');
     receipt.writeln('Route: $route');
     receipt.writeln('Date: $formattedDate');
     receipt.writeln('Time: $formattedTime');

@@ -34,7 +34,7 @@ class _ConductorFromState extends State<ConductorFrom> {
   Future<List<Map<String, dynamic>>>? placesFuture;
   String selectedPlaceCollection = 'Place';
   late List<Map<String, String>> routeDirections;
-  
+
   // Thermal Printer Service
   final ThermalPrinterService _printerService = ThermalPrinterService();
   final Map<String, bool> _printingStates = {};
@@ -113,7 +113,7 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   Future<void> _printManualTicket(Map<String, dynamic> ticket) async {
     final ticketId = ticket['id'] as String;
-    
+
     setState(() {
       _printingStates[ticketId] = true;
     });
@@ -139,7 +139,7 @@ class _ConductorFromState extends State<ConductorFrom> {
               });
               return;
             }
-            
+
             // Now print after successful connection
             await _performPrint(ticket, ticketId);
           },
@@ -164,14 +164,17 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
-  Future<void> _performPrint(Map<String, dynamic> ticket, String ticketId) async {
+  Future<void> _performPrint(
+      Map<String, dynamic> ticket, String ticketId) async {
     try {
       // Extract ticket data
       final from = ticket['from']?.toString() ?? 'N/A';
       final to = ticket['to']?.toString() ?? 'N/A';
-      final fromKm = ticket['fromKm']?.toString() ?? ticket['startKm']?.toString() ?? '0';
-      final toKm = ticket['toKm']?.toString() ?? ticket['endKm']?.toString() ?? '0';
-      
+      final fromKm =
+          ticket['fromKm']?.toString() ?? ticket['startKm']?.toString() ?? '0';
+      final toKm =
+          ticket['toKm']?.toString() ?? ticket['endKm']?.toString() ?? '0';
+
       String baseFare = '0.00';
       final fareData = ticket['farePerPassenger'];
       if (fareData != null) {
@@ -187,12 +190,11 @@ class _ConductorFromState extends State<ConductorFrom> {
       final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
       final totalFare = ticket['totalFare']?.toString() ?? '0.00';
       final discountAmount = ticket['discountAmount']?.toString() ?? '0.00';
-      
+
       List<String>? discountBreakdown;
       if (ticket['discountBreakdown'] != null) {
         discountBreakdown = List<String>.from(
-          (ticket['discountBreakdown'] as List).map((e) => e.toString())
-        );
+            (ticket['discountBreakdown'] as List).map((e) => e.toString()));
       }
 
       // Print receipt
@@ -852,12 +854,14 @@ class _ConductorFromState extends State<ConductorFrom> {
                                             ElevatedButton(
                                               onPressed: isPrinting
                                                   ? null
-                                                  : () => _printManualTicket(ticket),
+                                                  : () => _printManualTicket(
+                                                      ticket),
                                               style: ElevatedButton.styleFrom(
                                                 backgroundColor:
                                                     const Color(0xFF0091AD),
                                                 foregroundColor: Colors.white,
-                                                padding: const EdgeInsets.symmetric(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                   horizontal: 12,
                                                   vertical: 8,
                                                 ),
@@ -890,19 +894,21 @@ class _ConductorFromState extends State<ConductorFrom> {
                                                   backgroundColor:
                                                       Colors.green[600],
                                                   foregroundColor: Colors.white,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
                                                     horizontal: 12,
                                                     vertical: 8,
                                                   ),
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
-                                                        BorderRadius.circular(20),
+                                                        BorderRadius.circular(
+                                                            20),
                                                   ),
                                                 ),
                                                 child: const Text(
                                                   'Mark Done',
-                                                  style: TextStyle(fontSize: 11),
+                                                  style:
+                                                      TextStyle(fontSize: 11),
                                                 ),
                                               ),
                                             ],
@@ -1820,6 +1826,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
         'userId': userId, // ✅ Save userId in dailyTrips too
         'route': data['route'],
         'direction': data['direction'],
+        'ticketType': 'preTicket',
       });
 
       print('✅ Pre-ticket saved to dailyTrips collection');

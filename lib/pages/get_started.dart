@@ -92,15 +92,39 @@ class _GetStartedPageState extends State<GetStartedPage> {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     final isDesktop = ResponsiveBreakpoints.of(context).isDesktop;
-    
+
     // Responsive sizing
-    final titleFontSize = isMobile ? 60.0 : isTablet ? 72.0 : 84.0;
-    final subtitleFontSize = isMobile ? 22.0 : isTablet ? 26.0 : 30.0;
-    final buttonFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final buttonHeight = isMobile ? 55.0 : isTablet ? 60.0 : 65.0;
-    final iconSize = isMobile ? 80.0 : isTablet ? 100.0 : 120.0;
-    final centerImageSize = isMobile ? 200.0 : isTablet ? 250.0 : 300.0;
-    
+    final titleFontSize = isMobile
+        ? 60.0
+        : isTablet
+            ? 72.0
+            : 84.0;
+    final subtitleFontSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 26.0
+            : 30.0;
+    final buttonFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final buttonHeight = isMobile
+        ? 55.0
+        : isTablet
+            ? 60.0
+            : 65.0;
+    final iconSize = isMobile
+        ? 80.0
+        : isTablet
+            ? 100.0
+            : 120.0;
+    final centerImageSize = isMobile
+        ? 200.0
+        : isTablet
+            ? 250.0
+            : 300.0;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -117,8 +141,12 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      top: _spread ? (isMobile ? 10 : 20) : (isMobile ? 200 : 250),
-                      left: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
+                      top: _spread
+                          ? (isMobile ? 10 : 20)
+                          : (isMobile ? 200 : 250),
+                      left: _spread
+                          ? (isMobile ? 5 : 10)
+                          : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][0],
                         key: ValueKey('${_currentIndex}_topLeft'),
@@ -129,8 +157,12 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      top: _spread ? (isMobile ? 10 : 20) : (isMobile ? 200 : 250),
-                      right: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
+                      top: _spread
+                          ? (isMobile ? 10 : 20)
+                          : (isMobile ? 200 : 250),
+                      right: _spread
+                          ? (isMobile ? 5 : 10)
+                          : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][1],
                         key: ValueKey('${_currentIndex}_topRight'),
@@ -141,8 +173,12 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      bottom: _spread ? (isMobile ? 40 : 60) : (isMobile ? 200 : 250),
-                      left: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
+                      bottom: _spread
+                          ? (isMobile ? 40 : 60)
+                          : (isMobile ? 200 : 250),
+                      left: _spread
+                          ? (isMobile ? 5 : 10)
+                          : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][2],
                         key: ValueKey('${_currentIndex}_bottomLeft'),
@@ -153,8 +189,12 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     AnimatedPositioned(
                       duration: const Duration(milliseconds: 800),
                       curve: Curves.easeInOut,
-                      bottom: _spread ? (isMobile ? 40 : 60) : (isMobile ? 200 : 250),
-                      right: _spread ? (isMobile ? 5 : 10) : (isMobile ? 150 : 200),
+                      bottom: _spread
+                          ? (isMobile ? 40 : 60)
+                          : (isMobile ? 200 : 250),
+                      right: _spread
+                          ? (isMobile ? 5 : 10)
+                          : (isMobile ? 150 : 200),
                       child: Image.asset(
                         _miniImages[_currentIndex][3],
                         key: ValueKey('${_currentIndex}_bottomRight'),
@@ -218,15 +258,14 @@ class _GetStartedPageState extends State<GetStartedPage> {
 
             SizedBox(height: isMobile ? 25 : 35),
 
-            // Get Started button
+            // Get Started button - UPDATED TO NAVIGATE TO AUTH CHECK
             Padding(
               padding: EdgeInsets.symmetric(horizontal: isMobile ? 30 : 40),
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const MainPage()),
-                  );
+                  // UPDATED: Navigate to /auth_check instead of MainPage
+                  // This will check if user is already logged in
+                  Navigator.pushReplacementNamed(context, '/auth_check');
                 },
                 style: ElevatedButton.styleFrom(
                   minimumSize: Size.fromHeight(buttonHeight),

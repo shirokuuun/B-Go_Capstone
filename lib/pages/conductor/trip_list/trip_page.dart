@@ -541,11 +541,11 @@ class _TripsPageState extends State<TripsPage> {
                             onPressed: () async {
                               final authServices = AuthServices();
                               await authServices.signOut();
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(
-                                    builder: (context) => ConductorLogin()),
-                                (route) => false,
-                              );
+                              // UPDATED: Navigate to auth_check
+                              if (context.mounted) {
+                                Navigator.pushNamedAndRemoveUntil(
+                                    context, '/auth_check', (route) => false);
+                              }
                             },
                           ),
                         ),

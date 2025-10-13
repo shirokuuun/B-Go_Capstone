@@ -1,6 +1,7 @@
 import 'package:b_go/pages/get_started.dart';
 import 'package:b_go/auth/login_page.dart';
 import 'package:b_go/auth/login_phone_page.dart';
+import 'package:b_go/auth/auth_state_handler.dart'; // ADD THIS
 import 'package:b_go/pages/passenger/profile/Settings/reservation_confirm.dart';
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
@@ -22,12 +23,15 @@ import 'package:b_go/pages/passenger/services/pre_ticket.dart';
 import 'package:b_go/auth/register_page.dart';
 import 'package:b_go/auth/register_phone_page.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
+import 'package:b_go/services/realtime_location_service.dart';
+import 'package:b_go/services/offline_location_service.dart';
+import 'package:b_go/services/background_location_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:responsive_framework/responsive_framework.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:b_go/services/expired_reservation_service.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -38,6 +42,27 @@ void main() async {
   
   // Initialize geolocator
   await Geolocator.requestPermission();
+  
+  // Start the expired reservation service
+  ExpiredReservationService.startService();
+  
+  // Initialize background location service
+  final backgroundLocationService = BackgroundLocationService();
+  await backgroundLocationService.initialize();
+  
+  // Check for active location tracking on app startup
+  final locationService = RealtimeLocationService();
+  await locationService.checkForActiveTracking();
+  
+  // Check for active background tracking
+  await backgroundLocationService.checkForActiveTracking();
+  
+  // Sync any offline locations from previous sessions
+  final offlineService = OfflineLocationService();
+  await offlineService.syncOfflineLocations();
+  
+  // Sync offline locations from background service
+  await backgroundLocationService.syncOfflineLocations();
   
   runApp(const MyApp());
 }
@@ -59,9 +84,12 @@ class MyApp extends StatelessWidget {
           const Breakpoint(start: 1921, end: double.infinity, name: '4K'),
         ],
       ),
-      //home: MainPage(),
+      // UPDATED: Use AuthStateHandler instead of GetStartedPage
       home: GetStartedPage(),
       routes: {
+        '/auth_check': (context) => AuthStateHandler(showRegisterPage: () {
+          Navigator.pushReplacementNamed(context, '/register');
+        }),
         '/login': (context) =>
             LoginPage(showRegisterPage: () {
               Navigator.pushReplacementNamed(context, '/register');

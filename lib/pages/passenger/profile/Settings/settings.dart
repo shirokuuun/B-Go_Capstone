@@ -10,7 +10,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     // App color palette
     final primaryTeal = const Color(0xFF0091AD);
-    
+
     final options = [
       _SettingsOption('Pre-Ticket QRs', Icons.confirmation_num),
       _SettingsOption('Reservation Confirmations', Icons.event_available),
@@ -88,7 +88,7 @@ class SettingsPage extends StatelessWidget {
         itemCount: options.length,
         itemBuilder: (context, i) {
           final opt = options[i];
-          
+
           return Container(
             color: Colors.white,
             child: ListTile(
@@ -168,13 +168,14 @@ class SettingsPage extends StatelessWidget {
                       ],
                     ),
                   );
-                  
+
                   if (shouldLogout == true) {
                     final authServices = AuthServices();
                     await authServices.signOut();
                     if (context.mounted) {
+                      // UPDATED: Navigate to auth_check which will show login page
                       Navigator.pushNamedAndRemoveUntil(
-                        context, '/login', (route) => false);
+                          context, '/auth_check', (route) => false);
                     }
                   }
                 }
@@ -193,4 +194,3 @@ class _SettingsOption {
   final bool isLogout;
   const _SettingsOption(this.title, this.icon, {this.isLogout = false});
 }
-

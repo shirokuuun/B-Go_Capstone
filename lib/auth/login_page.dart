@@ -52,10 +52,6 @@ class _LoginPageState extends State<LoginPage> {
 
       if (user == null) return;
 
-      // Only clear fields after successful login
-      emailController.clear();
-      passwordController.clear();
-
       // Only work with conductors that have uid field (created via admin website)
       final query = await FirebaseFirestore.instance
           .collection('conductors')
@@ -63,28 +59,16 @@ class _LoginPageState extends State<LoginPage> {
           .limit(1)
           .get();
 
-      if (!mounted) return; // <--- Add this before using context
+      if (!mounted) return;
 
       if (query.docs.isNotEmpty) {
         final conductorData = query.docs.first.data();
         final route = conductorData['route'] ?? '';
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                ConductorFrom(role: 'Conductor', route: route),
-          ),
-        );
-        // Only clear after navigation
-        emailController.clear();
-        passwordController.clear();
+        Navigator.pushReplacementNamed(context, '/auth_check');
         return;
       } else {
         // Not a conductor, navigate as a normal user
-        Navigator.pushReplacementNamed(context, '/user_selection');
-        // Only clear after navigation
-        emailController.clear();
-        passwordController.clear();
+        Navigator.pushReplacementNamed(context, '/auth_check');
         return;
       }
     } on FirebaseAuthException catch (e) {
@@ -476,21 +460,8 @@ class _LoginPageState extends State<LoginPage> {
 
                                   if (!mounted) return;
 
-                                  if (conductorDoc.exists) {
-                                    final route =
-                                        conductorDoc.data()?['route'] ?? '';
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ConductorFrom(
-                                            role: 'Conductor', route: route),
-                                      ),
-                                    );
-                                  } else {
-                                    // Not a conductor, navigate as a normal user
-                                    Navigator.pushReplacementNamed(
-                                        context, '/user_selection');
-                                  }
+                                  // Navigate to auth check - it will handle routing
+                                  Navigator.pushReplacementNamed(context, '/auth_check');
                                 }
                               } catch (e) {
                                 if (!mounted) return;

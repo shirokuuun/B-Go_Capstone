@@ -56,22 +56,10 @@ class _ConductorLoginState extends State<ConductorLogin> {
         return;
       }
 
-      final doc = query.docs.first;
-      final data = doc.data();
-      final route = data['route'] ?? '';
-      final placeCollection = data['placeCollection'] ?? 'Place';
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ConductorHome(
-            role: 'Conductor',
-            route: route,
-            placeCollection: placeCollection,
-            selectedIndex: 0,
-          ),
-        ),
-      );
+      // Navigate to auth check - it will handle the routing automatically
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, '/auth_check');
+      
     } on FirebaseAuthException catch (e) {
       setState(() {
         _errorMessage = e.message ?? 'Login failed. Please try again.';

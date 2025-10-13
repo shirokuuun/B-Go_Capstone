@@ -10,6 +10,7 @@ import 'package:b_go/pages/conductor/remittance_service.dart';
 import 'package:b_go/services/direction_validation_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:b_go/pages/passenger/services/pre_book.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart'; // ✅ ADD THIS IMPORT
 
 class ConductorDeparture extends StatefulWidget {
   final String route;
@@ -191,6 +192,10 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         final now = DateTime.now();
         final tripId = 'trip_${now.millisecondsSinceEpoch}';
 
+        // ✅ CLEAR GEOFENCING CACHE WHEN STARTING NEW TRIP
+        GeofencingService().clearProcessedTickets();
+        print('✅ Cleared geofencing cache before starting new trip');
+
         // Create or update daily trip document
         try {
           final dailyTripDoc = await FirebaseFirestore.instance
@@ -362,8 +367,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
     }
   }
 
-// Replace your _endCurrentTrip method with this fixed version
-
   Future<void> _endCurrentTrip() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -428,7 +431,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('Error moving tickets to remittance: $e');
           }
 
-          // FIXED: Mark scannedQRCodes as completed, but DON'T update if already accomplished
+          // Mark scannedQRCodes as completed, but DON'T update if already accomplished
           try {
             final scannedQRs = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -441,7 +444,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               final data = doc.data();
               final currentStatus = data['status'] ?? '';
 
-              // Only update if NOT already accomplished by geofencing
               if (currentStatus != 'accomplished' &&
                   data['tripCompleted'] != true) {
                 await doc.reference.update({
@@ -458,7 +460,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('⚠️ Error marking QR codes as completed: $e');
           }
 
-          // FIXED: Mark preBookings as completed, but DON'T overwrite accomplished status
+          // Mark preBookings as completed, but DON'T overwrite accomplished status
           try {
             final preBookings = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -471,7 +473,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               final data = doc.data();
               final currentStatus = data['status'] ?? '';
 
-              // Only mark as completed if NOT already accomplished by geofencing
               if (currentStatus != 'accomplished' &&
                   data['tripCompleted'] != true) {
                 await doc.reference.update({
@@ -487,7 +488,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('⚠️ Error marking pre-bookings as completed: $e');
           }
 
-          // FIXED: Only delete scannedQRCodes that were NOT accomplished
+          // Only delete scannedQRCodes that were NOT accomplished
           try {
             final scannedQRsToDelete = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -503,7 +504,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               final data = doc.data();
               final status = data['status'] ?? '';
 
-              // CRITICAL: Don't delete if accomplished by geofencing
               if (status == 'accomplished' ||
                   data['dropOffTimestamp'] != null) {
                 print('🛡️ Preserving accomplished scannedQR: ${doc.id}');
@@ -521,7 +521,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('⚠️ Error clearing scanned QR codes: $e');
           }
 
-          // FIXED: Only delete pre-bookings that were NOT accomplished
+          // Only delete pre-bookings that were NOT accomplished
           try {
             final preBookingsToDelete = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -537,7 +537,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               final data = doc.data();
               final status = data['status'] ?? '';
 
-              // CRITICAL: Don't delete if accomplished by geofencing
               if (status == 'accomplished' ||
                   data['dropOffTimestamp'] != null) {
                 print('🛡️ Preserving accomplished preBooking: ${doc.id}');
@@ -555,7 +554,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('⚠️ Error clearing boarded pre-bookings: $e');
           }
 
-          // FIXED: Process trip end with respect to accomplished pre-bookings
+          // Process trip end with respect to accomplished pre-bookings
           try {
             await PreBook.processTripEndForPreBookings(
                 conductorDocId, today, endingTripId);
@@ -564,7 +563,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             print('❌ Error processing pre-bookings for trip end: $e');
           }
 
-          // Rest of the trip ending logic (unchanged)
+          // Rest of the trip ending logic
           try {
             final dailyTripDoc = await FirebaseFirestore.instance
                 .collection('conductors')
@@ -626,6 +625,10 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                   'passengerCount': 0,
                 });
 
+                // ✅ CLEAR GEOFENCING CACHE WHEN STARTING RETURN TRIP
+                GeofencingService().clearProcessedTickets();
+                print('✅ Cleared geofencing cache for return trip $nextTripId');
+
                 setState(() {
                   isTripActive = true;
                   selectedPlaceCollection = oppositePlaceCollection;
@@ -660,6 +663,10 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                   'passengerCount': 0,
                 });
 
+                // ✅ CLEAR GEOFENCING CACHE WHEN ROUND TRIP COMPLETES
+                GeofencingService().clearProcessedTickets();
+                print('✅ Cleared geofencing cache after round trip completion');
+
                 setState(() {
                   isTripActive = false;
                   currentTripDirection = null;
@@ -683,6 +690,10 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                 'passengerCount': 0,
               });
 
+              // ✅ CLEAR GEOFENCING CACHE
+              GeofencingService().clearProcessedTickets();
+              print('✅ Cleared geofencing cache after trip completion');
+
               setState(() {
                 isTripActive = false;
                 currentTripDirection = null;
@@ -704,6 +715,10 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               'activeTrip': FieldValue.delete(),
               'passengerCount': 0,
             });
+
+            // ✅ CLEAR GEOFENCING CACHE EVEN ON ERROR
+            GeofencingService().clearProcessedTickets();
+            print('✅ Cleared geofencing cache after error');
 
             setState(() {
               isTripActive = false;

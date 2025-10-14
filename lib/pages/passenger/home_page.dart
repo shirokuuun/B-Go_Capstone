@@ -26,7 +26,8 @@ class _HomePageState extends State<HomePage> {
   final user = FirebaseAuth.instance.currentUser;
   late GoogleMapController mapController;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final LatLng _center = const LatLng(13.9407, 121.1529); // Example: Rosario, Batangas
+  final LatLng _center =
+      const LatLng(13.9407, 121.1529); // Example: Rosario, Batangas
   int _selectedIndex = 0;
 
   // Bus location tracking
@@ -59,11 +60,13 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     // Debug: Check if API key is loaded correctly
-    print('🔑 Google Maps API Key loaded: ${_googleMapsApiKey.substring(0, 10)}...');
+    print(
+        '🔑 Google Maps API Key loaded: ${_googleMapsApiKey.substring(0, 10)}...');
     print('🔑 API Key length: ${_googleMapsApiKey.length}');
     print('🔑 Full API Key: $_googleMapsApiKey');
-    print('🔑 Is placeholder: ${_googleMapsApiKey == 'YOUR_MAPS_API_DIRECTIONS_KEY_HERE'}');
-    
+    print(
+        '🔑 Is placeholder: ${_googleMapsApiKey == 'YOUR_MAPS_API_DIRECTIONS_KEY_HERE'}');
+
     _loadAvailableRoutes();
     _startBusTracking();
     _getUserLocation();
@@ -134,13 +137,20 @@ class _HomePageState extends State<HomePage> {
   void _createFallbackMarkers() {
     print('Creating fallback markers with default colors...');
     _busIcons = {
-      'batangas': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-      'mataas na kahoy': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
-      'mataas na kahoy palengke': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
-      'rosario': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-      'tiaong': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
-      'san juan': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-      'default': BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+      'batangas':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      'mataas na kahoy':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+      'mataas na kahoy palengke':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+      'rosario':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      'tiaong':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+      'san juan':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+      'default':
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
     };
 
     if (mounted) {
@@ -202,7 +212,6 @@ class _HomePageState extends State<HomePage> {
     print('=== END DEBUG ===');
   }
 
-
   // Updated _updateMarkers method with better debugging and position tracking
   void _updateMarkers() {
     if (!mounted) return;
@@ -246,13 +255,16 @@ class _HomePageState extends State<HomePage> {
       if (hasPositionChanged) {
         print('  📍 Position changed for ${bus.conductorId}');
         if (previousPosition != null) {
-          print('    Previous: ${previousPosition.latitude}, ${previousPosition.longitude}');
-          print('    Current: ${bus.location.latitude}, ${bus.location.longitude}');
+          print(
+              '    Previous: ${previousPosition.latitude}, ${previousPosition.longitude}');
+          print(
+              '    Current: ${bus.location.latitude}, ${bus.location.longitude}');
         }
       }
 
       // Skip if route filter is applied and bus doesn't match
-      if (_selectedRoute != null && !_matchesRoute(bus.route, _selectedRoute!)) {
+      if (_selectedRoute != null &&
+          !_matchesRoute(bus.route, _selectedRoute!)) {
         print('  Skipped: Route filter mismatch');
         continue;
       }
@@ -295,7 +307,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Calculate distance between two points in kilometers
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double earthRadius = 6371; // Earth's radius in kilometers
     final double dLat = _degreesToRadians(lat2 - lat1);
     final double dLon = _degreesToRadians(lon2 - lon1);
@@ -374,11 +387,11 @@ class _HomePageState extends State<HomePage> {
       final etaData = _busETAs[bus.conductorId]!;
       final timestamp = etaData['timestamp'] as DateTime;
       final etaString = etaData['eta'] as String;
-      
+
       // Check if cache is still valid (3 minutes = 180 seconds)
       final now = DateTime.now();
       final timeDifference = now.difference(timestamp).inSeconds;
-      
+
       if (timeDifference < 180) {
         return etaString;
       } else {
@@ -391,9 +404,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Get road-based ETA using Google Maps Directions API
-  Future<Map<String, dynamic>?> _getRoadBasedETA(LatLng busLocation, LatLng userLocation) async {
-    if (_googleMapsApiKey == 'YOUR_MAPS_API_KEY_HERE' || _googleMapsApiKey.isEmpty) {
-      print('⚠️ Google Maps API key not configured. Using fallback calculation.');
+  Future<Map<String, dynamic>?> _getRoadBasedETA(
+      LatLng busLocation, LatLng userLocation) async {
+    if (_googleMapsApiKey == 'YOUR_MAPS_API_KEY_HERE' ||
+        _googleMapsApiKey.isEmpty) {
+      print(
+          '⚠️ Google Maps API key not configured. Using fallback calculation.');
       return _getFallbackETA(busLocation, userLocation);
     }
 
@@ -401,17 +417,18 @@ class _HomePageState extends State<HomePage> {
       final origin = '${busLocation.latitude},${busLocation.longitude}';
       final destination = '${userLocation.latitude},${userLocation.longitude}';
 
-      final url = Uri.parse(
-          'https://maps.googleapis.com/maps/api/directions/json'
-          '?origin=$origin'
-          '&destination=$destination'
-          '&mode=driving'
-          '&traffic_model=best_guess'
-          '&departure_time=now'
-          '&key=$_googleMapsApiKey');
+      final url =
+          Uri.parse('https://maps.googleapis.com/maps/api/directions/json'
+              '?origin=$origin'
+              '&destination=$destination'
+              '&mode=driving'
+              '&traffic_model=best_guess'
+              '&departure_time=now'
+              '&key=$_googleMapsApiKey');
 
       print('🛣️ Requesting route from $origin to $destination');
-      print('🔗 API URL: ${url.toString().replaceAll(_googleMapsApiKey, 'API_KEY_HIDDEN')}');
+      print(
+          '🔗 API URL: ${url.toString().replaceAll(_googleMapsApiKey, 'API_KEY_HIDDEN')}');
       print('🔑 Using API Key: ${_googleMapsApiKey.substring(0, 10)}...');
 
       final response = await http.get(url).timeout(Duration(seconds: 10));
@@ -436,7 +453,8 @@ class _HomePageState extends State<HomePage> {
               '${busLocation.latitude},${busLocation.longitude}_${userLocation.latitude},${userLocation.longitude}';
           _routeCache[cacheKey] = result;
 
-          print('✅ Route calculated: ${(duration / 60).round()} min, ${(distance / 1000).toStringAsFixed(1)} km');
+          print(
+              '✅ Route calculated: ${(duration / 60).round()} min, ${(distance / 1000).toStringAsFixed(1)} km');
           return result;
         } else {
           print('❌ No routes found: ${data['status']}');
@@ -444,8 +462,10 @@ class _HomePageState extends State<HomePage> {
             print('🚨 API Error: ${data['error_message']}');
           }
           if (data['status'] == 'REQUEST_DENIED') {
-            print('🔑 Check your API key and make sure Directions API is enabled');
-            print('🔑 Current API key starts with: ${_googleMapsApiKey.substring(0, 10)}...');
+            print(
+                '🔑 Check your API key and make sure Directions API is enabled');
+            print(
+                '🔑 Current API key starts with: ${_googleMapsApiKey.substring(0, 10)}...');
             print('🔑 Full API key: $_googleMapsApiKey');
             print('🔑 API key length: ${_googleMapsApiKey.length}');
           }
@@ -464,7 +484,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // Fallback ETA calculation when API is not available
-  Map<String, dynamic> _getFallbackETA(LatLng busLocation, LatLng userLocation) {
+  Map<String, dynamic> _getFallbackETA(
+      LatLng busLocation, LatLng userLocation) {
     final distance = _calculateDistance(
       busLocation.latitude,
       busLocation.longitude,
@@ -563,7 +584,7 @@ class _HomePageState extends State<HomePage> {
       final routeData = await _getRoadBasedETA(bus.location, _userLocation!);
       if (routeData != null && mounted) {
         final etaString = _formatETA(routeData['duration'] / 60);
-        
+
         // Store the ETA for this bus with timestamp
         setState(() {
           _busETAs[bus.conductorId] = {
@@ -584,14 +605,14 @@ class _HomePageState extends State<HomePage> {
     // Check if we have a valid cached ETA
     bool hasValidCache = false;
     bool needsRecalculation = false;
-    
+
     if (_busETAs.containsKey(bus.conductorId)) {
       final etaData = _busETAs[bus.conductorId]!;
       final timestamp = etaData['timestamp'] as DateTime;
       final cachedBusLocation = etaData['busLocation'] as LatLng;
       final now = DateTime.now();
       final timeDifference = now.difference(timestamp).inSeconds;
-      
+
       // Check if cache is still valid (3 minutes = 180 seconds)
       if (timeDifference < 180) {
         // Check if bus has moved significantly (more than 100 meters)
@@ -601,10 +622,12 @@ class _HomePageState extends State<HomePage> {
           bus.location.latitude,
           bus.location.longitude,
         );
-        
-        if (distanceMoved > 0.1) { // 100 meters = 0.1 km
+
+        if (distanceMoved > 0.1) {
+          // 100 meters = 0.1 km
           needsRecalculation = true;
-          print('🚌 Bus moved significantly (${(distanceMoved * 1000).round()}m), will recalculate ETA');
+          print(
+              '🚌 Bus moved significantly (${(distanceMoved * 1000).round()}m), will recalculate ETA');
         } else {
           hasValidCache = true;
           print('✅ Using cached ETA for ${bus.conductorId}');
@@ -615,7 +638,7 @@ class _HomePageState extends State<HomePage> {
         print('⏰ Cache expired for ${bus.conductorId}, will recalculate');
       }
     }
-    
+
     // Only calculate ETA if we don't have a valid cache or bus moved significantly
     if (!hasValidCache || needsRecalculation) {
       print('🔄 Calculating new ETA for ${bus.conductorId}');
@@ -743,86 +766,36 @@ class _HomePageState extends State<HomePage> {
                         .limit(1)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      int baseCount = 0;
-                      String? conductorDocId;
-                      String? activeTripId;
+                      int passengerCount = 0;
+
                       if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                         final doc = snapshot.data!.docs.first;
                         final data = doc.data() as Map<String, dynamic>?;
-                        baseCount = data?['passengerCount'] ?? 0;
-                        conductorDocId = doc.id;
-                        activeTripId = (data?['activeTrip'] as Map<String, dynamic>?)?['tripId'];
+                        passengerCount = data?['passengerCount'] ?? 0;
                       }
 
-                      if (conductorDocId == null) {
-                        final isFull = baseCount >= 27;
-                        return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isFull ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: isFull ? Colors.red : Colors.green, width: 1),
-                          ),
-                          child: Text(
-                            '$baseCount/27 Passengers',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                      final isFull = passengerCount >= 27;
+
+                      return Container(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isFull
+                              ? Colors.red.withOpacity(0.1)
+                              : Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
                               color: isFull ? Colors.red : Colors.green,
-                            ),
+                              width: 1),
+                        ),
+                        child: Text(
+                          '$passengerCount/27 Passengers',
+                          style: GoogleFonts.outfit(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isFull ? Colors.red : Colors.green,
                           ),
-                        );
-                      }
-
-                      // Nested stream: count boarded pre-bookings for the conductor (current trip if available)
-                      final preBookingsQuery = activeTripId != null
-                          ? FirebaseFirestore.instance
-                              .collection('conductors')
-                              .doc(conductorDocId)
-                              .collection('preBookings')
-                              .where('tripId', isEqualTo: activeTripId)
-                              .where('status', isEqualTo: 'boarded')
-                              .where('boardingStatus', isEqualTo: 'boarded')
-                              .snapshots()
-                          : FirebaseFirestore.instance
-                              .collection('conductors')
-                              .doc(conductorDocId)
-                              .collection('preBookings')
-                              .where('status', isEqualTo: 'boarded')
-                              .where('boardingStatus', isEqualTo: 'boarded')
-                              .snapshots();
-
-                      return StreamBuilder<QuerySnapshot>(
-                        stream: preBookingsQuery,
-                        builder: (context, preSnap) {
-                          int boardedPreBooked = 0;
-                          if (preSnap.hasData) {
-                            boardedPreBooked = preSnap.data!.docs.fold<int>(0, (sum, d) {
-                              final m = d.data() as Map<String, dynamic>;
-                              return sum + ((m['quantity'] as int?) ?? 1);
-                            });
-                          }
-                          final total = baseCount + boardedPreBooked;
-                          final isFull = total >= 27;
-                          return Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: isFull ? Colors.red.withOpacity(0.1) : Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: isFull ? Colors.red : Colors.green, width: 1),
-                            ),
-                            child: Text(
-                              '$total/27 Passengers',
-                              style: GoogleFonts.outfit(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isFull ? Colors.red : Colors.green,
-                              ),
-                            ),
-                          );
-                        },
+                        ),
                       );
                     },
                   ),
@@ -877,17 +850,23 @@ class _HomePageState extends State<HomePage> {
         case 'batangas':
           return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
         case 'rosario':
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueBlue);
         case 'tiaong':
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueGreen);
         case 'san juan':
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueYellow);
         case 'mataas na kahoy':
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueViolet);
         case 'mataas na kahoy palengke':
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueOrange);
         default:
-          return BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+          return BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueAzure);
       }
     }
 
@@ -899,7 +878,8 @@ class _HomePageState extends State<HomePage> {
 
     // Try partial matches
     for (String key in _busIcons.keys) {
-      if (key != 'default' && (routeKey.contains(key) || key.contains(routeKey))) {
+      if (key != 'default' &&
+          (routeKey.contains(key) || key.contains(routeKey))) {
         print('Found partial match: $key for route: $routeKey');
         return _busIcons[key]!;
       }
@@ -907,7 +887,8 @@ class _HomePageState extends State<HomePage> {
 
     // Fallback to default
     print('Using default bus icon for route: $routeKey');
-    return _busIcons['default'] ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+    return _busIcons['default'] ??
+        BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -975,7 +956,11 @@ class _HomePageState extends State<HomePage> {
                     Text(
                       'Filter by Route',
                       style: GoogleFonts.outfit(
-                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontSize: isMobile
+                            ? 20
+                            : isTablet
+                                ? 22
+                                : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
@@ -1008,9 +993,10 @@ class _HomePageState extends State<HomePage> {
                           Navigator.of(context).pop();
                         },
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 16),
                           decoration: BoxDecoration(
-                            color: _selectedRoute == null 
+                            color: _selectedRoute == null
                                 ? Color(0xFF0091AD).withOpacity(0.1)
                                 : Colors.transparent,
                             border: Border(
@@ -1028,12 +1014,12 @@ class _HomePageState extends State<HomePage> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: _selectedRoute == null 
+                                    color: _selectedRoute == null
                                         ? Color(0xFF0091AD)
                                         : Colors.grey.shade400,
                                     width: 2,
                                   ),
-                                  color: _selectedRoute == null 
+                                  color: _selectedRoute == null
                                       ? Color(0xFF0091AD)
                                       : Colors.transparent,
                                 ),
@@ -1054,11 +1040,15 @@ class _HomePageState extends State<HomePage> {
                               Text(
                                 'Show All Routes',
                                 style: GoogleFonts.outfit(
-                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-                                  fontWeight: _selectedRoute == null 
-                                      ? FontWeight.w600 
+                                  fontSize: isMobile
+                                      ? 16
+                                      : isTablet
+                                          ? 18
+                                          : 20,
+                                  fontWeight: _selectedRoute == null
+                                      ? FontWeight.w600
                                       : FontWeight.w500,
-                                  color: _selectedRoute == null 
+                                  color: _selectedRoute == null
                                       ? Color(0xFF0091AD)
                                       : Colors.black87,
                                 ),
@@ -1068,76 +1058,83 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                       // Route options
-                      ..._availableRoutes.map((route) => InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedRoute = route;
-                            _updateMarkers();
-                          });
-                          Navigator.of(context).pop();
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: _selectedRoute == route 
-                                ? Color(0xFF0091AD).withOpacity(0.1)
-                                : Colors.transparent,
-                            border: Border(
-                              bottom: BorderSide(
-                                color: Colors.grey.shade200,
-                                width: 1,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: isMobile ? 20 : 24,
-                                height: isMobile ? 20 : 24,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _selectedRoute == route 
-                                        ? Color(0xFF0091AD)
-                                        : Colors.grey.shade400,
-                                    width: 2,
+                      ..._availableRoutes
+                          .map((route) => InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedRoute = route;
+                                    _updateMarkers();
+                                  });
+                                  Navigator.of(context).pop();
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: _selectedRoute == route
+                                        ? Color(0xFF0091AD).withOpacity(0.1)
+                                        : Colors.transparent,
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Colors.grey.shade200,
+                                        width: 1,
+                                      ),
+                                    ),
                                   ),
-                                  color: _selectedRoute == route 
-                                      ? Color(0xFF0091AD)
-                                      : Colors.transparent,
-                                ),
-                                child: _selectedRoute == route
-                                    ? Center(
-                                        child: Container(
-                                          width: isMobile ? 8 : 10,
-                                          height: isMobile ? 8 : 10,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: isMobile ? 20 : 24,
+                                        height: isMobile ? 20 : 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: _selectedRoute == route
+                                                ? Color(0xFF0091AD)
+                                                : Colors.grey.shade400,
+                                            width: 2,
+                                          ),
+                                          color: _selectedRoute == route
+                                              ? Color(0xFF0091AD)
+                                              : Colors.transparent,
+                                        ),
+                                        child: _selectedRoute == route
+                                            ? Center(
+                                                child: Container(
+                                                  width: isMobile ? 8 : 10,
+                                                  height: isMobile ? 8 : 10,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      SizedBox(width: 16),
+                                      Expanded(
+                                        child: Text(
+                                          route,
+                                          style: GoogleFonts.outfit(
+                                            fontSize: isMobile
+                                                ? 16
+                                                : isTablet
+                                                    ? 18
+                                                    : 20,
+                                            fontWeight: _selectedRoute == route
+                                                ? FontWeight.w600
+                                                : FontWeight.w500,
+                                            color: _selectedRoute == route
+                                                ? Color(0xFF0091AD)
+                                                : Colors.black87,
                                           ),
                                         ),
-                                      )
-                                    : null,
-                              ),
-                              SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  route,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-                                    fontWeight: _selectedRoute == route 
-                                        ? FontWeight.w600 
-                                        : FontWeight.w500,
-                                    color: _selectedRoute == route 
-                                        ? Color(0xFF0091AD)
-                                        : Colors.black87,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )).toList(),
+                              ))
+                          .toList(),
                     ],
                   ),
                 ),
@@ -1157,11 +1154,31 @@ class _HomePageState extends State<HomePage> {
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
     // Responsive sizing
-    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
-    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final busCountFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final busCountSubFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final drawerHeaderFontSize = isMobile
+        ? 30.0
+        : isTablet
+            ? 34.0
+            : 38.0;
+    final drawerItemFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final busCountFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final busCountSubFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
 
     return Scaffold(
       appBar: AppBar(
@@ -1284,8 +1301,7 @@ class _HomePageState extends State<HomePage> {
                 maxWidth: isMobile ? 200 : 250,
               ),
               padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 20,
-                vertical: isMobile ? 12 : 16),
+                  horizontal: isMobile ? 16 : 20, vertical: isMobile ? 12 : 16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(25),
@@ -1301,7 +1317,8 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.directions_bus, color: Color(0xFF0091AD), size: isMobile ? 24 : 28),
+                  Icon(Icons.directions_bus,
+                      color: Color(0xFF0091AD), size: isMobile ? 24 : 28),
                   SizedBox(width: isMobile ? 8 : 12),
                   Flexible(
                     child: Column(

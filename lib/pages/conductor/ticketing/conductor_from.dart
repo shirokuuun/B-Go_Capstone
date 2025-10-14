@@ -1862,6 +1862,7 @@ Future<int> _getNextTicketNumber(
   }
 }
 
+// ✅ FIXED _processPreBooking - Only increment passenger count when status changes to 'boarded'
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
   final conductorDocId = conductorDoc.docs.first.id;
@@ -1987,6 +1988,10 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
 
   print('✅ Processing pre-booking: $bookingId');
   print('✅ User ID: $userId');
+  print('✅ Previous status: ${preBookingData['status']}');
+
+  // ✅ CRITICAL FIX: Check if pre-booking was already boarded
+  final wasAlreadyBoarded = preBookingData['status'] == 'boarded';
 
   // ✅ CRITICAL FIX: Update status from "paid" → "boarded" in original location
   await paidPreBooking.reference.update({
@@ -2094,12 +2099,17 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   });
   print('✅ Added to scannedQRCodes as "boarded"');
 
-  // ✅ Increment passenger count
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .update({'passengerCount': FieldValue.increment(quantity)});
-  print('✅ Incremented passengerCount by $quantity');
+  // ✅ CRITICAL FIX: Only increment passenger count if status changed from 'paid' to 'boarded'
+  if (!wasAlreadyBoarded) {
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .update({'passengerCount': FieldValue.increment(quantity)});
+    print(
+        '✅ Incremented passengerCount by $quantity (status changed from paid to boarded)');
+  } else {
+    print('ℹ️ Pre-booking was already boarded, passenger count not changed');
+  }
 
   print('✅ === PRE-BOOKING SCAN COMPLETE ===');
   print('✅ Pre-booking $bookingId is now "boarded" and ready for geofencing\n');

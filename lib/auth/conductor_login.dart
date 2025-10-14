@@ -16,12 +16,87 @@ class ConductorLogin extends StatefulWidget {
 class _ConductorLoginState extends State<ConductorLogin> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  String? _errorMessage;
   bool _obscurePassword = true;
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0091AD),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text(
+                      'OK',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   Future<void> _login() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
+
+    // Validate empty fields
+    if (email.isEmpty || password.isEmpty) {
+      _showErrorDialog(
+        'Login Error',
+        'Please enter both email and password.',
+      );
+      return;
+    }
 
     try {
       // Use Firebase Auth for sign-in
@@ -29,16 +104,14 @@ class _ConductorLoginState extends State<ConductorLogin> {
         email: email,
         password: password,
       );
-      setState(() {
-        _errorMessage = null;
-      });
 
       // Only work with conductors that have uid field (created via admin website)
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        setState(() {
-          _errorMessage = 'Authentication failed. Please try again.';
-        });
+        _showErrorDialog(
+          'Authentication Error',
+          'Authentication failed. Please try again.',
+        );
         return;
       }
 
@@ -49,10 +122,10 @@ class _ConductorLoginState extends State<ConductorLogin> {
           .get();
 
       if (query.docs.isEmpty) {
-        setState(() {
-          _errorMessage =
-              'No conductor record found. This conductor must be created via the admin website.';
-        });
+        _showErrorDialog(
+          'Account Not Found',
+          'No conductor record found. This conductor must be created via the admin website.',
+        );
         return;
       }
 
@@ -61,14 +134,46 @@ class _ConductorLoginState extends State<ConductorLogin> {
       Navigator.pushReplacementNamed(context, '/auth_check');
       
     } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = e.message ?? 'Login failed. Please try again.';
-      });
+      String errorTitle = 'Login Error';
+      String errorMessage = 'An error occurred. Please try again.';
+
+      // Handle specific Firebase Auth error codes
+      switch (e.code) {
+        case 'user-not-found':
+          errorTitle = 'Email Not Found';
+          errorMessage = 'No account found with this email address.';
+          break;
+        case 'wrong-password':
+          errorTitle = 'Incorrect Password';
+          errorMessage = 'The password you entered is incorrect.';
+          break;
+        case 'invalid-email':
+          errorTitle = 'Invalid Email';
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'user-disabled':
+          errorTitle = 'Account Disabled';
+          errorMessage = 'This account has been disabled.';
+          break;
+        case 'invalid-credential':
+          errorTitle = 'Invalid Credentials';
+          errorMessage = 'The supplied auth credential is incorrect, malformed or has expired.';
+          break;
+        case 'too-many-requests':
+          errorTitle = 'Too Many Attempts';
+          errorMessage = 'Too many failed login attempts. Please try again later.';
+          break;
+        default:
+          errorMessage = e.message ?? 'Login failed. Please try again.';
+      }
+
+      _showErrorDialog(errorTitle, errorMessage);
     } catch (e) {
       print("Error fetching conductor data: $e");
-      setState(() {
-        _errorMessage = 'Failed to fetch conductor route.';
-      });
+      _showErrorDialog(
+        'Error',
+        'Failed to fetch conductor data. Please try again.',
+      );
     }
   }
 
@@ -221,18 +326,6 @@ class _ConductorLoginState extends State<ConductorLogin> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 10),
-
-                  // Error message
-                  if (_errorMessage != null) ...[
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
 
                   // Login button
                   SizedBox(height: fieldSpacing),

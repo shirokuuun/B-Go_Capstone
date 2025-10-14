@@ -24,7 +24,83 @@ class _LoginPageState extends State<LoginPage> {
   final AuthServices _authServices = AuthServices();
   bool _obscurePassword = true;
 
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  message,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0091AD),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                    child: Text(
+                      'OK',
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future signIn() async {
+    // Validate empty fields
+    if (emailController.text.trim().isEmpty || passwordController.text.isEmpty) {
+      _showErrorDialog(
+        'Login Error',
+        'Please enter both email and password.',
+      );
+      return;
+    }
+
     try {
       await _authServices.signInWithEmailAndPassword(
         email: emailController.text,
@@ -73,40 +149,51 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      String message;
+      
+      String errorTitle = 'Login Error';
+      String errorMessage = 'An error occurred. Please try again.';
+
+      // Handle specific Firebase Auth error codes
       switch (e.code) {
         case 'user-not-found':
-          message = 'No account found for that email.';
+          errorTitle = 'Email Not Found';
+          errorMessage = 'No account found with this email address.';
           break;
         case 'wrong-password':
-          message = 'Incorrect password. Please try again.';
+          errorTitle = 'Incorrect Password';
+          errorMessage = 'The password you entered is incorrect.';
           break;
         case 'invalid-email':
-          message = 'Please enter a valid email address.';
+          errorTitle = 'Invalid Email';
+          errorMessage = 'Please enter a valid email address.';
           break;
         case 'user-disabled':
-          message = 'This account has been disabled.';
+          errorTitle = 'Account Disabled';
+          errorMessage = 'This account has been disabled.';
+          break;
+        case 'invalid-credential':
+          errorTitle = 'Invalid Credentials';
+          errorMessage = 'The supplied auth credential is incorrect, malformed or has expired.';
           break;
         case 'email-not-verified':
-          message = 'Please verify your email address before logging in.';
+          errorTitle = 'Email Not Verified';
+          errorMessage = 'Please verify your email address before logging in.';
+          break;
+        case 'too-many-requests':
+          errorTitle = 'Too Many Attempts';
+          errorMessage = 'Too many failed login attempts. Please try again later.';
           break;
         default:
-          message = 'Login failed. Please try again.';
+          errorMessage = e.message ?? 'Login failed. Please try again.';
       }
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text("Login Failed"),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text("OK"),
-            )
-          ],
-        ),
+
+      _showErrorDialog(errorTitle, errorMessage);
+    } catch (e) {
+      if (!mounted) return;
+      _showErrorDialog(
+        'Error',
+        'An unexpected error occurred. Please try again.',
       );
-      // Do NOT clear fields on failed login
     }
   }
 
@@ -465,19 +552,9 @@ class _LoginPageState extends State<LoginPage> {
                                 }
                               } catch (e) {
                                 if (!mounted) return;
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text("Google Sign-In Failed"),
-                                    content: Text(e.toString()),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(),
-                                        child: Text("OK"),
-                                      ),
-                                    ],
-                                  ),
+                                _showErrorDialog(
+                                  'Google Sign-In Failed',
+                                  'Unable to sign in with Google. Please try again.',
                                 );
                               }
                             },

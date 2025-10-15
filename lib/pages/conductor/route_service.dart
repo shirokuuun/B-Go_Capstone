@@ -869,6 +869,7 @@ class RouteService {
     required double lng,
     required String route,
     required bool isActive,
+    List<String>? imageUrls,
   }) async {
     final counterDocRef =
         FirebaseFirestore.instance.collection('counters').doc('sos');
@@ -892,7 +893,7 @@ class RouteService {
 
       transaction.set(counterDocRef, {'count': newCount});
 
-      // Save SOS request
+      // Save SOS request - ADDED imageUrls field
       transaction.set(newDocRef, {
         'route': route,
         'emergencyType': emergencyType,
@@ -904,6 +905,7 @@ class RouteService {
           'lat': lat,
           'lng': lng,
         },
+        'imageUrls': imageUrls ?? [], // ✅ ADDED THIS LINE
         'docPath': newDocRef.path,
       });
     });

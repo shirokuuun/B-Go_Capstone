@@ -235,6 +235,101 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
+  Future<void> _printScannedTicket(Map<String, dynamic> ticketData, String ticketType) async {
+  try {
+    // If not connected to printer, show connection dialog
+    if (!_printerService.isConnected) {
+      await ThermalPrinterService.showPrinterConnectionDialog(
+        context,
+        (ip, port) async {
+          final connected = await _printerService.connectPrinter(ip, port);
+          if (!connected) {
+            if (mounted) {
+              _showCustomSnackBar('Failed to connect to printer', 'error');
+            }
+            return;
+          }
+
+          // Now print after successful connection
+          await _performScannedTicketPrint(ticketData, ticketType);
+        },
+      );
+    } else {
+      // Already connected, just print
+      await _performScannedTicketPrint(ticketData, ticketType);
+    }
+  } catch (e) {
+    print('Error printing scanned ticket: $e');
+    if (mounted) {
+      _showCustomSnackBar('Error: ${e.toString()}', 'error');
+    }
+  }
+}
+
+Future<void> _performScannedTicketPrint(
+    Map<String, dynamic> ticketData, String ticketType) async {
+  try {
+    // Extract ticket data
+    final from = ticketData['from']?.toString() ?? 'N/A';
+    final to = ticketData['to']?.toString() ?? 'N/A';
+    final fromKm = ticketData['fromKm']?.toString() ?? '0';
+    final toKm = ticketData['toKm']?.toString() ?? '0';
+
+    String baseFare = '0.00';
+    final fareData = ticketData['fare'] ?? ticketData['amount'] ?? ticketData['totalFare'];
+    if (fareData != null) {
+      if (fareData is num) {
+        baseFare = fareData.toStringAsFixed(2);
+      } else if (fareData is String) {
+        baseFare = fareData;
+      }
+    }
+
+    final quantity = (ticketData['quantity'] as num?)?.toInt() ?? 1;
+    final totalFare = (ticketData['totalFare'] ?? ticketData['totalAmount'] ?? ticketData['amount'] ?? '0.00').toString();
+    final discountAmount = ticketData['discountAmount']?.toString() ?? '0.00';
+
+    List<String>? discountBreakdown;
+    if (ticketData['discountBreakdown'] != null) {
+      discountBreakdown = List<String>.from(
+          (ticketData['discountBreakdown'] as List).map((e) => e.toString()));
+    }
+
+    // Print receipt
+    final success = await _printerService.printManualTicket(
+      route: getRouteLabel(selectedPlaceCollection),
+      from: from,
+      to: to,
+      fromKm: fromKm,
+      toKm: toKm,
+      baseFare: baseFare,
+      quantity: quantity,
+      totalFare: totalFare,
+      discountAmount: discountAmount,
+      discountBreakdown: discountBreakdown,
+    );
+
+    if (mounted) {
+      if (success) {
+        _showCustomSnackBar(
+          '$ticketType receipt printed successfully!',
+          'success',
+        );
+      } else {
+        _showCustomSnackBar(
+          'Failed to print $ticketType receipt',
+          'error',
+        );
+      }
+    }
+  } catch (e) {
+    print('Error performing scanned ticket print: $e');
+    if (mounted) {
+      _showCustomSnackBar('Print error: ${e.toString()}', 'error');
+    }
+  }
+}
+
   void _initializeRouteDirections() {
     if ('${widget.route.trim()}' == 'Rosario') {
       routeDirections = [
@@ -321,6 +416,79 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
+  void _showCustomSnackBar(String message, String type) {
+  Color backgroundColor;
+  IconData icon;
+  Color iconColor;
+
+  switch (type) {
+    case 'success':
+      backgroundColor = Colors.green;
+      icon = Icons.check_circle;
+      iconColor = Colors.white;
+      break;
+    case 'error':
+      backgroundColor = Colors.red;
+      icon = Icons.error;
+      iconColor = Colors.white;
+      break;
+    case 'warning':
+      backgroundColor = Colors.orange;
+      icon = Icons.warning;
+      iconColor = Colors.white;
+      break;
+    default:
+      backgroundColor = Colors.grey;
+      icon = Icons.info;
+      iconColor = Colors.white;
+  }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Row(
+        children: [
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: iconColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 12,
+              color: backgroundColor,
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.outfit(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: backgroundColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      margin: EdgeInsets.all(16),
+      action: SnackBarAction(
+        label: '✕',
+        textColor: Colors.white,
+        onPressed: () {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        },
+      ),
+    ),
+  );
+}
+
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
       List<Map<String, dynamic>> allPlaces) async {
     if (!mounted) return;
@@ -353,38 +521,51 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
-  void _openQRScanner() async {
-    if (await Permission.camera.request().isGranted) {
-      final result = await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => QRScanPage(),
-        ),
-      );
-      if (result == true) {
+void _openQRScanner() async {
+  if (await Permission.camera.request().isGranted) {
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => QRScanPage(),
+      ),
+    );
+    
+    if (result is Map<String, dynamic>) {
+      final success = result['success'] as bool;
+      
+      if (success) {
         _refreshPassengerCount();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('QR code scanned and stored successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else if (result == false) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to process QR code.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        
+        final ticketType = result['type'] as String;
+        final ticketData = result['data'] as Map<String, dynamic>;
+        
+        // Show success message with custom snackbar
+        if (ticketType == 'preTicket') {
+          _showCustomSnackBar(
+            'Pre-ticket scanned successfully!',
+            'success',
+          );
+        } else if (ticketType == 'preBooking') {
+          _showCustomSnackBar(
+            'Pre-booking scanned successfully!',
+            'success',
+          );
+        }
+        
+        // Automatically print the ticket
+        await _printScannedTicket(ticketData, ticketType);
+        
+      } else {
+        final error = result['error'] as String? ?? 'Failed to process QR code';
+        _showCustomSnackBar(error, 'error');
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Camera permission is required to scan QR codes.'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+  } else {
+    _showCustomSnackBar(
+      'Camera permission is required to scan QR codes.',
+      'error',
+    );
   }
+}
 
   void _refreshPassengerCount() {
     setState(() {});
@@ -1493,64 +1674,63 @@ class QRScanPage extends StatefulWidget {
 class _QRScanPageState extends State<QRScanPage> {
   bool _isProcessing = false;
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
-        backgroundColor: Color(0xFF0091AD),
-        foregroundColor: Colors.white,
-      ),
-      body: MobileScanner(
-        onDetect: (capture) async {
-          if (_isProcessing) {
-            print('QR scan already in progress, ignoring duplicate detection');
-            return;
-          }
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
+      backgroundColor: Color(0xFF0091AD),
+      foregroundColor: Colors.white,
+    ),
+    body: MobileScanner(
+      onDetect: (capture) async {
+        if (_isProcessing) {
+          print('QR scan already in progress, ignoring duplicate detection');
+          return;
+        }
 
-          setState(() {
-            _isProcessing = true;
-          });
+        setState(() {
+          _isProcessing = true;
+        });
 
-          final barcode = capture.barcodes.first;
-          final qrData = barcode.rawValue;
+        final barcode = capture.barcodes.first;
+        final qrData = barcode.rawValue;
 
-          if (qrData != null && qrData.isNotEmpty) {
-            try {
-              final data = parseQRData(qrData);
-              await storePreTicketToFirestore(data);
-              Navigator.of(context).pop(true);
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Scan failed: ${e.toString().replaceAll('Exception: ', '')}'),
-                  backgroundColor: Colors.red,
-                  duration: Duration(seconds: 5),
-                ),
-              );
-              Navigator.of(context).pop(false);
-            } finally {
-              setState(() {
-                _isProcessing = false;
-              });
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Invalid QR code: No data detected'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
+        if (qrData != null && qrData.isNotEmpty) {
+          try {
+            final data = parseQRData(qrData);
+            await storePreTicketToFirestore(data);
+            
+            // Return both success flag and ticket data for printing
+            Navigator.of(context).pop({
+              'success': true,
+              'type': data['type'] ?? 'preTicket',
+              'data': data,
+            });
+          } catch (e) {
+            // Show error in the parent screen
+            Navigator.of(context).pop({
+              'success': false,
+              'error': e.toString().replaceAll('Exception: ', ''),
+            });
+          } finally {
             setState(() {
               _isProcessing = false;
             });
           }
-        },
-      ),
-    );
-  }
+        } else {
+          Navigator.of(context).pop({
+            'success': false,
+            'error': 'Invalid QR code: No data detected',
+          });
+          setState(() {
+            _isProcessing = false;
+          });
+        }
+      },
+    ),
+  );
+}
 }
 
 Map<String, dynamic> parseQRData(String qrData) {
@@ -1659,9 +1839,41 @@ Future<void> storePreTicketToFirestore(Map<String, dynamic> data) async {
   }
 }
 
+Future<int> _getNextTicketNumber(
+    String conductorId, String formattedDate) async {
+  try {
+    final ticketsSnapshot = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorId)
+        .collection('remittance')
+        .doc(formattedDate)
+        .collection('tickets')
+        .get();
+
+    return ticketsSnapshot.docs.length + 1;
+  } catch (e) {
+    print('❌ Error getting next ticket number: $e');
+    return 1;
+  }
+}
+
 // ✅ UPDATED _processPreTicket WITH userId FIX
 Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
+  final conductorDocId = conductorDoc.docs.first.id;
+  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+  final now = DateTime.now();
+  final formattedDate =
+      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+  print('\n🔍 === STARTING PRE-TICKET SCAN PROCESS ===');
+  print('🔍 Conductor ID: $conductorDocId');
+  print('🔍 Active Trip ID: $activeTripId');
+  print('🔍 Quantity: $quantity');
+  print('🔍 QR Data: $data');
+
+  // Search for pre-ticket
   final preTicketsQuery = await FirebaseFirestore.instance
       .collectionGroup('preTickets')
       .where('qrData', isEqualTo: qrDataString)
@@ -1675,7 +1887,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   final pendingPreTicket = preTicketsQuery.docs.first;
   final preTicketData = pendingPreTicket.data();
 
-  // ✅ CRITICAL FIX: Get userId from the pre-ticket
+  // ✅ Get userId from the pre-ticket
   final userId = preTicketData['userId'];
 
   print('🔍 Pre-ticket userId: $userId');
@@ -1689,13 +1901,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     throw Exception('This pre-ticket has already been scanned and boarded.');
   }
 
-  final conductorDocId = conductorDoc.docs.first.id;
-  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
-  final activeTripId = conductorData['activeTrip']?['tripId'];
-  final now = DateTime.now();
-  final formattedDate =
-      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
+  // ✅ Update status to boarded
   await pendingPreTicket.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
@@ -1723,7 +1929,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'from': data['from'],
     'to': data['to'],
     'quantity': quantity,
-    'userId': userId, // ✅ CRITICAL: Save the userId here
+    'userId': userId,
     'totalFare': data['totalFare'] ?? data['amount'] ?? data['fare'],
     'route': data['route'],
     'direction': data['direction'],
@@ -1731,6 +1937,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
 
   print('✅ Saved pre-ticket with userId: $userId');
 
+  // ✅ Save to remittance collection
   try {
     final ticketNumber =
         await _getNextTicketNumber(conductorDocId, formattedDate);
@@ -1763,7 +1970,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
       'createdAt': FieldValue.serverTimestamp(),
       'scannedAt': FieldValue.serverTimestamp(),
       'boardedAt': FieldValue.serverTimestamp(),
-      'userId': userId, // ✅ Also save userId in remittance
+      'userId': userId,
     };
 
     await FirebaseFirestore.instance
@@ -1791,6 +1998,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-ticket to remittance: $e');
   }
 
+  // ✅ Save to dailyTrips
   try {
     final dailyTripDoc = await FirebaseFirestore.instance
         .collection('conductors')
@@ -1823,7 +2031,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
         'scannedBy': user.uid,
         'tripId': activeTripId,
         'qrData': qrDataString,
-        'userId': userId, // ✅ Save userId in dailyTrips too
+        'userId': userId,
         'route': data['route'],
         'direction': data['direction'],
         'ticketType': 'preTicket',
@@ -1835,39 +2043,26 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-ticket to dailyTrips: $e');
   }
 
+  // ✅ CRITICAL: Only increment passenger count ONCE when boarding
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
       .update({'passengerCount': FieldValue.increment(quantity)});
 
-  print(
-      '✅ Pre-ticket processed successfully. Incremented passengerCount by $quantity');
-}
-
-Future<int> _getNextTicketNumber(
-    String conductorId, String formattedDate) async {
-  try {
-    final ticketsSnapshot = await FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorId)
-        .collection('remittance')
-        .doc(formattedDate)
-        .collection('tickets')
-        .get();
-
-    return ticketsSnapshot.docs.length + 1;
-  } catch (e) {
-    print('❌ Error getting next ticket number: $e');
-    return 1;
-  }
+  print('✅ Incremented passengerCount by $quantity');
+  print('✅ === PRE-TICKET SCAN COMPLETE ===\n');
 }
 
 // ✅ FIXED _processPreBooking - Only increment passenger count when status changes to 'boarded'
+// ✅ FIXED _processPreBooking - Saves to remittance collection
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
   final conductorDocId = conductorDoc.docs.first.id;
   final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
   final activeTripId = conductorData['activeTrip']?['tripId'];
+  final now = DateTime.now();
+  final formattedDate =
+      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
   print('\n🔍 === STARTING PRE-BOOKING SCAN PROCESS ===');
   print('🔍 Conductor ID: $conductorDocId');
@@ -1897,7 +2092,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         final bookingStatus = bookingData['status'] ?? '';
         print('🔍 Found booking: status=$bookingStatus');
 
-        // ✅ Accept both 'paid' and 'boarded' status
+        // ✅ Accept 'paid' or 'boarded' status
         if (bookingStatus == 'paid' || bookingStatus == 'boarded') {
           paidPreBooking = directBooking;
           preBookingData = bookingData;
@@ -1990,12 +2185,16 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   print('✅ User ID: $userId');
   print('✅ Previous status: ${preBookingData['status']}');
 
-  // ✅ CRITICAL FIX: Check if pre-booking was already boarded
+  // ✅ CRITICAL: Check if pre-booking was already boarded
   final wasAlreadyBoarded = preBookingData['status'] == 'boarded';
 
-  // ✅ CRITICAL FIX: Update status from "paid" → "boarded" in original location
+  if (wasAlreadyBoarded) {
+    throw Exception('This pre-booking has already been scanned and boarded.');
+  }
+
+  // ✅ Update status from "paid" → "boarded" in original location
   await paidPreBooking.reference.update({
-    'status': 'boarded', // ✅ CRITICAL: Change from "paid" to "boarded"
+    'status': 'boarded',
     'boardingStatus': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
@@ -2015,7 +2214,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     final conductorPreBookingSnap = await conductorPreBookingRef.get();
     if (conductorPreBookingSnap.exists) {
       await conductorPreBookingRef.update({
-        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'status': 'boarded',
         'boardingStatus': 'boarded',
         'boardedAt': FieldValue.serverTimestamp(),
         'scannedBy': user.uid,
@@ -2056,7 +2255,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
           .collection('preBookings')
           .doc(bookingId)
           .update({
-        'status': 'boarded', // ✅ CRITICAL: Change to "boarded"
+        'status': 'boarded',
         'boardingStatus': 'boarded',
         'boardedAt': FieldValue.serverTimestamp(),
         'scannedBy': user.uid,
@@ -2069,6 +2268,117 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
+  // ✅ NEW: Save to remittance collection
+  try {
+    final ticketNumber =
+        await _getNextTicketNumber(conductorDocId, formattedDate);
+    final ticketDocId = 'ticket $ticketNumber';
+
+    final remittanceData = {
+      'active': true,
+      'discountAmount': '0.00',
+      'discountBreakdown': [],
+      'documentId': bookingId,
+      'documentType': 'preBooking',
+      'endKm': data['toKm'] ?? preBookingData['toKm'] ?? 0,
+      'farePerPassenger': [
+        data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00'
+      ],
+      'from': data['from'] ?? preBookingData['from'],
+      'quantity': quantity,
+      'scannedBy': user.uid,
+      'startKm': data['fromKm'] ?? preBookingData['fromKm'] ?? 0,
+      'status': 'boarded',
+      'ticketType': 'preBooking', // ✅ CRITICAL: Add ticketType
+      'timestamp': FieldValue.serverTimestamp(),
+      'to': data['to'] ?? preBookingData['to'],
+      'totalFare':
+          (data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00')
+              .toString(),
+      'totalKm': (data['toKm'] ?? preBookingData['toKm'] ?? 0) -
+          (data['fromKm'] ?? preBookingData['fromKm'] ?? 0),
+      'route': data['route'] ?? preBookingData['route'],
+      'direction': data['direction'] ?? preBookingData['direction'],
+      'conductorId': conductorDocId,
+      'tripId': activeTripId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'scannedAt': FieldValue.serverTimestamp(),
+      'boardedAt': FieldValue.serverTimestamp(),
+      'userId': userId,
+      'bookingId': bookingId,
+    };
+
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('remittance')
+        .doc(formattedDate)
+        .collection('tickets')
+        .doc(ticketDocId)
+        .set(remittanceData);
+
+    await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('remittance')
+        .doc(formattedDate)
+        .set({
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastUpdated': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    print(
+        '✅ Pre-booking saved to remittance/tickets collection as $ticketDocId');
+  } catch (e) {
+    print('❌ Error saving pre-booking to remittance: $e');
+  }
+
+  // ✅ Save to dailyTrips
+  try {
+    final dailyTripDoc = await FirebaseFirestore.instance
+        .collection('conductors')
+        .doc(conductorDocId)
+        .collection('dailyTrips')
+        .doc(formattedDate)
+        .get();
+
+    if (dailyTripDoc.exists) {
+      final dailyTripData = dailyTripDoc.data();
+      final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+      final tripCollection = 'trip$currentTrip';
+
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('dailyTrips')
+          .doc(formattedDate)
+          .collection(tripCollection)
+          .doc('preBookings')
+          .collection('preBookings')
+          .doc(bookingId)
+          .set({
+        'from': data['from'] ?? preBookingData['from'],
+        'to': data['to'] ?? preBookingData['to'],
+        'quantity': quantity,
+        'totalFare': data['totalAmount'] ?? preBookingData['totalFare'],
+        'status': 'boarded',
+        'scannedAt': FieldValue.serverTimestamp(),
+        'scannedBy': user.uid,
+        'tripId': activeTripId,
+        'qrData': qrDataString,
+        'userId': userId,
+        'route': data['route'] ?? preBookingData['route'],
+        'direction': data['direction'] ?? preBookingData['direction'],
+        'ticketType': 'preBooking',
+        'bookingId': bookingId,
+      });
+
+      print('✅ Pre-booking saved to dailyTrips collection');
+    }
+  } catch (e) {
+    print('❌ Error saving pre-booking to dailyTrips: $e');
+  }
+
   // ✅ Add to scannedQRCodes collection as "boarded"
   await FirebaseFirestore.instance
       .collection('conductors')
@@ -2077,9 +2387,9 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       .add({
     'type': 'preBooking',
     'bookingId': bookingId,
-    'preBookingId': bookingId, // ✅ For query compatibility
-    'id': bookingId, // ✅ For query compatibility
-    'documentId': bookingId, // ✅ For query compatibility
+    'preBookingId': bookingId,
+    'id': bookingId,
+    'documentId': bookingId,
     'qrData': qrDataString,
     'originalDocumentId': paidPreBooking.id,
     'originalCollection': paidPreBooking.reference.parent.path,
@@ -2090,27 +2400,23 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     'from': data['from'] ?? preBookingData['from'],
     'to': data['to'] ?? preBookingData['to'],
     'quantity': quantity,
-    'userId': userId, // ✅ Include userId
+    'userId': userId,
     'totalFare':
         data['totalAmount'] ?? preBookingData['totalFare'] ?? data['amount'],
     'route': data['route'] ?? preBookingData['route'],
-    'status': 'boarded', // ✅ CRITICAL: Start as "boarded"
+    'status': 'boarded',
     'boardingStatus': 'boarded',
   });
   print('✅ Added to scannedQRCodes as "boarded"');
 
-  // ✅ CRITICAL FIX: Only increment passenger count if status changed from 'paid' to 'boarded'
-  if (!wasAlreadyBoarded) {
-    await FirebaseFirestore.instance
-        .collection('conductors')
-        .doc(conductorDocId)
-        .update({'passengerCount': FieldValue.increment(quantity)});
-    print(
-        '✅ Incremented passengerCount by $quantity (status changed from paid to boarded)');
-  } else {
-    print('ℹ️ Pre-booking was already boarded, passenger count not changed');
-  }
+  // ✅ CRITICAL: Only increment passenger count when status changes from 'paid' to 'boarded'
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .update({'passengerCount': FieldValue.increment(quantity)});
+  print(
+      '✅ Incremented passengerCount by $quantity (status changed from paid to boarded)');
 
   print('✅ === PRE-BOOKING SCAN COMPLETE ===');
-  print('✅ Pre-booking $bookingId is now "boarded" and ready for geofencing\n');
+  print('✅ Pre-booking $bookingId is now "boarded" and saved to remittance\n');
 }

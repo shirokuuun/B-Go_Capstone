@@ -10,7 +10,8 @@ import 'package:b_go/pages/conductor/remittance_service.dart';
 import 'package:b_go/services/direction_validation_service.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:b_go/pages/passenger/services/pre_book.dart';
-import 'package:b_go/pages/passenger/services/geofencing_service.dart'; // ✅ ADD THIS IMPORT
+import 'package:b_go/pages/conductor/trip_summary.dart';
+import 'package:b_go/pages/passenger/services/geofencing_service.dart';
 
 class ConductorDeparture extends StatefulWidget {
   final String route;
@@ -33,6 +34,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
   String? currentTripDirection;
   DateTime? tripStartTime;
   String? currentTripId;
+  bool _isEndingTrip = false; // ✅ NEW: Prevent double-tap
 
   @override
   void initState() {
@@ -368,8 +370,51 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
   }
 
   Future<void> _endCurrentTrip() async {
+    // ✅ Prevent double-tap
+    if (_isEndingTrip) {
+      print('⚠️ End trip already in progress, ignoring duplicate request');
+      return;
+    }
+
+    setState(() {
+      _isEndingTrip = true;
+    });
+
+    // ✅ Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Ending trip...\nPlease wait',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.outfit(fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    if (user == null) {
+      Navigator.of(context).pop(); // Close loading dialog
+      setState(() {
+        _isEndingTrip = false;
+      });
+      return;
+    }
 
     try {
       final conductorDoc = await FirebaseFirestore.instance
@@ -378,336 +423,288 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           .limit(1)
           .get();
 
-      if (conductorDoc.docs.isNotEmpty) {
-        final conductorDocId = conductorDoc.docs.first.id;
-        final conductorData = conductorDoc.docs.first.data();
-        final activeTrip = conductorData['activeTrip'];
+      if (conductorDoc.docs.isEmpty) {
+        throw Exception('Conductor not found');
+      }
 
-        if (activeTrip != null) {
-          final currentPlaceCollection = activeTrip['placeCollection'];
-          final endingTripId = activeTrip['tripId'];
-          final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final conductorDocId = conductorDoc.docs.first.id;
+      final conductorData = conductorDoc.docs.first.data();
+      final activeTrip = conductorData['activeTrip'];
 
-          // Move tickets to remittance
-          try {
-            final ticketsSnapshot = await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('trips')
-                .doc(today)
-                .collection('tickets')
-                .get();
+      if (activeTrip == null) {
+        throw Exception('No active trip found');
+      }
 
-            for (var ticket in ticketsSnapshot.docs) {
-              final ticketData = ticket.data();
-              await FirebaseFirestore.instance
-                  .collection('conductors')
-                  .doc(conductorDocId)
-                  .collection('remittance')
-                  .doc(today)
-                  .collection('tickets')
-                  .doc(ticket.id)
-                  .set(ticketData);
-            }
+      final currentPlaceCollection = activeTrip['placeCollection'];
+      final endingTripId = activeTrip['tripId'];
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
+      // Move tickets to remittance
+      try {
+        final ticketsSnapshot = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('trips')
+            .doc(today)
+            .collection('tickets')
+            .get();
+
+        for (var ticket in ticketsSnapshot.docs) {
+          final ticketData = ticket.data();
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('remittance')
+              .doc(today)
+              .collection('tickets')
+              .doc(ticket.id)
+              .set(ticketData);
+        }
+
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('trips')
+            .doc(today)
+            .delete();
+
+        try {
+          final remittanceSummary =
+              await RemittanceService.calculateDailyRemittance(
+                  conductorDocId, today);
+          await RemittanceService.saveRemittanceSummary(
+              conductorDocId, today, remittanceSummary);
+          print('✅ Remittance summary calculated and saved for $today');
+        } catch (e) {
+          print('Error calculating remittance summary: $e');
+        }
+      } catch (e) {
+        print('Error moving tickets to remittance: $e');
+      }
+
+      // Mark scannedQRCodes as completed, but DON'T update if already accomplished
+      try {
+        final scannedQRs = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('scannedQRCodes')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        for (var doc in scannedQRs.docs) {
+          final data = doc.data();
+          final currentStatus = data['status'] ?? '';
+
+          if (currentStatus != 'accomplished' &&
+              data['tripCompleted'] != true) {
+            await doc.reference.update({
+              'tripCompleted': true,
+              'completedAt': FieldValue.serverTimestamp(),
+              'completedTripId': endingTripId,
+            });
+          }
+        }
+
+        print(
+            '✅ Marked scannedQRCodes as completed (preserved accomplished status)');
+      } catch (e) {
+        print('⚠️ Error marking QR codes as completed: $e');
+      }
+
+      // Mark preBookings as completed, but DON'T overwrite accomplished status
+      try {
+        final preBookings = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('preBookings')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        for (var doc in preBookings.docs) {
+          final data = doc.data();
+          final currentStatus = data['status'] ?? '';
+
+          if (currentStatus != 'accomplished' &&
+              data['tripCompleted'] != true) {
+            await doc.reference.update({
+              'tripCompleted': true,
+              'completedAt': FieldValue.serverTimestamp(),
+            });
+          }
+        }
+
+        print(
+            '✅ Marked preBookings as completed (preserved accomplished status)');
+      } catch (e) {
+        print('⚠️ Error marking pre-bookings as completed: $e');
+      }
+
+      // Only delete scannedQRCodes that were NOT accomplished
+      try {
+        final scannedQRsToDelete = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('scannedQRCodes')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        int deletedCount = 0;
+        int preservedCount = 0;
+
+        for (var doc in scannedQRsToDelete.docs) {
+          final data = doc.data();
+          final status = data['status'] ?? '';
+
+          if (status == 'accomplished' || data['dropOffTimestamp'] != null) {
+            print('🛡️ Preserving accomplished scannedQR: ${doc.id}');
+            preservedCount++;
+            continue;
+          }
+
+          await doc.reference.delete();
+          deletedCount++;
+        }
+
+        print(
+            '✅ Cleared $deletedCount scanned QR codes, preserved $preservedCount accomplished ones from trip $endingTripId');
+      } catch (e) {
+        print('⚠️ Error clearing scanned QR codes: $e');
+      }
+
+      // Only delete pre-bookings that were NOT accomplished
+      try {
+        final preBookingsToDelete = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('preBookings')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        int deletedCount = 0;
+        int preservedCount = 0;
+
+        for (var doc in preBookingsToDelete.docs) {
+          final data = doc.data();
+          final status = data['status'] ?? '';
+
+          if (status == 'accomplished' || data['dropOffTimestamp'] != null) {
+            print('🛡️ Preserving accomplished preBooking: ${doc.id}');
+            preservedCount++;
+            continue;
+          }
+
+          await doc.reference.delete();
+          deletedCount++;
+        }
+
+        print(
+            '✅ Cleared $deletedCount boarded pre-bookings, preserved $preservedCount accomplished ones from trip $endingTripId');
+      } catch (e) {
+        print('⚠️ Error clearing boarded pre-bookings: $e');
+      }
+
+      // Process trip end with respect to accomplished pre-bookings
+      try {
+        await PreBook.processTripEndForPreBookings(
+            conductorDocId, today, endingTripId);
+        print('✅ Pre-bookings processed for trip end');
+      } catch (e) {
+        print('❌ Error processing pre-bookings for trip end: $e');
+      }
+
+      // Rest of the trip ending logic
+      try {
+        final dailyTripDoc = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('dailyTrips')
+            .doc(today)
+            .get();
+
+        if (dailyTripDoc.exists) {
+          final dailyTripData = dailyTripDoc.data();
+          final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+
+          if (currentTrip % 2 == 1) {
             await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('trips')
-                .doc(today)
-                .delete();
-
-            try {
-              final remittanceSummary =
-                  await RemittanceService.calculateDailyRemittance(
-                      conductorDocId, today);
-              await RemittanceService.saveRemittanceSummary(
-                  conductorDocId, today, remittanceSummary);
-              print('✅ Remittance summary calculated and saved for $today');
-            } catch (e) {
-              print('Error calculating remittance summary: $e');
-            }
-          } catch (e) {
-            print('Error moving tickets to remittance: $e');
-          }
-
-          // Mark scannedQRCodes as completed, but DON'T update if already accomplished
-          try {
-            final scannedQRs = await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('scannedQRCodes')
-                .where('tripId', isEqualTo: endingTripId)
-                .get();
-
-            for (var doc in scannedQRs.docs) {
-              final data = doc.data();
-              final currentStatus = data['status'] ?? '';
-
-              if (currentStatus != 'accomplished' &&
-                  data['tripCompleted'] != true) {
-                await doc.reference.update({
-                  'tripCompleted': true,
-                  'completedAt': FieldValue.serverTimestamp(),
-                  'completedTripId': endingTripId,
-                });
-              }
-            }
-
-            print(
-                '✅ Marked scannedQRCodes as completed (preserved accomplished status)');
-          } catch (e) {
-            print('⚠️ Error marking QR codes as completed: $e');
-          }
-
-          // Mark preBookings as completed, but DON'T overwrite accomplished status
-          try {
-            final preBookings = await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('preBookings')
-                .where('tripId', isEqualTo: endingTripId)
-                .get();
-
-            for (var doc in preBookings.docs) {
-              final data = doc.data();
-              final currentStatus = data['status'] ?? '';
-
-              if (currentStatus != 'accomplished' &&
-                  data['tripCompleted'] != true) {
-                await doc.reference.update({
-                  'tripCompleted': true,
-                  'completedAt': FieldValue.serverTimestamp(),
-                });
-              }
-            }
-
-            print(
-                '✅ Marked preBookings as completed (preserved accomplished status)');
-          } catch (e) {
-            print('⚠️ Error marking pre-bookings as completed: $e');
-          }
-
-          // Only delete scannedQRCodes that were NOT accomplished
-          try {
-            final scannedQRsToDelete = await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('scannedQRCodes')
-                .where('tripId', isEqualTo: endingTripId)
-                .get();
-
-            int deletedCount = 0;
-            int preservedCount = 0;
-
-            for (var doc in scannedQRsToDelete.docs) {
-              final data = doc.data();
-              final status = data['status'] ?? '';
-
-              if (status == 'accomplished' ||
-                  data['dropOffTimestamp'] != null) {
-                print('🛡️ Preserving accomplished scannedQR: ${doc.id}');
-                preservedCount++;
-                continue;
-              }
-
-              await doc.reference.delete();
-              deletedCount++;
-            }
-
-            print(
-                '✅ Cleared $deletedCount scanned QR codes, preserved $preservedCount accomplished ones from trip $endingTripId');
-          } catch (e) {
-            print('⚠️ Error clearing scanned QR codes: $e');
-          }
-
-          // Only delete pre-bookings that were NOT accomplished
-          try {
-            final preBookingsToDelete = await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorDocId)
-                .collection('preBookings')
-                .where('tripId', isEqualTo: endingTripId)
-                .get();
-
-            int deletedCount = 0;
-            int preservedCount = 0;
-
-            for (var doc in preBookingsToDelete.docs) {
-              final data = doc.data();
-              final status = data['status'] ?? '';
-
-              if (status == 'accomplished' ||
-                  data['dropOffTimestamp'] != null) {
-                print('🛡️ Preserving accomplished preBooking: ${doc.id}');
-                preservedCount++;
-                continue;
-              }
-
-              await doc.reference.delete();
-              deletedCount++;
-            }
-
-            print(
-                '✅ Cleared $deletedCount boarded pre-bookings, preserved $preservedCount accomplished ones from trip $endingTripId');
-          } catch (e) {
-            print('⚠️ Error clearing boarded pre-bookings: $e');
-          }
-
-          // Process trip end with respect to accomplished pre-bookings
-          try {
-            await PreBook.processTripEndForPreBookings(
-                conductorDocId, today, endingTripId);
-            print('✅ Pre-bookings processed for trip end');
-          } catch (e) {
-            print('❌ Error processing pre-bookings for trip end: $e');
-          }
-
-          // Rest of the trip ending logic
-          try {
-            final dailyTripDoc = await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
                 .collection('dailyTrips')
                 .doc(today)
-                .get();
+                .update({
+              'trip$currentTrip.isComplete': true,
+              'trip$currentTrip.endTime': FieldValue.serverTimestamp(),
+              'currentTrip': currentTrip + 1,
+            });
 
-            if (dailyTripDoc.exists) {
-              final dailyTripData = dailyTripDoc.data();
-              final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+            final oppositePlaceCollection =
+                currentPlaceCollection == 'Place' ? 'Place 2' : 'Place';
+            final oppositeDirection = routeDirections.firstWhere(
+                (r) => r['collection'] == oppositePlaceCollection)['label'];
+            final nextTripId = 'trip_${DateTime.now().millisecondsSinceEpoch}';
 
-              if (currentTrip % 2 == 1) {
-                await FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .collection('dailyTrips')
-                    .doc(today)
-                    .update({
-                  'trip$currentTrip.isComplete': true,
-                  'trip$currentTrip.endTime': FieldValue.serverTimestamp(),
-                  'currentTrip': currentTrip + 1,
-                });
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorDocId)
+                .collection('dailyTrips')
+                .doc(today)
+                .update({
+              'trip${currentTrip + 1}': {
+                'startTime': Timestamp.fromDate(DateTime.now()),
+                'direction': oppositeDirection,
+                'placeCollection': oppositePlaceCollection,
+                'isComplete': false,
+                'tripId': nextTripId,
+              },
+            });
 
-                final oppositePlaceCollection =
-                    currentPlaceCollection == 'Place' ? 'Place 2' : 'Place';
-                final oppositeDirection = routeDirections.firstWhere(
-                    (r) => r['collection'] == oppositePlaceCollection)['label'];
-                final nextTripId =
-                    'trip_${DateTime.now().millisecondsSinceEpoch}';
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorDocId)
+                .update({
+              'activeTrip': {
+                'isActive': true,
+                'direction': oppositeDirection,
+                'placeCollection': oppositePlaceCollection,
+                'startTime': Timestamp.fromDate(DateTime.now()),
+                'tripId': nextTripId,
+                'isReturnTrip': true,
+              },
+              'passengerCount': 0,
+            });
 
-                await FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .collection('dailyTrips')
-                    .doc(today)
-                    .update({
-                  'trip${currentTrip + 1}': {
-                    'startTime': Timestamp.fromDate(DateTime.now()),
-                    'direction': oppositeDirection,
-                    'placeCollection': oppositePlaceCollection,
-                    'isComplete': false,
-                    'tripId': nextTripId,
-                  },
-                });
+            // ✅ CLEAR GEOFENCING CACHE WHEN STARTING RETURN TRIP
+            GeofencingService().clearProcessedTickets();
+            print('✅ Cleared geofencing cache for return trip $nextTripId');
 
-                await FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .update({
-                  'activeTrip': {
-                    'isActive': true,
-                    'direction': oppositeDirection,
-                    'placeCollection': oppositePlaceCollection,
-                    'startTime': Timestamp.fromDate(DateTime.now()),
-                    'tripId': nextTripId,
-                    'isReturnTrip': true,
-                  },
-                  'passengerCount': 0,
-                });
+            setState(() {
+              isTripActive = true;
+              selectedPlaceCollection = oppositePlaceCollection;
+              currentTripDirection = oppositeDirection;
+              tripStartTime = DateTime.now();
+              currentTripId = nextTripId;
+            });
 
-                // ✅ CLEAR GEOFENCING CACHE WHEN STARTING RETURN TRIP
-                GeofencingService().clearProcessedTickets();
-                print('✅ Cleared geofencing cache for return trip $nextTripId');
+            Navigator.of(context).pop(); // Close loading dialog
 
-                setState(() {
-                  isTripActive = true;
-                  selectedPlaceCollection = oppositePlaceCollection;
-                  currentTripDirection = oppositeDirection;
-                  tripStartTime = DateTime.now();
-                  currentTripId = nextTripId;
-                });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                  content: Text(
+                      'Trip $currentTrip completed. Starting Trip ${currentTrip + 1} (return direction).')),
+            );
+          } else if (currentTrip % 2 == 0) {
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorDocId)
+                .collection('dailyTrips')
+                .doc(today)
+                .update({
+              'trip$currentTrip.isComplete': true,
+              'trip$currentTrip.endTime': FieldValue.serverTimestamp(),
+              'isRoundTripComplete': true,
+              'endTime': FieldValue.serverTimestamp(),
+            });
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Trip $currentTrip completed. Starting Trip ${currentTrip + 1} (return direction).')),
-                );
-              } else if (currentTrip % 2 == 0) {
-                await FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .collection('dailyTrips')
-                    .doc(today)
-                    .update({
-                  'trip$currentTrip.isComplete': true,
-                  'trip$currentTrip.endTime': FieldValue.serverTimestamp(),
-                  'isRoundTripComplete': true,
-                  'endTime': FieldValue.serverTimestamp(),
-                });
-
-                await FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .update({
-                  'activeTrip': FieldValue.delete(),
-                  'passengerCount': 0,
-                });
-
-                // ✅ CLEAR GEOFENCING CACHE WHEN ROUND TRIP COMPLETES
-                GeofencingService().clearProcessedTickets();
-                print('✅ Cleared geofencing cache after round trip completion');
-
-                setState(() {
-                  isTripActive = false;
-                  currentTripDirection = null;
-                  tripStartTime = null;
-                  currentTripId = null;
-                  selectedPlaceCollection = 'Place';
-                });
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text(
-                          'Round trip completed successfully! You can now start a new trip.')),
-                );
-              }
-            } else {
-              await FirebaseFirestore.instance
-                  .collection('conductors')
-                  .doc(conductorDocId)
-                  .update({
-                'activeTrip': FieldValue.delete(),
-                'passengerCount': 0,
-              });
-
-              // ✅ CLEAR GEOFENCING CACHE
-              GeofencingService().clearProcessedTickets();
-              print('✅ Cleared geofencing cache after trip completion');
-
-              setState(() {
-                isTripActive = false;
-                currentTripDirection = null;
-                tripStartTime = null;
-                currentTripId = null;
-                selectedPlaceCollection = 'Place';
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Trip completed successfully!')),
-              );
-            }
-          } catch (e) {
-            print('Error checking trip direction: $e');
             await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
@@ -716,9 +713,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               'passengerCount': 0,
             });
 
-            // ✅ CLEAR GEOFENCING CACHE EVEN ON ERROR
+            // ✅ CLEAR GEOFENCING CACHE WHEN ROUND TRIP COMPLETES
             GeofencingService().clearProcessedTickets();
-            print('✅ Cleared geofencing cache after error');
+            print('✅ Cleared geofencing cache after round trip completion');
 
             setState(() {
               isTripActive = false;
@@ -728,16 +725,82 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               selectedPlaceCollection = 'Place';
             });
 
+            Navigator.of(context).pop(); // Close loading dialog
+
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Trip completed successfully!')),
+              SnackBar(
+                  content: Text(
+                      'Round trip completed successfully! You can now start a new trip.')),
             );
           }
+        } else {
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .update({
+            'activeTrip': FieldValue.delete(),
+            'passengerCount': 0,
+          });
+
+          // ✅ CLEAR GEOFENCING CACHE
+          GeofencingService().clearProcessedTickets();
+          print('✅ Cleared geofencing cache after trip completion');
+
+          setState(() {
+            isTripActive = false;
+            currentTripDirection = null;
+            tripStartTime = null;
+            currentTripId = null;
+            selectedPlaceCollection = 'Place';
+          });
+
+          Navigator.of(context).pop(); // Close loading dialog
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Trip completed successfully!')),
+          );
         }
+      } catch (e) {
+        print('Error checking trip direction: $e');
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .update({
+          'activeTrip': FieldValue.delete(),
+          'passengerCount': 0,
+        });
+
+        // ✅ CLEAR GEOFENCING CACHE EVEN ON ERROR
+        GeofencingService().clearProcessedTickets();
+        print('✅ Cleared geofencing cache after error');
+
+        setState(() {
+          isTripActive = false;
+          currentTripDirection = null;
+          tripStartTime = null;
+          currentTripId = null;
+          selectedPlaceCollection = 'Place';
+        });
+
+        Navigator.of(context).pop(); // Close loading dialog
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Trip completed successfully!')),
+        );
       }
     } catch (e) {
+      Navigator.of(context).pop(); // Close loading dialog
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error ending trip: $e')),
+        SnackBar(
+          content: Text('Error ending trip: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
+    } finally {
+      setState(() {
+        _isEndingTrip = false;
+      });
     }
   }
 
@@ -798,6 +861,26 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                             ),
                           ),
                         ),
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => TripSummary(
+                                  route: widget.route,
+                                  role: widget.role,
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.summarize,
+                            color: Colors.white,
+                            size: 24.0,
+                          ),
+                          tooltip: 'Trip Summary',
+                        ),
+                        const SizedBox(width: 8),
                       ],
                     ),
                   ),
@@ -1110,25 +1193,51 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                       ),
                     ),
                     SizedBox(height: 16),
+                    // ✅ UPDATED: End Trip button with loading state
                     SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor:
+                              _isEndingTrip ? Colors.grey : Colors.red,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed: _endCurrentTrip,
-                        child: Text(
-                          'End Trip',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                        onPressed: _isEndingTrip ? null : _endCurrentTrip,
+                        child: _isEndingTrip
+                            ? Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
+                                    ),
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Ending Trip...',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : Text(
+                                'End Trip',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ] else ...[

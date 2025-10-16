@@ -229,6 +229,23 @@ class RouteService {
       throw Exception('Conductor not found for email ${user?.email}');
     }
 
+    // ✅ GET THE ACTIVE TRIP ID
+    String? activeTripId;
+    try {
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .get();
+
+      if (conductorDoc.exists) {
+        final conductorData = conductorDoc.data() as Map<String, dynamic>?;
+        activeTripId = conductorData?['activeTrip']?['tripId'];
+        print('✅ Active Trip ID: $activeTripId');
+      }
+    } catch (e) {
+      print('⚠️ Error getting active trip ID: $e');
+    }
+
     try {
       await FirebaseFirestore.instance
           .collection('conductors')
@@ -261,6 +278,7 @@ class RouteService {
     final tripNumber = maxTripNumber + 1;
     final tripDocName = "ticket $tripNumber";
 
+    // ✅ SAVE TO REMITTANCE WITH TRIP ID
     await tripsCollection.doc(tripDocName).set({
       'from': from,
       'to': to,
@@ -275,9 +293,15 @@ class RouteService {
       'discountAmount': totalDiscountStr,
       'discountList': discountList,
       'discountBreakdown': discountBreakdown,
-      'status': 'boarded', // Add status for manually ticketed passengers
-      'ticketType': 'Manual', // Distinguish from QR-scanned tickets
+      'status': 'boarded',
+      'ticketType': 'Manual',
+      'tripId': activeTripId, // ✅ CRITICAL: Add tripId here
+      'conductorId': conductorId,
+      'route': route,
+      'createdAt': FieldValue.serverTimestamp(),
     });
+
+    print('✅ Manual ticket saved with tripId: $activeTripId');
 
     // Also save to daily trip structure (trip1 or trip2)
     try {
@@ -316,9 +340,15 @@ class RouteService {
           'discountAmount': totalDiscountStr,
           'discountList': discountList,
           'discountBreakdown': discountBreakdown,
-          'status': 'boarded', // Add status for manually ticketed passengers
-          'ticketType': 'Manual', // Distinguish from QR-scanned tickets
+          'status': 'boarded',
+          'ticketType': 'Manual',
+          'tripId': activeTripId, // ✅ CRITICAL: Add tripId here too
+          'conductorId': conductorId,
+          'route': route,
         });
+
+        print(
+            '✅ Manual ticket also saved to dailyTrips with tripId: $activeTripId');
       }
     } catch (e) {
       print('Failed to save to daily trip structure: $e');

@@ -235,100 +235,106 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
-  Future<void> _printScannedTicket(Map<String, dynamic> ticketData, String ticketType) async {
-  try {
-    // If not connected to printer, show connection dialog
-    if (!_printerService.isConnected) {
-      await ThermalPrinterService.showPrinterConnectionDialog(
-        context,
-        (ip, port) async {
-          final connected = await _printerService.connectPrinter(ip, port);
-          if (!connected) {
-            if (mounted) {
-              _showCustomSnackBar('Failed to connect to printer', 'error');
+  Future<void> _printScannedTicket(
+      Map<String, dynamic> ticketData, String ticketType) async {
+    try {
+      // If not connected to printer, show connection dialog
+      if (!_printerService.isConnected) {
+        await ThermalPrinterService.showPrinterConnectionDialog(
+          context,
+          (ip, port) async {
+            final connected = await _printerService.connectPrinter(ip, port);
+            if (!connected) {
+              if (mounted) {
+                _showCustomSnackBar('Failed to connect to printer', 'error');
+              }
+              return;
             }
-            return;
-          }
 
-          // Now print after successful connection
-          await _performScannedTicketPrint(ticketData, ticketType);
-        },
-      );
-    } else {
-      // Already connected, just print
-      await _performScannedTicketPrint(ticketData, ticketType);
-    }
-  } catch (e) {
-    print('Error printing scanned ticket: $e');
-    if (mounted) {
-      _showCustomSnackBar('Error: ${e.toString()}', 'error');
-    }
-  }
-}
-
-Future<void> _performScannedTicketPrint(
-    Map<String, dynamic> ticketData, String ticketType) async {
-  try {
-    // Extract ticket data
-    final from = ticketData['from']?.toString() ?? 'N/A';
-    final to = ticketData['to']?.toString() ?? 'N/A';
-    final fromKm = ticketData['fromKm']?.toString() ?? '0';
-    final toKm = ticketData['toKm']?.toString() ?? '0';
-
-    String baseFare = '0.00';
-    final fareData = ticketData['fare'] ?? ticketData['amount'] ?? ticketData['totalFare'];
-    if (fareData != null) {
-      if (fareData is num) {
-        baseFare = fareData.toStringAsFixed(2);
-      } else if (fareData is String) {
-        baseFare = fareData;
-      }
-    }
-
-    final quantity = (ticketData['quantity'] as num?)?.toInt() ?? 1;
-    final totalFare = (ticketData['totalFare'] ?? ticketData['totalAmount'] ?? ticketData['amount'] ?? '0.00').toString();
-    final discountAmount = ticketData['discountAmount']?.toString() ?? '0.00';
-
-    List<String>? discountBreakdown;
-    if (ticketData['discountBreakdown'] != null) {
-      discountBreakdown = List<String>.from(
-          (ticketData['discountBreakdown'] as List).map((e) => e.toString()));
-    }
-
-    // Print receipt
-    final success = await _printerService.printManualTicket(
-      route: getRouteLabel(selectedPlaceCollection),
-      from: from,
-      to: to,
-      fromKm: fromKm,
-      toKm: toKm,
-      baseFare: baseFare,
-      quantity: quantity,
-      totalFare: totalFare,
-      discountAmount: discountAmount,
-      discountBreakdown: discountBreakdown,
-    );
-
-    if (mounted) {
-      if (success) {
-        _showCustomSnackBar(
-          '$ticketType receipt printed successfully!',
-          'success',
+            // Now print after successful connection
+            await _performScannedTicketPrint(ticketData, ticketType);
+          },
         );
       } else {
-        _showCustomSnackBar(
-          'Failed to print $ticketType receipt',
-          'error',
-        );
+        // Already connected, just print
+        await _performScannedTicketPrint(ticketData, ticketType);
+      }
+    } catch (e) {
+      print('Error printing scanned ticket: $e');
+      if (mounted) {
+        _showCustomSnackBar('Error: ${e.toString()}', 'error');
       }
     }
-  } catch (e) {
-    print('Error performing scanned ticket print: $e');
-    if (mounted) {
-      _showCustomSnackBar('Print error: ${e.toString()}', 'error');
+  }
+
+  Future<void> _performScannedTicketPrint(
+      Map<String, dynamic> ticketData, String ticketType) async {
+    try {
+      // Extract ticket data
+      final from = ticketData['from']?.toString() ?? 'N/A';
+      final to = ticketData['to']?.toString() ?? 'N/A';
+      final fromKm = ticketData['fromKm']?.toString() ?? '0';
+      final toKm = ticketData['toKm']?.toString() ?? '0';
+
+      String baseFare = '0.00';
+      final fareData =
+          ticketData['fare'] ?? ticketData['amount'] ?? ticketData['totalFare'];
+      if (fareData != null) {
+        if (fareData is num) {
+          baseFare = fareData.toStringAsFixed(2);
+        } else if (fareData is String) {
+          baseFare = fareData;
+        }
+      }
+
+      final quantity = (ticketData['quantity'] as num?)?.toInt() ?? 1;
+      final totalFare = (ticketData['totalFare'] ??
+              ticketData['totalAmount'] ??
+              ticketData['amount'] ??
+              '0.00')
+          .toString();
+      final discountAmount = ticketData['discountAmount']?.toString() ?? '0.00';
+
+      List<String>? discountBreakdown;
+      if (ticketData['discountBreakdown'] != null) {
+        discountBreakdown = List<String>.from(
+            (ticketData['discountBreakdown'] as List).map((e) => e.toString()));
+      }
+
+      // Print receipt
+      final success = await _printerService.printManualTicket(
+        route: getRouteLabel(selectedPlaceCollection),
+        from: from,
+        to: to,
+        fromKm: fromKm,
+        toKm: toKm,
+        baseFare: baseFare,
+        quantity: quantity,
+        totalFare: totalFare,
+        discountAmount: discountAmount,
+        discountBreakdown: discountBreakdown,
+      );
+
+      if (mounted) {
+        if (success) {
+          _showCustomSnackBar(
+            '$ticketType receipt printed successfully!',
+            'success',
+          );
+        } else {
+          _showCustomSnackBar(
+            'Failed to print $ticketType receipt',
+            'error',
+          );
+        }
+      }
+    } catch (e) {
+      print('Error performing scanned ticket print: $e');
+      if (mounted) {
+        _showCustomSnackBar('Print error: ${e.toString()}', 'error');
+      }
     }
   }
-}
 
   void _initializeRouteDirections() {
     if ('${widget.route.trim()}' == 'Rosario') {
@@ -417,77 +423,77 @@ Future<void> _performScannedTicketPrint(
   }
 
   void _showCustomSnackBar(String message, String type) {
-  Color backgroundColor;
-  IconData icon;
-  Color iconColor;
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
 
-  switch (type) {
-    case 'success':
-      backgroundColor = Colors.green;
-      icon = Icons.check_circle;
-      iconColor = Colors.white;
-      break;
-    case 'error':
-      backgroundColor = Colors.red;
-      icon = Icons.error;
-      iconColor = Colors.white;
-      break;
-    case 'warning':
-      backgroundColor = Colors.orange;
-      icon = Icons.warning;
-      iconColor = Colors.white;
-      break;
-    default:
-      backgroundColor = Colors.grey;
-      icon = Icons.info;
-      iconColor = Colors.white;
-  }
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: iconColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              size: 12,
-              color: backgroundColor,
-            ),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message,
-              style: GoogleFonts.outfit(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
               ),
             ),
-          ),
-        ],
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
-      backgroundColor: backgroundColor,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      margin: EdgeInsets.all(16),
-      action: SnackBarAction(
-        label: '✕',
-        textColor: Colors.white,
-        onPressed: () {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        },
-      ),
-    ),
-  );
-}
+    );
+  }
 
   void _showToSelectionPage(Map<String, dynamic> fromPlace,
       List<Map<String, dynamic>> allPlaces) async {
@@ -521,51 +527,51 @@ Future<void> _performScannedTicketPrint(
     }
   }
 
-void _openQRScanner() async {
-  if (await Permission.camera.request().isGranted) {
-    final result = await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => QRScanPage(),
-      ),
-    );
-    
-    if (result is Map<String, dynamic>) {
-      final success = result['success'] as bool;
-      
-      if (success) {
-        _refreshPassengerCount();
-        
-        final ticketType = result['type'] as String;
-        final ticketData = result['data'] as Map<String, dynamic>;
-        
-        // Show success message with custom snackbar
-        if (ticketType == 'preTicket') {
-          _showCustomSnackBar(
-            'Pre-ticket scanned successfully!',
-            'success',
-          );
-        } else if (ticketType == 'preBooking') {
-          _showCustomSnackBar(
-            'Pre-booking scanned successfully!',
-            'success',
-          );
+  void _openQRScanner() async {
+    if (await Permission.camera.request().isGranted) {
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => QRScanPage(),
+        ),
+      );
+
+      if (result is Map<String, dynamic>) {
+        final success = result['success'] as bool;
+
+        if (success) {
+          _refreshPassengerCount();
+
+          final ticketType = result['type'] as String;
+          final ticketData = result['data'] as Map<String, dynamic>;
+
+          // Show success message with custom snackbar
+          if (ticketType == 'preTicket') {
+            _showCustomSnackBar(
+              'Pre-ticket scanned successfully!',
+              'success',
+            );
+          } else if (ticketType == 'preBooking') {
+            _showCustomSnackBar(
+              'Pre-booking scanned successfully!',
+              'success',
+            );
+          }
+
+          // Automatically print the ticket
+          await _printScannedTicket(ticketData, ticketType);
+        } else {
+          final error =
+              result['error'] as String? ?? 'Failed to process QR code';
+          _showCustomSnackBar(error, 'error');
         }
-        
-        // Automatically print the ticket
-        await _printScannedTicket(ticketData, ticketType);
-        
-      } else {
-        final error = result['error'] as String? ?? 'Failed to process QR code';
-        _showCustomSnackBar(error, 'error');
       }
+    } else {
+      _showCustomSnackBar(
+        'Camera permission is required to scan QR codes.',
+        'error',
+      );
     }
-  } else {
-    _showCustomSnackBar(
-      'Camera permission is required to scan QR codes.',
-      'error',
-    );
   }
-}
 
   void _refreshPassengerCount() {
     setState(() {});
@@ -1674,63 +1680,63 @@ class QRScanPage extends StatefulWidget {
 class _QRScanPageState extends State<QRScanPage> {
   bool _isProcessing = false;
 
-@override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
-      backgroundColor: Color(0xFF0091AD),
-      foregroundColor: Colors.white,
-    ),
-    body: MobileScanner(
-      onDetect: (capture) async {
-        if (_isProcessing) {
-          print('QR scan already in progress, ignoring duplicate detection');
-          return;
-        }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Scan QR Code', style: GoogleFonts.outfit(fontSize: 18)),
+        backgroundColor: Color(0xFF0091AD),
+        foregroundColor: Colors.white,
+      ),
+      body: MobileScanner(
+        onDetect: (capture) async {
+          if (_isProcessing) {
+            print('QR scan already in progress, ignoring duplicate detection');
+            return;
+          }
 
-        setState(() {
-          _isProcessing = true;
-        });
+          setState(() {
+            _isProcessing = true;
+          });
 
-        final barcode = capture.barcodes.first;
-        final qrData = barcode.rawValue;
+          final barcode = capture.barcodes.first;
+          final qrData = barcode.rawValue;
 
-        if (qrData != null && qrData.isNotEmpty) {
-          try {
-            final data = parseQRData(qrData);
-            await storePreTicketToFirestore(data);
-            
-            // Return both success flag and ticket data for printing
-            Navigator.of(context).pop({
-              'success': true,
-              'type': data['type'] ?? 'preTicket',
-              'data': data,
-            });
-          } catch (e) {
-            // Show error in the parent screen
+          if (qrData != null && qrData.isNotEmpty) {
+            try {
+              final data = parseQRData(qrData);
+              await storePreTicketToFirestore(data);
+
+              // Return both success flag and ticket data for printing
+              Navigator.of(context).pop({
+                'success': true,
+                'type': data['type'] ?? 'preTicket',
+                'data': data,
+              });
+            } catch (e) {
+              // Show error in the parent screen
+              Navigator.of(context).pop({
+                'success': false,
+                'error': e.toString().replaceAll('Exception: ', ''),
+              });
+            } finally {
+              setState(() {
+                _isProcessing = false;
+              });
+            }
+          } else {
             Navigator.of(context).pop({
               'success': false,
-              'error': e.toString().replaceAll('Exception: ', ''),
+              'error': 'Invalid QR code: No data detected',
             });
-          } finally {
             setState(() {
               _isProcessing = false;
             });
           }
-        } else {
-          Navigator.of(context).pop({
-            'success': false,
-            'error': 'Invalid QR code: No data detected',
-          });
-          setState(() {
-            _isProcessing = false;
-          });
-        }
-      },
-    ),
-  );
-}
+        },
+      ),
+    );
+  }
 }
 
 Map<String, dynamic> parseQRData(String qrData) {
@@ -2053,8 +2059,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   print('✅ === PRE-TICKET SCAN COMPLETE ===\n');
 }
 
-// ✅ FIXED _processPreBooking - Only increment passenger count when status changes to 'boarded'
-// ✅ FIXED _processPreBooking - Saves to remittance collection
+// ✅ FIXED _processPreBooking - Updates existing remittance ticket instead of creating duplicate
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
   final conductorDocId = conductorDoc.docs.first.id;
@@ -2092,7 +2097,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         final bookingStatus = bookingData['status'] ?? '';
         print('🔍 Found booking: status=$bookingStatus');
 
-        // ✅ Accept 'paid' or 'boarded' status
         if (bookingStatus == 'paid' || bookingStatus == 'boarded') {
           paidPreBooking = directBooking;
           preBookingData = bookingData;
@@ -2176,7 +2180,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'No paid pre-booking found with this QR code. Please ensure payment is completed.');
   }
 
-  // ✅ Get userId if not found yet
   if (userId == null) {
     userId = preBookingData['userId'] ?? data['userId'];
   }
@@ -2185,7 +2188,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   print('✅ User ID: $userId');
   print('✅ Previous status: ${preBookingData['status']}');
 
-  // ✅ CRITICAL: Check if pre-booking was already boarded
   final wasAlreadyBoarded = preBookingData['status'] == 'boarded';
 
   if (wasAlreadyBoarded) {
@@ -2224,7 +2226,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       });
       print('✅ Updated conductor preBookings to "boarded"');
     } else {
-      // ✅ If doesn't exist, create it as "boarded"
       await conductorPreBookingRef.set({
         ...preBookingData,
         'status': 'boarded',
@@ -2268,54 +2269,86 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
-  // ✅ NEW: Save to remittance collection
+  // ✅ CRITICAL FIX: Update existing remittance ticket instead of creating new one
   try {
-    final ticketNumber =
-        await _getNextTicketNumber(conductorDocId, formattedDate);
-    final ticketDocId = 'ticket $ticketNumber';
-
-    final remittanceData = {
-      'active': true,
-      'discountAmount': '0.00',
-      'discountBreakdown': [],
-      'documentId': bookingId,
-      'documentType': 'preBooking',
-      'endKm': data['toKm'] ?? preBookingData['toKm'] ?? 0,
-      'farePerPassenger': [
-        data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00'
-      ],
-      'from': data['from'] ?? preBookingData['from'],
-      'quantity': quantity,
-      'scannedBy': user.uid,
-      'startKm': data['fromKm'] ?? preBookingData['fromKm'] ?? 0,
-      'status': 'boarded',
-      'ticketType': 'preBooking', // ✅ CRITICAL: Add ticketType
-      'timestamp': FieldValue.serverTimestamp(),
-      'to': data['to'] ?? preBookingData['to'],
-      'totalFare':
-          (data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00')
-              .toString(),
-      'totalKm': (data['toKm'] ?? preBookingData['toKm'] ?? 0) -
-          (data['fromKm'] ?? preBookingData['fromKm'] ?? 0),
-      'route': data['route'] ?? preBookingData['route'],
-      'direction': data['direction'] ?? preBookingData['direction'],
-      'conductorId': conductorDocId,
-      'tripId': activeTripId,
-      'createdAt': FieldValue.serverTimestamp(),
-      'scannedAt': FieldValue.serverTimestamp(),
-      'boardedAt': FieldValue.serverTimestamp(),
-      'userId': userId,
-      'bookingId': bookingId,
-    };
-
-    await FirebaseFirestore.instance
+    // Find the existing remittance ticket for this pre-booking
+    final existingTicketQuery = await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorDocId)
         .collection('remittance')
         .doc(formattedDate)
         .collection('tickets')
-        .doc(ticketDocId)
-        .set(remittanceData);
+        .where('documentId', isEqualTo: bookingId)
+        .where('documentType', isEqualTo: 'preBooking')
+        .get();
+
+    if (existingTicketQuery.docs.isNotEmpty) {
+      // ✅ Update the existing ticket to "boarded" status
+      final existingTicketDoc = existingTicketQuery.docs.first;
+      await existingTicketDoc.reference.update({
+        'status': 'boarded',
+        'scannedBy': user.uid,
+        'scannedAt': FieldValue.serverTimestamp(),
+        'boardedAt': FieldValue.serverTimestamp(),
+        'tripId': activeTripId,
+        'active': true,
+      });
+
+      print(
+          '✅ Updated existing remittance ticket ${existingTicketDoc.id} from "paid" to "boarded"');
+    } else {
+      // ✅ If no existing ticket found, create one (fallback for edge cases)
+      print('⚠️ No existing remittance ticket found, creating new one');
+
+      final ticketNumber =
+          await _getNextTicketNumber(conductorDocId, formattedDate);
+      final ticketDocId = 'ticket $ticketNumber';
+
+      final remittanceData = {
+        'active': true,
+        'discountAmount': '0.00',
+        'discountBreakdown': [],
+        'documentId': bookingId,
+        'documentType': 'preBooking',
+        'endKm': data['toKm'] ?? preBookingData['toKm'] ?? 0,
+        'farePerPassenger': [
+          data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00'
+        ],
+        'from': data['from'] ?? preBookingData['from'],
+        'quantity': quantity,
+        'scannedBy': user.uid,
+        'startKm': data['fromKm'] ?? preBookingData['fromKm'] ?? 0,
+        'status': 'boarded',
+        'ticketType': 'preBooking',
+        'timestamp': FieldValue.serverTimestamp(),
+        'to': data['to'] ?? preBookingData['to'],
+        'totalFare':
+            (data['totalAmount'] ?? preBookingData['totalFare'] ?? '0.00')
+                .toString(),
+        'totalKm': (data['toKm'] ?? preBookingData['toKm'] ?? 0) -
+            (data['fromKm'] ?? preBookingData['fromKm'] ?? 0),
+        'route': data['route'] ?? preBookingData['route'],
+        'direction': data['direction'] ?? preBookingData['direction'],
+        'conductorId': conductorDocId,
+        'tripId': activeTripId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'scannedAt': FieldValue.serverTimestamp(),
+        'boardedAt': FieldValue.serverTimestamp(),
+        'userId': userId,
+        'bookingId': bookingId,
+      };
+
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorDocId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .doc(ticketDocId)
+          .set(remittanceData);
+
+      print('✅ Created new remittance ticket as $ticketDocId');
+    }
 
     await FirebaseFirestore.instance
         .collection('conductors')
@@ -2326,11 +2359,8 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       'createdAt': FieldValue.serverTimestamp(),
       'lastUpdated': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-
-    print(
-        '✅ Pre-booking saved to remittance/tickets collection as $ticketDocId');
   } catch (e) {
-    print('❌ Error saving pre-booking to remittance: $e');
+    print('❌ Error updating remittance ticket: $e');
   }
 
   // ✅ Save to dailyTrips
@@ -2371,7 +2401,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'direction': data['direction'] ?? preBookingData['direction'],
         'ticketType': 'preBooking',
         'bookingId': bookingId,
-      });
+      }, SetOptions(merge: true));
 
       print('✅ Pre-booking saved to dailyTrips collection');
     }
@@ -2418,5 +2448,5 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       '✅ Incremented passengerCount by $quantity (status changed from paid to boarded)');
 
   print('✅ === PRE-BOOKING SCAN COMPLETE ===');
-  print('✅ Pre-booking $bookingId is now "boarded" and saved to remittance\n');
+  print('✅ Pre-booking $bookingId status updated from "paid" to "boarded"\n');
 }

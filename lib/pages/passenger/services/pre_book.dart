@@ -2014,7 +2014,7 @@ class _ReceiptModal extends StatelessWidget {
     }
   }
 
-  // Helper method to save pre-booking to conductor's collections
+// Helper method to save pre-booking to conductor's collections
   Future<void> _saveToConductorCollections(String bookingId,
       Map<String, dynamic> data, double baseFare, double totalAmount) async {
     if (selectedConductor == null || selectedConductor!['id'] == null) {
@@ -2045,9 +2045,8 @@ class _ReceiptModal extends StatelessWidget {
         'farePerPassenger': data['passengerFares'],
         'totalFare': totalAmount.toStringAsFixed(2),
         'discountBreakdown': data['discountBreakdown'],
-        'status':
-            'pending_payment', // Will be updated to 'boarded' when scanned
-        'ticketType': 'preBooking', // Distinguish from manual tickets
+        'status': 'pending_payment',
+        'ticketType': 'preBooking',
         'preBookingId': bookingId,
         'userId': data['userId'],
         'conductorId': conductorId,
@@ -2077,14 +2076,13 @@ class _ReceiptModal extends StatelessWidget {
       await _saveToDailyTrips(
           conductorId, formattedDate, bookingId, ticketData);
 
-      // 3. Save to remittance collection
-      await _saveToRemittance(
-          conductorId, formattedDate, bookingId, ticketData);
+      // ❌ REMOVED: Don't save to remittance until payment is confirmed
+      // await _saveToRemittance(conductorId, formattedDate, bookingId, ticketData);
 
-      print('✅ PreBook: Successfully saved to all conductor collections');
+      print(
+          '✅ PreBook: Successfully saved to conductor collections (excluding remittance)');
     } catch (e) {
       print('❌ PreBook: Error saving to conductor collections: $e');
-      // Don't throw error here to avoid breaking the main save process
     }
   }
 
@@ -2863,7 +2861,7 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage>
     }
   }
 
-  // Helper method to update pre-booking status to 'paid' in all collections
+// Helper method to update pre-booking status to 'paid' in all collections
   Future<void> _updatePreBookingStatusToPaid() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -2914,8 +2912,8 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage>
           // Update in dailyTrips collection
           await _updateDailyTripsStatus(conductorId, formattedDate, 'paid');
 
-          // Update in remittance collection
-          await _updateRemittanceStatus(conductorId, formattedDate, 'paid');
+          // ✅ NOW add to remittance when paid
+          await _addToRemittanceWhenPaid(conductorId, formattedDate);
 
           print(
               '✅ PreBook: Successfully updated all conductor collections to paid status');
@@ -2925,6 +2923,93 @@ class _PreBookSummaryPageState extends State<PreBookSummaryPage>
       print('✅ PreBook: Pre-booking status updated to paid successfully');
     } catch (e) {
       print('❌ PreBook: Error updating pre-booking status to paid: $e');
+    }
+  }
+
+// ✅ NEW METHOD: Add pre-booking to remittance when paid
+  Future<void> _addToRemittanceWhenPaid(
+      String conductorId, String formattedDate) async {
+    try {
+      // Get pre-booking data from conductor's preBookings collection
+      final preBookingDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('preBookings')
+          .doc(widget.bookingId)
+          .get();
+
+      if (!preBookingDoc.exists) {
+        print('⚠️ PreBook: Pre-booking not found in conductor collection');
+        return;
+      }
+
+      final preBookingData = preBookingDoc.data()!;
+
+      // Get the next ticket number for this date
+      final ticketsSnapshot = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .get();
+
+      final ticketNumber = ticketsSnapshot.docs.length + 1;
+      final ticketDocId = 'ticket $ticketNumber';
+
+      // Prepare remittance data
+      final remittanceData = {
+        'active': true,
+        'discountAmount': '0.00',
+        'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
+        'documentId': widget.bookingId,
+        'documentType': 'preBooking',
+        'endKm': preBookingData['toKm'],
+        'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
+        'from': preBookingData['from'],
+        'quantity': preBookingData['quantity'],
+        'startKm': preBookingData['fromKm'],
+        'status': 'paid',
+        'ticketType': 'preBooking',
+        'timestamp': FieldValue.serverTimestamp(),
+        'to': preBookingData['to'],
+        'totalFare': preBookingData['totalFare'],
+        'totalKm':
+            (preBookingData['toKm'] as num) - (preBookingData['fromKm'] as num),
+        'route': preBookingData['route'],
+        'direction': preBookingData['direction'],
+        'conductorId': conductorId,
+        'conductorName': preBookingData['conductorName'],
+        'busNumber': preBookingData['busNumber'],
+        'tripId': preBookingData['tripId'],
+        'createdAt': preBookingData['createdAt'],
+        'paidAt': FieldValue.serverTimestamp(),
+        'paymentMethod': 'simulated',
+      };
+
+      // Save to remittance tickets subcollection
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .collection('tickets')
+          .doc(ticketDocId)
+          .set(remittanceData);
+
+      // Update lastUpdated on date document
+      await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(formattedDate)
+          .set({
+        'lastUpdated': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ PreBook: Added paid pre-booking to remittance as $ticketDocId');
+    } catch (e) {
+      print('❌ PreBook: Error adding to remittance: $e');
     }
   }
 

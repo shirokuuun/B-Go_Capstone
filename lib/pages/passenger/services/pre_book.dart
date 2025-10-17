@@ -449,9 +449,16 @@ class _PreBookState extends State<PreBook> {
       // Set direction based on conductor's active trip
       final activeTrip = selectedConductor!['activeTrip'];
       if (activeTrip != null) {
-        final isReturnTrip = activeTrip['isReturnTrip'] ?? false;
-        directionIndex = isReturnTrip ? 1 : 0;
-        selectedPlaceCollection = isReturnTrip ? 'Place 2' : 'Place';
+        // ✅ FIX: Use the placeCollection from activeTrip instead of isReturnTrip
+        selectedPlaceCollection = activeTrip['placeCollection'] ?? 'Place';
+
+        // Set directionIndex based on placeCollection
+        directionIndex = selectedPlaceCollection == 'Place' ? 0 : 1;
+
+        print('🔍 PreBook: Selected conductor active trip:');
+        print('   - Direction: ${activeTrip['direction']}');
+        print('   - PlaceCollection: $selectedPlaceCollection');
+        print('   - DirectionIndex: $directionIndex');
       }
     }
 
@@ -741,6 +748,7 @@ class _PreBookState extends State<PreBook> {
         fareTypes: fareTypes,
         currentLocation: _currentLocation, // Pass the location directly
         selectedConductor: selectedConductor, // Pass conductor info
+        selectedPlaceCollection: selectedPlaceCollection,
       ),
     );
   }
@@ -1813,15 +1821,19 @@ class _ReceiptModal extends StatelessWidget {
   final List<String> fareTypes;
   final Position? currentLocation; // Added for location passing
   final Map<String, dynamic>? selectedConductor; // Added for conductor info
-  _ReceiptModal(
-      {required this.route,
-      required this.directionLabel,
-      required this.fromPlace,
-      required this.toPlace,
-      required this.quantity,
-      required this.fareTypes,
-      this.currentLocation,
-      this.selectedConductor});
+  final String selectedPlaceCollection;
+
+  _ReceiptModal({
+    required this.route,
+    required this.directionLabel,
+    required this.fromPlace,
+    required this.toPlace,
+    required this.quantity,
+    required this.fareTypes,
+    this.currentLocation,
+    this.selectedConductor,
+    required this.selectedPlaceCollection,
+  });
 
   // Calculate full trip fare for pre-booking (from start to end of route)
   double computeFullTripFare(String route) {
@@ -1879,11 +1891,17 @@ class _ReceiptModal extends StatelessWidget {
     print(
         '💾 PreBook: Saving booking with passenger location: ${passengerLocation?.latitude}, ${passengerLocation?.longitude}');
 
+    final actualDirection =
+        selectedConductor?['activeTrip']?['direction'] ?? directionLabel;
+    final actualPlaceCollection = selectedConductor?['activeTrip']
+            ?['placeCollection'] ??
+        selectedPlaceCollection;
     // Create QR data for the booking
     final qrData = {
       'type': 'preBooking',
       'route': route,
-      'direction': directionLabel,
+      'direction': actualDirection,
+      'placeCollection': actualPlaceCollection,
       'from': fromPlace['name'],
       'to': toPlace['name'],
       'fromKm': (fromPlace['km'] as num).toInt(),
@@ -1919,7 +1937,8 @@ class _ReceiptModal extends StatelessWidget {
 
     final data = {
       'route': route,
-      'direction': directionLabel,
+      'direction': actualDirection,
+      'placeCollection': actualPlaceCollection,
       'from': fromPlace['name'],
       'to': toPlace['name'],
       'fromKm': (fromPlace['km'] as num).toInt(),
@@ -2014,7 +2033,6 @@ class _ReceiptModal extends StatelessWidget {
     }
   }
 
-// Helper method to save pre-booking to conductor's collections
   Future<void> _saveToConductorCollections(String bookingId,
       Map<String, dynamic> data, double baseFare, double totalAmount) async {
     if (selectedConductor == null || selectedConductor!['id'] == null) {
@@ -2031,6 +2049,12 @@ class _ReceiptModal extends StatelessWidget {
     try {
       print(
           '💾 PreBook: Saving to conductor collections for conductor: $conductorId');
+
+      // ✅ Get the correct direction and placeCollection from conductor's active trip
+      final activeTrip = selectedConductor!['activeTrip'];
+      final conductorDirection = activeTrip?['direction'] ?? data['direction'];
+      final conductorPlaceCollection =
+          activeTrip?['placeCollection'] ?? selectedPlaceCollection;
 
       // Prepare ticket data for conductor collections
       final ticketData = {
@@ -2053,7 +2077,8 @@ class _ReceiptModal extends StatelessWidget {
         'conductorName': data['conductorName'],
         'busNumber': data['busNumber'],
         'route': data['route'],
-        'direction': data['direction'],
+        'direction': conductorDirection, // ✅ Use conductor's direction
+        'placeCollection': conductorPlaceCollection, // ✅ Add placeCollection
         'passengerLatitude': data['passengerLatitude'],
         'passengerLongitude': data['passengerLongitude'],
         'qrData': data['qrData'],
@@ -2062,7 +2087,7 @@ class _ReceiptModal extends StatelessWidget {
         'tripId': data['tripId'],
       };
 
-      // 1. Save to conductor's active trip (preBookings collection)
+      // Save to conductor's preBookings collection
       await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
@@ -2072,15 +2097,11 @@ class _ReceiptModal extends StatelessWidget {
 
       print('✅ PreBook: Saved to conductor preBookings collection');
 
-      // 2. Save to dailyTrips collection
+      // Save to dailyTrips collection
       await _saveToDailyTrips(
           conductorId, formattedDate, bookingId, ticketData);
 
-      // ❌ REMOVED: Don't save to remittance until payment is confirmed
-      // await _saveToRemittance(conductorId, formattedDate, bookingId, ticketData);
-
-      print(
-          '✅ PreBook: Successfully saved to conductor collections (excluding remittance)');
+      print('✅ PreBook: Saved to conductor collections successfully');
     } catch (e) {
       print('❌ PreBook: Error saving to conductor collections: $e');
     }
@@ -2218,6 +2239,8 @@ class _ReceiptModal extends StatelessWidget {
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
     final formattedTime =
         "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final actualDirection =
+        selectedConductor?['activeTrip']?['direction'] ?? directionLabel;
     final startKm = fromPlace['km'] is num
         ? fromPlace['km']
         : num.tryParse(fromPlace['km'].toString()) ?? 0;
@@ -2261,7 +2284,7 @@ class _ReceiptModal extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Route: $route', style: GoogleFonts.outfit(fontSize: 14)),
-              Text('Direction: $directionLabel',
+              Text('Direction: $actualDirection',
                   style: GoogleFonts.outfit(fontSize: 14)),
               Text('Date: $formattedDate',
                   style: GoogleFonts.outfit(fontSize: 14)),

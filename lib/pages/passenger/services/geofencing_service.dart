@@ -21,7 +21,7 @@ class GeofencingService {
   // Configuration
   static const double _geofenceRadius =
       250.0; // 250 meters for drop-off detection
-  static const Duration _checkInterval = Duration(seconds: 20);
+  static const Duration _checkInterval = Duration(seconds: 10);
   static const double _locationAccuracyThreshold = 50.0;
   static const Duration _minProcessingInterval = Duration(seconds: 10);
 

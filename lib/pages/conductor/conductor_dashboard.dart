@@ -10,7 +10,8 @@ class ConductorDashboard extends StatefulWidget {
   final String route;
   final String role;
 
-  const ConductorDashboard({super.key, required this.route, required this.role});
+  const ConductorDashboard(
+      {super.key, required this.route, required this.role});
 
   @override
   State<ConductorDashboard> createState() => _ConductorDashboardState();
@@ -62,7 +63,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
 
   void _updateStatusMessage() {
     setState(() {
-      _statusMessage = _isTracking 
+      _statusMessage = _isTracking
           ? 'Location tracking is active - Passengers can see your bus on the map'
           : 'Location tracking is off - Passengers cannot see your bus';
     });
@@ -72,7 +73,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     try {
       if (_isTracking) {
         await _locationService.stopLocationTracking();
-        
+
         setState(() {
           _isTracking = false;
         });
@@ -80,9 +81,9 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
       } else {
         // Show loading indicator
         _showSnackBar('Starting location tracking...', Colors.blue);
-        
+
         await _locationService.startLocationTracking();
-        
+
         setState(() {
           _isTracking = true;
         });
@@ -92,18 +93,20 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     } catch (e) {
       // If there's an error, check the actual database state
       await _checkTrackingState();
-      
+
       String errorMessage = 'Error starting location tracking';
       if (e.toString().contains('Location services are disabled')) {
-        errorMessage = 'Please enable GPS/Location services in your device settings';
+        errorMessage =
+            'Please enable GPS/Location services in your device settings';
       } else if (e.toString().contains('Location permission denied')) {
         errorMessage = 'Please enable location access in app settings';
       } else if (e.toString().contains('permanently denied')) {
-        errorMessage = 'Location access is permanently denied. Please enable it in device settings';
+        errorMessage =
+            'Location access is permanently denied. Please enable it in device settings';
       } else if (e.toString().contains('MissingPluginException')) {
         errorMessage = 'Location service not available. Please restart the app';
       }
-      
+
       _showSnackBar(errorMessage, Colors.red);
     }
   }
@@ -118,10 +121,11 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     );
   }
 
-  void _showManualPassengerAdjustmentDialog(BuildContext context, int currentPassengerCount) {
+  void _showManualPassengerAdjustmentDialog(
+      BuildContext context, int currentPassengerCount) {
     final TextEditingController quantityController = TextEditingController();
     final TextEditingController reasonController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -196,7 +200,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange[700], size: 20),
+                      Icon(Icons.info_outline,
+                          color: Colors.orange[700], size: 20),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -236,30 +241,33 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   );
                   return;
                 }
-                
+
                 final quantity = int.tryParse(quantityText);
                 if (quantity == null || quantity <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Please enter a valid number greater than 0'),
+                      content:
+                          Text('Please enter a valid number greater than 0'),
                       backgroundColor: Colors.red,
                     ),
                   );
                   return;
                 }
-                
+
                 if (quantity > currentPassengerCount) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Cannot subtract more passengers than currently on board'),
+                      content: Text(
+                          'Cannot subtract more passengers than currently on board'),
                       backgroundColor: Colors.red,
                     ),
                   );
                   return;
                 }
-                
+
                 Navigator.of(context).pop();
-                await _adjustPassengerCount(quantity, reasonController.text.trim());
+                await _adjustPassengerCount(
+                    quantity, reasonController.text.trim());
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF0091AD),
@@ -279,8 +287,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     );
   }
 
-
-
   Future<void> _adjustPassengerCount(int quantity, String reason) async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -295,14 +301,15 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           .where('uid', isEqualTo: user.uid)
           .limit(1)
           .get();
-      
+
       if (conductorDoc.docs.isEmpty) {
         _showSnackBar('Conductor data not found', Colors.red);
         return;
       }
 
       final conductorId = conductorDoc.docs.first.id;
-      final currentCount = conductorDoc.docs.first.data()['passengerCount'] ?? 0;
+      final currentCount =
+          conductorDoc.docs.first.data()['passengerCount'] ?? 0;
       final newCount = math.max<int>(0, currentCount - quantity);
 
       // Update passenger count (critical operation)
@@ -350,7 +357,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
 
       // Refresh the UI
       setState(() {});
-      
     } catch (e) {
       _showSnackBar('Error adjusting passenger count: $e', Colors.red);
       print('Error adjusting passenger count: $e');
@@ -384,79 +390,28 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           );
         }
 
-        final conductorData = conductorDocs.first.data() as Map<String, dynamic>;
+        final conductorData =
+            conductorDocs.first.data() as Map<String, dynamic>;
         final conductorDocId = conductorDocs.first.id;
-
         final activeTripId = conductorData['activeTrip']?['tripId'];
-        return StreamBuilder<QuerySnapshot>(
-          stream: activeTripId != null
-              ? FirebaseFirestore.instance
-                  .collection('conductors')
-                  .doc(conductorDocId)
-                  .collection('preBookings')
-                  .where('tripId', isEqualTo: activeTripId)
-                  .snapshots()
-              : FirebaseFirestore.instance
-                  .collection('conductors')
-                  .doc(conductorDocId)
-                  .collection('preBookings')
-                  .snapshots(),
-          builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
-        }
 
-        if (snapshot.hasError) {
-          return Text(
-            'Error loading pre-bookings: ${snapshot.error}',
-            style: GoogleFonts.outfit(color: Colors.red),
-          );
-        }
-
-        final allPreBookings = snapshot.data?.docs ?? [];
-        
-        // Filter in memory to avoid index requirements
-        final preBookings = allPreBookings
-            .where((doc) {
-              final data = doc.data() as Map<String, dynamic>;
-              // If there's an active trip, only show pre-bookings for that trip
-              // If no active trip, show all pre-bookings for this conductor
-              final isForCurrentTrip = activeTripId == null ||
-                  data['tripId'] == activeTripId ||
-                  data['tripId'] == null; // Include pre-bookings without tripId
-              // Only show pre-bookings that are paid but NOT scanned yet
-              return data['route'] == widget.route &&
-                     data['status'] == 'paid' &&
-                     data['boardingStatus'] != 'boarded' &&
-                     data['scannedBy'] == null && // NOT scanned yet
-                     isForCurrentTrip;
-            })
-            .toList();
-
-        if (preBookings.isEmpty) {
+        // ✅ FIX: Only show pre-bookings if there's an active trip
+        if (activeTripId == null) {
           return Container(
             padding: EdgeInsets.all(16),
             child: Column(
               children: [
-                Icon(
-                  Icons.people_outline,
-                  size: 48,
-                  color: Colors.grey[400],
-                ),
+                Icon(Icons.people_outline, size: 48, color: Colors.grey[400]),
                 SizedBox(height: 8),
                 Text(
-                  'No pre-booked passengers yet',
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    color: Colors.grey[600],
-                  ),
+                  'No active trip',
+                  style:
+                      GoogleFonts.outfit(fontSize: 16, color: Colors.grey[600]),
                 ),
                 Text(
-                  'Passengers with paid pre-bookings will appear here',
-                  style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    color: Colors.grey[500],
-                  ),
+                  'Start a trip to see pre-booked passengers',
+                  style:
+                      GoogleFonts.outfit(fontSize: 12, color: Colors.grey[500]),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -464,85 +419,146 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           );
         }
 
-        return Column(
-          children: [
-            Text(
-              '${preBookings.length} pre-booked passenger${preBookings.length == 1 ? '' : 's'}',
-              style: GoogleFonts.outfit(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(height: 12),
-            ...preBookings.map((doc) {
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('preBookings')
+              .snapshots(), // ✅ Get all, filter in memory
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return Center(child: CircularProgressIndicator());
+            }
+
+            if (snapshot.hasError) {
+              return Text(
+                'Error loading pre-bookings: ${snapshot.error}',
+                style: GoogleFonts.outfit(color: Colors.red),
+              );
+            }
+
+            final allPreBookings = snapshot.data?.docs ?? [];
+
+            // ✅ CRITICAL: Filter by active trip AND not completed
+            final preBookings = allPreBookings.where((doc) {
               final data = doc.data() as Map<String, dynamic>;
+
+              // Must be for current trip
+              final isForCurrentTrip = data['tripId'] == activeTripId;
+
+              // Must not be completed
+              final notCompleted = data['tripCompleted'] != true;
+
+              // Only show pre-bookings that are paid but NOT scanned yet
+              return data['route'] == widget.route &&
+                  data['status'] == 'paid' &&
+                  data['boardingStatus'] != 'boarded' &&
+                  data['scannedBy'] == null &&
+                  isForCurrentTrip &&
+                  notCompleted; // ✅ NEW: Don't show completed trips
+            }).toList();
+
+            if (preBookings.isEmpty) {
               return Container(
-                margin: EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green[200]!),
-                ),
-                child: Row(
+                padding: EdgeInsets.all(16),
+                child: Column(
                   children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.person,
-                        color: Colors.green[700],
-                        size: 20,
-                      ),
+                    Icon(Icons.people_outline,
+                        size: 48, color: Colors.grey[400]),
+                    SizedBox(height: 8),
+                    Text(
+                      'No pre-booked passengers yet',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, color: Colors.grey[600]),
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${data['from']} → ${data['to']}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${data['quantity']} passenger${data['quantity'] == 1 ? '' : 's'} • ${data['totalFare']?.toString() ?? '0.00'} PHP',
-                            style: GoogleFonts.outfit(
-                              fontSize: 12,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.green[100],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'PAID',
-                        style: GoogleFonts.outfit(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[700],
-                        ),
-                      ),
+                    Text(
+                      'Passengers with paid pre-bookings will appear here',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: Colors.grey[500]),
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               );
-            }).toList(),
-          ],
-        );
+            }
+
+            return Column(
+              children: [
+                Text(
+                  '${preBookings.length} pre-booked passenger${preBookings.length == 1 ? '' : 's'}',
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                SizedBox(height: 12),
+                ...preBookings.map((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 8),
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green[200]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.green[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.person,
+                              color: Colors.green[700], size: 20),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${data['from']} → ${data['to']}',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                '${data['quantity']} passenger${data['quantity'] == 1 ? '' : 's'} • ${data['totalFare']?.toString() ?? '0.00'} PHP',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'PAID',
+                            style: GoogleFonts.outfit(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ],
+            );
           },
         );
       },
@@ -552,7 +568,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
   Widget _buildScannedQRDataList() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      return Text('User not authenticated', style: GoogleFonts.outfit(color: Colors.red));
+      return Text('User not authenticated',
+          style: GoogleFonts.outfit(color: Colors.red));
     }
 
     return StreamBuilder<QuerySnapshot>(
@@ -566,7 +583,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           return Center(child: CircularProgressIndicator());
         }
 
-        if (conductorSnapshot.hasError || conductorSnapshot.data?.docs.isEmpty == true) {
+        if (conductorSnapshot.hasError ||
+            conductorSnapshot.data?.docs.isEmpty == true) {
           return Text(
             'Error loading conductor data',
             style: GoogleFonts.outfit(color: Colors.red),
@@ -574,14 +592,22 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         }
 
         final conductorDocId = conductorSnapshot.data!.docs.first.id;
+        final conductorData =
+            conductorSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+        final activeTripId =
+            conductorData['activeTrip']?['tripId']; // ✅ GET ACTIVE TRIP
+
+        // ✅ FIX: Only show scanned QR codes if there's an active trip
+        if (activeTripId == null) {
+          return _buildEmptyScannedQRState();
+        }
 
         return StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
               .collection('conductors')
               .doc(conductorDocId)
               .collection('scannedQRCodes')
-              .orderBy('scannedAt', descending: true)
-              .snapshots(),
+              .snapshots(), // ✅ REMOVED orderBy to avoid index error
           builder: (context, qrSnapshot) {
             if (qrSnapshot.connectionState == ConnectionState.waiting) {
               return Center(child: CircularProgressIndicator());
@@ -589,35 +615,46 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
 
             if (qrSnapshot.hasError) {
               print('Error loading scanned QR codes: ${qrSnapshot.error}');
-              // Fallback to legacy preBookings collection
-              return StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('conductors')
-                    .doc(conductorDocId)
-                    .collection('preBookings')
-                    .where('qr', isEqualTo: true)
-                    .orderBy('scannedAt', descending: true)
-                    .snapshots(),
-                builder: (context, legacySnap) {
-                  if (legacySnap.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  }
-                  if (legacySnap.hasError) {
-                    return Text(
-                      'Error loading scanned QR data: ${legacySnap.error}',
-                      style: GoogleFonts.outfit(color: Colors.red),
-                    );
-                  }
-                  final fallbackDocs = legacySnap.data?.docs ?? [];
-                  if (fallbackDocs.isEmpty) {
-                    return _buildEmptyScannedQRState();
-                  }
-                  return _buildScannedListFromDocs(fallbackDocs);
-                },
+              // ✅ SHOW ERROR instead of infinite loading
+              return Container(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 48, color: Colors.orange[400]),
+                    SizedBox(height: 8),
+                    Text(
+                      'Unable to load scanned QR codes',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, color: Colors.orange[600]),
+                    ),
+                    Text(
+                      'Please create the required Firebase index',
+                      style: GoogleFonts.outfit(
+                          fontSize: 12, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               );
             }
 
-            final scannedQRs = qrSnapshot.data?.docs ?? [];
+            // ✅ FILTER by active trip and sort in memory
+            var scannedQRs = (qrSnapshot.data?.docs ?? []).where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return data['tripId'] == activeTripId &&
+                  data['tripCompleted'] != true;
+            }).toList();
+
+            // ✅ SORT in memory (since we removed orderBy)
+            scannedQRs.sort((a, b) {
+              final aTime =
+                  (a.data() as Map<String, dynamic>)['scannedAt'] as Timestamp?;
+              final bTime =
+                  (b.data() as Map<String, dynamic>)['scannedAt'] as Timestamp?;
+              if (aTime == null || bTime == null) return 0;
+              return bTime.compareTo(aTime); // Descending
+            });
 
             if (scannedQRs.isEmpty) {
               return _buildEmptyScannedQRState();
@@ -696,13 +733,14 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     return docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
       final scannedAt = data['scannedAt'] as Timestamp?;
-      
+
       // Support both scannedQRCodes and preBookings document structures
       final from = data['from'] ?? data['data']?['from'] ?? 'Unknown';
       final to = data['to'] ?? data['data']?['to'] ?? 'Unknown';
-      final qty = (data['quantity'] as num?)?.toInt() ?? 
-                  (data['data']?['quantity'] as num?)?.toInt() ?? 1;
-      
+      final qty = (data['quantity'] as num?)?.toInt() ??
+          (data['data']?['quantity'] as num?)?.toInt() ??
+          1;
+
       // Handle different fare field names
       double amount = 0.0;
       final totalFareStr = data['totalFare'] ?? data['data']?['totalFare'];
@@ -712,7 +750,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         amount = totalFareStr.toDouble();
       } else {
         // Try other possible amount fields
-        final amountStr = data['data']?['amount'] ?? data['data']?['totalAmount'];
+        final amountStr =
+            data['data']?['amount'] ?? data['data']?['totalAmount'];
         if (amountStr != null) {
           if (amountStr is String) {
             amount = double.tryParse(amountStr) ?? 0.0;
@@ -726,7 +765,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
       final status = data['status'] ?? 'boarded';
       final isAccomplished = status == 'accomplished';
 
-      print('🔍 Dashboard QR tile: from=$from, to=$to, qty=$qty, amount=$amount, status=$status');
+      print(
+          '🔍 Dashboard QR tile: from=$from, to=$to, qty=$qty, amount=$amount, status=$status');
 
       return Container(
         margin: EdgeInsets.only(bottom: 8),
@@ -734,7 +774,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         decoration: BoxDecoration(
           color: isAccomplished ? Colors.green[50] : Colors.blue[50],
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isAccomplished ? Colors.green[200]! : Colors.blue[200]!),
+          border: Border.all(
+              color: isAccomplished ? Colors.green[200]! : Colors.blue[200]!),
         ),
         child: Row(
           children: [
@@ -807,24 +848,84 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     // Responsive sizing
-    final titleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final welcomeFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final routeFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final cardTitleFontSize = isMobile ? 20.0 : isTablet ? 22.0 : 24.0;
-    final bodyFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final smallFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
-    final buttonFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final resetButtonFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
-    final instructionsFontSize = isMobile ? 14.0 : isTablet ? 16.0 : 18.0;
-    final iconSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final bodyPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final cardPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final spacing = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
-    final smallSpacing = isMobile ? 8.0 : isTablet ? 10.0 : 12.0;
-    final mediumSpacing = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final welcomeFontSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final routeFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final cardTitleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 22.0
+            : 24.0;
+    final bodyFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final smallFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+    final buttonFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final resetButtonFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final instructionsFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final bodyPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final cardPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final spacing = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final smallSpacing = isMobile
+        ? 8.0
+        : isTablet
+            ? 10.0
+            : 12.0;
+    final mediumSpacing = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
@@ -883,7 +984,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.people, color: Color(0xFF0091AD), size: iconSize),
+                        Icon(Icons.people,
+                            color: Color(0xFF0091AD), size: iconSize),
                         SizedBox(width: smallSpacing),
                         Text(
                           'Passenger Count',
@@ -898,18 +1000,21 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                     StreamBuilder<QuerySnapshot>(
                       stream: FirebaseFirestore.instance
                           .collection('conductors')
-                          .where('uid', isEqualTo: FirebaseAuth.instance.currentUser?.uid)
+                          .where('uid',
+                              isEqualTo: FirebaseAuth.instance.currentUser?.uid)
                           .limit(1)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return Center(child: CircularProgressIndicator());
                         }
 
                         if (snapshot.hasError) {
                           return Text(
                             'Error loading passenger count: ${snapshot.error}',
-                            style: GoogleFonts.outfit(color: Colors.red, fontSize: bodyFontSize),
+                            style: GoogleFonts.outfit(
+                                color: Colors.red, fontSize: bodyFontSize),
                           );
                         }
 
@@ -917,16 +1022,20 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         if (docs.isEmpty) {
                           return Text(
                             'No conductor data found',
-                            style: GoogleFonts.outfit(color: Colors.grey, fontSize: bodyFontSize),
+                            style: GoogleFonts.outfit(
+                                color: Colors.grey, fontSize: bodyFontSize),
                           );
                         }
 
-                        final conductorData = docs.first.data() as Map<String, dynamic>;
+                        final conductorData =
+                            docs.first.data() as Map<String, dynamic>;
                         final conductorDocId = docs.first.id;
-                        final boardedPassengers = conductorData['passengerCount'] ?? 0;
-                        
+                        final boardedPassengers =
+                            conductorData['passengerCount'] ?? 0;
+
                         // Get pre-booked passengers count
-                        final activeTripId = conductorData['activeTrip']?['tripId'];
+                        final activeTripId =
+                            conductorData['activeTrip']?['tripId'];
                         print('🔍 Dashboard: Active trip ID: $activeTripId');
                         print('🔍 Dashboard: Conductor data: $conductorData');
                         return StreamBuilder<QuerySnapshot>(
@@ -946,32 +1055,36 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                   .snapshots(),
                           builder: (context, preBookingSnapshot) {
                             int preBookedPassengers = 0;
-                            
+
                             if (preBookingSnapshot.hasData) {
-                              final allPreBookings = preBookingSnapshot.data!.docs;
-                              print('🔍 Dashboard: Found ${allPreBookings.length} pre-bookings in preBookings collection');
-                              
+                              final allPreBookings =
+                                  preBookingSnapshot.data!.docs;
+                              print(
+                                  '🔍 Dashboard: Found ${allPreBookings.length} pre-bookings in preBookings collection');
+
                               for (var doc in allPreBookings) {
                                 final data = doc.data() as Map<String, dynamic>;
-                                print('🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, BoardingStatus: ${data['boardingStatus']}, TripId: ${data['tripId']}');
-                                
-                                final isForCurrentTrip = activeTripId == null || 
-                                    data['tripId'] == activeTripId || 
+                                print(
+                                    '🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, BoardingStatus: ${data['boardingStatus']}, TripId: ${data['tripId']}');
+
+                                final isForCurrentTrip = activeTripId == null ||
+                                    data['tripId'] == activeTripId ||
                                     data['tripId'] == null;
-                                
+
                                 // FIXED: Only count pre-bookings that are NOT yet boarded/scanned
                                 // Boarded/scanned pre-bookings are already in passengerCount
                                 if (data['route'] == widget.route &&
                                     isForCurrentTrip &&
                                     data['status'] == 'paid' &&
                                     data['boardingStatus'] != 'boarded' &&
-                                    data['scannedBy'] == null) { // NOT scanned yet
+                                    data['scannedBy'] == null) {
+                                  // NOT scanned yet
                                   final qty = (data['quantity'] as int?) ?? 1;
                                   preBookedPassengers += qty;
                                 }
                               }
                             }
-                            
+
                             // Get additional scanned pre-bookings from scannedQRCodes collection
                             return StreamBuilder<QuerySnapshot>(
                               stream: FirebaseFirestore.instance
@@ -984,19 +1097,23 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                               builder: (context, scannedSnapshot) {
                                 // REMOVED: scannedPreBookedPassengers calculation
                                 // Scanned pre-bookings are already in passengerCount
-                                
+
                                 // passengerCount already includes all boarded passengers (regular + pre-booked)
-                                final totalBoardedPassengers = boardedPassengers;
-                                
+                                final totalBoardedPassengers =
+                                    boardedPassengers;
+
                                 // Total capacity = boarded + waiting pre-bookings
-                                final totalPassengers = totalBoardedPassengers + preBookedPassengers;
+                                final totalPassengers = totalBoardedPassengers +
+                                    preBookedPassengers;
                                 final maxCapacity = 27;
-                                final percentage = (totalPassengers / maxCapacity) * 100;
+                                final percentage =
+                                    (totalPassengers / maxCapacity) * 100;
 
                                 return Column(
                                   children: [
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           'Current Passengers:',
@@ -1010,7 +1127,10 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                           style: GoogleFonts.outfit(
                                             fontSize: bodyFontSize,
                                             fontWeight: FontWeight.bold,
-                                            color: totalPassengers >= maxCapacity ? Colors.red : Color(0xFF0091AD),
+                                            color:
+                                                totalPassengers >= maxCapacity
+                                                    ? Colors.red
+                                                    : Color(0xFF0091AD),
                                           ),
                                         ),
                                       ],
@@ -1018,7 +1138,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                     SizedBox(height: smallSpacing),
                                     // Color-coded breakdown
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         // Boarded passengers (light blue)
                                         Row(
@@ -1082,11 +1203,19 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                               child: Container(
                                                 decoration: BoxDecoration(
                                                   color: Colors.lightBlue[400],
-                                                  borderRadius: BorderRadius.only(
+                                                  borderRadius:
+                                                      BorderRadius.only(
                                                     topLeft: Radius.circular(4),
-                                                    bottomLeft: Radius.circular(4),
-                                                    topRight: preBookedPassengers == 0 ? Radius.circular(4) : Radius.zero,
-                                                    bottomRight: preBookedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                    bottomLeft:
+                                                        Radius.circular(4),
+                                                    topRight:
+                                                        preBookedPassengers == 0
+                                                            ? Radius.circular(4)
+                                                            : Radius.zero,
+                                                    bottomRight:
+                                                        preBookedPassengers == 0
+                                                            ? Radius.circular(4)
+                                                            : Radius.zero,
                                                   ),
                                                 ),
                                               ),
@@ -1098,11 +1227,22 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                               child: Container(
                                                 decoration: BoxDecoration(
                                                   color: Colors.orange[400],
-                                                  borderRadius: BorderRadius.only(
-                                                    topRight: Radius.circular(4),
-                                                    bottomRight: Radius.circular(4),
-                                                    topLeft: totalBoardedPassengers == 0 ? Radius.circular(4) : Radius.zero,
-                                                    bottomLeft: totalBoardedPassengers == 0 ? Radius.circular(4) : Radius.zero,
+                                                  borderRadius:
+                                                      BorderRadius.only(
+                                                    topRight:
+                                                        Radius.circular(4),
+                                                    bottomRight:
+                                                        Radius.circular(4),
+                                                    topLeft:
+                                                        totalBoardedPassengers ==
+                                                                0
+                                                            ? Radius.circular(4)
+                                                            : Radius.zero,
+                                                    bottomLeft:
+                                                        totalBoardedPassengers ==
+                                                                0
+                                                            ? Radius.circular(4)
+                                                            : Radius.zero,
                                                   ),
                                                 ),
                                               ),
@@ -1110,7 +1250,10 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                           // Remaining capacity (gray)
                                           if (totalPassengers < maxCapacity)
                                             Expanded(
-                                              flex: (maxCapacity - totalPassengers).clamp(1, maxCapacity).toInt(),
+                                              flex: (maxCapacity -
+                                                      totalPassengers)
+                                                  .clamp(1, maxCapacity)
+                                                  .toInt(),
                                               child: Container(
                                                 color: Colors.grey[300],
                                                 child: SizedBox.shrink(),
@@ -1133,8 +1276,10 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                         padding: EdgeInsets.all(smallSpacing),
                                         decoration: BoxDecoration(
                                           color: Colors.red[50],
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(color: Colors.red[200]!),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: Colors.red[200]!),
                                         ),
                                         child: Text(
                                           'Bus is at full capacity!',
@@ -1146,21 +1291,27 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                                         ),
                                       ),
                                     ],
-                                    
+
                                     SizedBox(height: mediumSpacing),
                                     Row(
                                       children: [
                                         Expanded(
                                           child: ElevatedButton(
-                                            onPressed: totalBoardedPassengers > 0 ? () async {
-                                              // Show manual passenger count adjustment dialog
-                                              _showManualPassengerAdjustmentDialog(context, totalBoardedPassengers);
-                                            } : null,
+                                            onPressed:
+                                                totalBoardedPassengers > 0
+                                                    ? () async {
+                                                        // Show manual passenger count adjustment dialog
+                                                        _showManualPassengerAdjustmentDialog(
+                                                            context,
+                                                            totalBoardedPassengers);
+                                                      }
+                                                    : null,
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.orange,
                                               foregroundColor: Colors.white,
                                               shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                             ),
                                             child: Text(
@@ -1227,7 +1378,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       child: ElevatedButton(
                         onPressed: _toggleLocationTracking,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: _isTracking ? Colors.red : Color(0xFF0091AD),
+                          backgroundColor:
+                              _isTracking ? Colors.red : Color(0xFF0091AD),
                           foregroundColor: Colors.white,
                           padding: EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -1266,7 +1418,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.people, color: Color(0xFF0091AD), size: iconSize),
+                        Icon(Icons.people,
+                            color: Color(0xFF0091AD), size: iconSize),
                         SizedBox(width: smallSpacing),
                         Text(
                           'Pre-booked Passengers',
@@ -1295,7 +1448,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.qr_code_scanner, color: Color(0xFF0091AD), size: iconSize),
+                        Icon(Icons.qr_code_scanner,
+                            color: Color(0xFF0091AD), size: iconSize),
                         SizedBox(width: smallSpacing),
                         Text(
                           'Scanned QR Codes',
@@ -1324,7 +1478,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.info_outline, color: Color(0xFF0091AD), size: iconSize),
+                        Icon(Icons.info_outline,
+                            color: Color(0xFF0091AD), size: iconSize),
                         SizedBox(width: smallSpacing),
                         Text(
                           'Instructions',

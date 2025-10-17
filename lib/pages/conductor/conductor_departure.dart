@@ -548,27 +548,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             .where('tripId', isEqualTo: endingTripId)
             .get();
 
-        int deletedCount = 0;
-        int preservedCount = 0;
-
         for (var doc in scannedQRsToDelete.docs) {
-          final data = doc.data();
-          final status = data['status'] ?? '';
-
-          if (status == 'accomplished' || data['dropOffTimestamp'] != null) {
-            print('🛡️ Preserving accomplished scannedQR: ${doc.id}');
-            preservedCount++;
-            continue;
-          }
-
           await doc.reference.delete();
-          deletedCount++;
         }
 
         print(
-            '✅ Cleared $deletedCount scanned QR codes, preserved $preservedCount accomplished ones from trip $endingTripId');
+            '✅ Deleted ${scannedQRsToDelete.docs.length} scanned QR codes from trip $endingTripId');
       } catch (e) {
-        print('⚠️ Error clearing scanned QR codes: $e');
+        print('⚠️ Error deleting scanned QR codes: $e');
       }
 
       // Only delete pre-bookings that were NOT accomplished
@@ -580,27 +567,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             .where('tripId', isEqualTo: endingTripId)
             .get();
 
-        int deletedCount = 0;
-        int preservedCount = 0;
-
         for (var doc in preBookingsToDelete.docs) {
-          final data = doc.data();
-          final status = data['status'] ?? '';
-
-          if (status == 'accomplished' || data['dropOffTimestamp'] != null) {
-            print('🛡️ Preserving accomplished preBooking: ${doc.id}');
-            preservedCount++;
-            continue;
-          }
-
           await doc.reference.delete();
-          deletedCount++;
         }
 
         print(
-            '✅ Cleared $deletedCount boarded pre-bookings, preserved $preservedCount accomplished ones from trip $endingTripId');
+            '✅ Deleted ${preBookingsToDelete.docs.length} pre-bookings from trip $endingTripId');
       } catch (e) {
-        print('⚠️ Error clearing boarded pre-bookings: $e');
+        print('⚠️ Error deleting pre-bookings: $e');
       }
 
       // Process trip end with respect to accomplished pre-bookings

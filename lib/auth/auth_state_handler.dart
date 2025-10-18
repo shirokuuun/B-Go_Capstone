@@ -3,19 +3,63 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:b_go/pages/conductor/conductor_home.dart';
 import 'package:b_go/auth/login_page.dart';
+import 'package:b_go/pages/user_role/user_selection.dart';
+import 'dart:async';
 
-class AuthStateHandler extends StatelessWidget {
+class AuthStateHandler extends StatefulWidget {
   final VoidCallback showRegisterPage;
   
   const AuthStateHandler({Key? key, required this.showRegisterPage}) : super(key: key);
 
   @override
+  State<AuthStateHandler> createState() => _AuthStateHandlerState();
+}
+
+class _AuthStateHandlerState extends State<AuthStateHandler> {
+  Future<bool> _checkIfConductor(String uid) async {
+    try {
+      print('🔍 Starting Firestore query for conductor check...');
+      
+      final query = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: uid)
+          .limit(1)
+          .get()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              print('⏱️ TIMEOUT: Firestore query took too long');
+              throw TimeoutException('Query timeout');
+            },
+          );
+      
+      print('✅ Firestore query completed');
+      print('📊 Documents found: ${query.docs.length}');
+      
+      return query.docs.isNotEmpty;
+    } on FirebaseException catch (e) {
+      print('❌ FirebaseException: ${e.code} - ${e.message}');
+      return false;
+    } on TimeoutException catch (e) {
+      print('❌ TimeoutException: $e');
+      return false;
+    } catch (e) {
+      print('❌ Unknown error: $e');
+      return false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    print('🔍 AuthStateHandler: Building...');
+    
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        // Show loading while checking auth state
+        print('🔍 AuthStateHandler: ConnectionState = ${snapshot.connectionState}');
+        
         if (snapshot.connectionState == ConnectionState.waiting) {
+          print('⏳ AuthStateHandler: Waiting for auth state...');
           return const Scaffold(
             backgroundColor: Color(0xFFE5E9F0),
             body: Center(
@@ -26,97 +70,105 @@ class AuthStateHandler extends StatelessWidget {
           );
         }
         
-        // If user is logged in
+        print('🔍 AuthStateHandler: Has data = ${snapshot.hasData}');
+        
         if (snapshot.hasData && snapshot.data != null) {
           final user = snapshot.data!;
+          print('✅ User is logged in: ${user.uid}');
+          print('📧 Email verified: ${user.emailVerified}');
           
-          // Check if user is a conductor FIRST before checking email verification
-          return FutureBuilder<QuerySnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('conductors')
-                .where('uid', isEqualTo: user.uid)
-                .limit(1)
-                .get(),
+          return FutureBuilder<bool>(
+            future: _checkIfConductor(user.uid),
             builder: (context, conductorSnapshot) {
-              if (conductorSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  backgroundColor: Color(0xFFE5E9F0),
-                  body: Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
-                    ),
-                  ),
-                );
-              }
+              print('🔍 Conductor check: ConnectionState = ${conductorSnapshot.connectionState}');
               
-              if (conductorSnapshot.hasError) {
+              if (conductorSnapshot.connectionState == ConnectionState.waiting) {
+                print('⏳ Checking if user is conductor...');
                 return Scaffold(
-                  backgroundColor: Color(0xFFE5E9F0),
+                  backgroundColor: const Color(0xFFE5E9F0),
                   body: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, size: 48, color: Colors.red),
-                        SizedBox(height: 16),
-                        Text(
-                          'Error loading user data',
-                          style: TextStyle(fontSize: 16),
+                        const CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
                         ),
-                        SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: () async {
-                            await FirebaseAuth.instance.signOut();
-                          },
-                          child: Text('Return to Login'),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Loading...',
+                          style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
                 );
               }
               
-              if (conductorSnapshot.hasData && conductorSnapshot.data!.docs.isNotEmpty) {
-                // User is a conductor - let them in regardless of email verification
-                final conductorData = conductorSnapshot.data!.docs.first.data() as Map<String, dynamic>;
-                final route = conductorData['route'] ?? '';
-                final placeCollection = conductorData['placeCollection'] ?? 'Place';
+              final isConductor = conductorSnapshot.data ?? false;
+              print('🔍 Is conductor: $isConductor');
+              
+              if (conductorSnapshot.hasError) {
+                print('❌ Error in conductor check: ${conductorSnapshot.error}');
+              }
+              
+              if (isConductor) {
+                print('🚌 User is a conductor - fetching conductor data');
                 
-                return ConductorHome(
-                  role: 'Conductor',
-                  route: route,
-                  placeCollection: placeCollection,
-                  selectedIndex: 0,
-                );
-              } else {
-                // User is NOT a conductor - now check email verification for regular users
-                if (!user.emailVerified && user.providerData.first.providerId == 'password') {
-                  // Regular users need email verification
-                  return LoginPage(showRegisterPage: showRegisterPage);
-                }
-                
-                // User is a verified regular user, navigate to user selection
-                return FutureBuilder(
-                  future: Future.delayed(Duration.zero, () {
-                    Navigator.pushReplacementNamed(context, '/user_selection');
-                  }),
-                  builder: (context, _) {
-                    return const Scaffold(
-                      backgroundColor: Color(0xFFE5E9F0),
-                      body: Center(
-                        child: CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
+                // Need to fetch conductor data again to get route and placeCollection
+                return FutureBuilder<QuerySnapshot>(
+                  future: FirebaseFirestore.instance
+                      .collection('conductors')
+                      .where('uid', isEqualTo: user.uid)
+                      .limit(1)
+                      .get(),
+                  builder: (context, dataSnapshot) {
+                    if (dataSnapshot.connectionState == ConnectionState.waiting) {
+                      return const Scaffold(
+                        backgroundColor: Color(0xFFE5E9F0),
+                        body: Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
+                          ),
                         ),
-                      ),
-                    );
+                      );
+                    }
+                    
+                    if (dataSnapshot.hasData && dataSnapshot.data!.docs.isNotEmpty) {
+                      final conductorData = dataSnapshot.data!.docs.first.data() as Map<String, dynamic>;
+                      final route = conductorData['route'] ?? '';
+                      final placeCollection = conductorData['placeCollection'] ?? 'Place';
+                      
+                      return ConductorHome(
+                        role: 'Conductor',
+                        route: route,
+                        placeCollection: placeCollection,
+                        selectedIndex: 0,
+                      );
+                    }
+                    
+                    // Fallback if data fetch fails
+                    return UserSelection();
                   },
                 );
+              } else {
+                print('👤 User is NOT a conductor');
+                
+                if (!user.emailVerified && user.providerData.isNotEmpty && 
+                    user.providerData.first.providerId == 'password') {
+                  print('⚠️ Email not verified, showing LoginPage');
+                  return LoginPage(showRegisterPage: widget.showRegisterPage);
+                }
+                
+                print('✅ Proceeding to UserSelection');
+                return UserSelection();
               }
             },
           );
         }
         
-        // If user is not logged in, show login page
-        return LoginPage(showRegisterPage: showRegisterPage);
+        print('❌ No user logged in, showing LoginPage');
+        return LoginPage(showRegisterPage: widget.showRegisterPage);
       },
     );
   }

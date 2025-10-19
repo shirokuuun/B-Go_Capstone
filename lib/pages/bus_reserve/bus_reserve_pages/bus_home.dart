@@ -15,113 +15,84 @@ class BusHome extends StatefulWidget {
 
 class _BusHomeState extends State<BusHome> {
   List<Map<String, dynamic>> _availableBuses = [];
-  Set<String> _selectedBusIds = {};
-  String? _selectedWeekday; // 'Monday', 'Tuesday', etc. or null for all
-  String _availabilityFilter = 'all'; // 'all', 'available', 'unavailable', 'reserved'
+  String? _selectedBusId; // Changed from Set to single String
+  String? _selectedWeekday;
+  String _availabilityFilter = 'all';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
     super.initState();
     _fetchConductorBuses();
-    // Update expired reservations when the page loads
     ReservationService.updateExpiredReservations();
   }
 
   Future<void> _fetchConductorBuses() async {
-    // Fetch all conductors formatted as bus data
     final buses = await ReservationService.getAllConductorsAsBuses();
     setState(() {
       _availableBuses = buses;
     });
   }
 
-  // Helper method to get a date for a specific weekday (next occurrence)
   DateTime _getDateFromWeekday(String weekday) {
-    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    final targetWeekday = weekdays.indexOf(weekday) + 1; // Convert to 1-7 format
-    
+    final weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
+    final targetWeekday = weekdays.indexOf(weekday) + 1;
+
     final today = DateTime.now();
     final currentWeekday = today.weekday;
-    
-    // Calculate days until target weekday
+
     int daysUntilTarget = (targetWeekday - currentWeekday) % 7;
     if (daysUntilTarget == 0) {
-      daysUntilTarget = 7; // If it's the same day, get next week's occurrence
+      daysUntilTarget = 7;
     }
-    
+
     return today.add(Duration(days: daysUntilTarget));
   }
 
   List<Map<String, dynamic>> _getFilteredBuses() {
     List<Map<String, dynamic>> filtered = List.from(_availableBuses);
 
-    // Apply weekday filter first
+    // Apply weekday filter first (filters by coding day availability)
     if (_selectedWeekday != null) {
+      final selectedDate = _getDateFromWeekday(_selectedWeekday!);
       filtered = filtered.where((bus) {
         final plateNumber = bus['plateNumber'] as String? ?? '';
         return ReservationService.isBusAvailableForReservation(
-          plateNumber, 
-          _getDateFromWeekday(_selectedWeekday!)
-        );
+            plateNumber, selectedDate);
       }).toList();
     }
 
-    // Apply availability filter
+    // Apply availability filter (filters by reservation status)
     if (_availabilityFilter != 'all') {
       filtered = filtered.where((bus) {
         final conductor = bus['conductorData'] as Map<String, dynamic>?;
-        final plateNumber = bus['plateNumber'] as String? ?? '';
-        
+
         if (conductor == null) {
-          // No conductor data - check if bus is on its coding day
-          final isOnCodingDay = _selectedWeekday != null 
-            ? ReservationService.isBusAvailableForReservation(
-                plateNumber, 
-                _getDateFromWeekday(_selectedWeekday!)
-              )
-            : true; // Show all buses if no weekday filter
-          
-          return _availabilityFilter == 'available' ? isOnCodingDay : !isOnCodingDay;
+          return _availabilityFilter == 'available';
         }
-        
-        // Get conductor availability status
-        final busAvailabilityStatus = ReservationService.getBusAvailabilityStatus(conductor);
-        
-        if (_selectedWeekday != null) {
-          // When weekday is selected, check coding day + conductor status
-          final isOnCodingDay = ReservationService.isBusAvailableForReservation(
-            plateNumber, 
-            _getDateFromWeekday(_selectedWeekday!)
-          );
-          final selectedDate = _getDateFromWeekday(_selectedWeekday!);
-          final isReservedForDate = ReservationService.isBusReservedForDate(conductor, selectedDate);
-          final isAvailable = isOnCodingDay && busAvailabilityStatus == 'available' && !isReservedForDate;
-          final isPending = busAvailabilityStatus == 'pending';
-          final isReserved = busAvailabilityStatus == 'reserved' && isReservedForDate;
-          
-          if (_availabilityFilter == 'available') {
-            return isAvailable;
-          } else if (_availabilityFilter == 'unavailable') {
-            return !isAvailable && !isPending && !isReserved;
-          } else if (_availabilityFilter == 'reserved') {
-            return isReserved;
-          }
-        } else {
-          // When no weekday selected, only check conductor status
-          final isAvailable = busAvailabilityStatus == 'available';
-          final isPending = busAvailabilityStatus == 'pending';
-          final isReserved = busAvailabilityStatus == 'reserved';
-          
-          if (_availabilityFilter == 'available') {
-            return isAvailable;
-          } else if (_availabilityFilter == 'unavailable') {
-            return !isAvailable && !isPending && !isReserved;
-          } else if (_availabilityFilter == 'reserved') {
-            return isReserved;
-          }
+
+        final busAvailabilityStatus =
+            ReservationService.getBusAvailabilityStatus(conductor);
+
+        if (_availabilityFilter == 'available') {
+          return busAvailabilityStatus == 'available';
+        } else if (_availabilityFilter == 'unavailable') {
+          // Include both 'unavailable' and 'pending' statuses
+          return busAvailabilityStatus == 'unavailable' ||
+              busAvailabilityStatus == 'pending';
+        } else if (_availabilityFilter == 'reserved') {
+          // Only include 'reserved' status (verified receipts)
+          return busAvailabilityStatus == 'reserved';
         }
-        
+
         return true;
       }).toList();
     }
@@ -133,7 +104,7 @@ class _BusHomeState extends State<BusHome> {
     final isSelected = _availabilityFilter == value;
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -142,9 +113,7 @@ class _BusHomeState extends State<BusHome> {
       },
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: isMobile ? 10 : 12, 
-          vertical: isMobile ? 5 : 6
-        ),
+            horizontal: isMobile ? 10 : 12, vertical: isMobile ? 5 : 6),
         decoration: BoxDecoration(
           color: isSelected ? Color(0xFF0091AD) : Colors.grey.shade200,
           borderRadius: BorderRadius.circular(20),
@@ -157,7 +126,11 @@ class _BusHomeState extends State<BusHome> {
           label,
           style: GoogleFonts.outfit(
             color: isSelected ? Colors.white : Colors.black87,
-            fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+            fontSize: isMobile
+                ? 12
+                : isTablet
+                    ? 14
+                    : 16,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -169,40 +142,75 @@ class _BusHomeState extends State<BusHome> {
     final conductor = bus['conductorData'] as Map<String, dynamic>?;
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    final plateNumber = bus['plateNumber'] as String? ?? '';
-    final effectiveDate = _selectedWeekday != null ? _getDateFromWeekday(_selectedWeekday!) : DateTime.now();
-    final isGrayedOut = _selectedWeekday != null ? ReservationService.isBusGrayedOutDueToCoding(plateNumber, effectiveDate) : false;
 
     if (conductor == null || conductor.isEmpty) {
-      if (_selectedWeekday != null) {
-        final isOnCodingDay = ReservationService.isBusAvailableForReservation(
-          plateNumber, 
-          effectiveDate
-        );
-        
-        return RichText(
+      return RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: 'Status: ',
+              style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            TextSpan(
+              text: 'No conductor data',
+              style: GoogleFonts.outfit(
+                color: Colors.grey,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Get the ACTUAL reservation status
+    final busAvailabilityStatus =
+        ReservationService.getBusAvailabilityStatus(conductor);
+
+    // Determine status based on actual reservation status
+    Color statusColor;
+    String statusText;
+
+    if (busAvailabilityStatus == 'pending') {
+      statusColor = Colors.orange;
+      statusText = 'Pending Payment';
+    } else if (busAvailabilityStatus == 'reserved') {
+      statusColor = Colors.blue;
+      statusText = 'Reserved (Verified)';
+    } else if (busAvailabilityStatus == 'unavailable') {
+      statusColor = Colors.red;
+      statusText = 'Unavailable';
+    } else {
+      statusColor = Colors.green;
+      statusText = 'Available';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RichText(
           text: TextSpan(
             children: [
               TextSpan(
-                text: 'Status: ',
+                text: 'Conductor: ',
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.bold,
-                  color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                  color: Colors.black,
                 ),
               ),
               TextSpan(
-                text: isOnCodingDay ? 'Available - Coding Day' : 'Not on Coding Day',
+                text: conductor['name'] ?? 'Unknown',
                 style: GoogleFonts.outfit(
-                  color: isOnCodingDay ? Colors.green : Colors.red,
-                  fontStyle: FontStyle.italic,
-                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800],
                 ),
               ),
             ],
           ),
-        );
-      } else {
-        return RichText(
+        ),
+        RichText(
           text: TextSpan(
             children: [
               TextSpan(
@@ -213,195 +221,57 @@ class _BusHomeState extends State<BusHome> {
                 ),
               ),
               TextSpan(
-                text: 'Check coding day',
+                text: statusText,
                 style: GoogleFonts.outfit(
-                  color: Colors.blue,
-                  fontStyle: FontStyle.italic,
+                  color: statusColor,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ],
           ),
-        );
-      }
-    }
-
-    final busAvailabilityStatus = ReservationService.getBusAvailabilityStatus(conductor);
-    
-    if (_selectedWeekday != null) {
-      // When weekday is selected, check coding day + conductor status
-      final isOnCodingDay = ReservationService.isBusAvailableForReservation(
-        plateNumber, 
-        effectiveDate
-      );
-      final isReservedForDate = ReservationService.isBusReservedForDate(conductor, effectiveDate);
-      final isAvailable = isOnCodingDay && busAvailabilityStatus == 'available' && !isReservedForDate;
-      final isPending = busAvailabilityStatus == 'pending';
-      final isReserved = busAvailabilityStatus == 'reserved' && isReservedForDate;
-      
-      final statusColor = isAvailable ? Colors.green : 
-                         isPending ? Colors.orange : 
-                         isReserved ? Colors.blue : Colors.red;
-      final statusText = isAvailable ? 'Available' : 
-                        isPending ? 'Pending Payment' : 
-                        isReserved ? 'Reserved' : 'Unavailable';
-      final statusReason = !isOnCodingDay ? ' (Not coding day)' : 
-                         isPending ? ' (Awaiting payment verification)' : 
-                         isReserved ? ' (Reserved for this date)' : '';
-      
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        ),
+        if (conductor['codingDay'] != null)
           RichText(
             text: TextSpan(
               children: [
                 TextSpan(
-                  text: 'Conductor: ',
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.bold,
-                    color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
-                  ),
-                ),
-                TextSpan(
-                  text: conductor['name'] ?? 'Unknown',
-                  style: GoogleFonts.outfit(
-                    color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Status: ',
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.bold,
-                    color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
-                  ),
-                ),
-                TextSpan(
-                  text: '$statusText$statusReason',
-                  style: GoogleFonts.outfit(
-                    color: statusColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (conductor['codingDay'] != null)
-            RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Coding Day: ',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
-                    ),
-                  ),
-                  TextSpan(
-                    text: conductor['codingDay'] ?? 'Unknown',
-                    style: GoogleFonts.outfit(
-                      color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
-                      fontSize: isMobile ? 11 : isTablet ? 12 : 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-    } else {
-      // When no weekday selected, only show conductor status
-      final isAvailable = busAvailabilityStatus == 'available';
-      final isPending = busAvailabilityStatus == 'pending';
-      final isReserved = busAvailabilityStatus == 'reserved';
-      
-      final statusColor = isAvailable ? Colors.green : 
-                         isPending ? Colors.orange : 
-                         isReserved ? Colors.blue : Colors.red;
-      final statusText = isAvailable ? 'Available' : 
-                        isPending ? 'Pending Payment' : 
-                        isReserved ? 'Reserved' : 'Unavailable';
-      final statusReason = isPending ? ' (Awaiting payment verification)' : 
-                          isReserved ? ' (Reserved for specific date)' : '';
-
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Conductor: ',
+                  text: 'Coding Day: ',
                   style: GoogleFonts.outfit(
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
                 ),
                 TextSpan(
-                  text: conductor['name'] ?? 'Unknown',
+                  text: conductor['codingDay'] ?? 'Unknown',
                   style: GoogleFonts.outfit(
                     color: Colors.grey[800],
+                    fontSize: isMobile
+                        ? 11
+                        : isTablet
+                            ? 12
+                            : 13,
                   ),
                 ),
               ],
             ),
           ),
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Status: ',
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-                TextSpan(
-                  text: '$statusText$statusReason',
-                  style: GoogleFonts.outfit(
-                    color: statusColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (conductor['codingDay'] != null)
-            RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: 'Coding Day: ',
-                    style: GoogleFonts.outfit(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  TextSpan(
-                    text: conductor['codingDay'] ?? 'Unknown',
-                    style: GoogleFonts.outfit(
-                      color: Colors.grey[800],
-                      fontSize: isMobile ? 11 : isTablet ? 12 : 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      );
-    }
+      ],
+    );
   }
 
   void _selectWeekday() {
-    final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday'
+    ];
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -418,7 +288,6 @@ class _BusHomeState extends State<BusHome> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Drag handle
               Container(
                 margin: EdgeInsets.only(top: 12, bottom: 8),
                 width: 40,
@@ -428,7 +297,6 @@ class _BusHomeState extends State<BusHome> {
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              // Header
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(
@@ -442,7 +310,11 @@ class _BusHomeState extends State<BusHome> {
                     Text(
                       'Filter by Day',
                       style: GoogleFonts.outfit(
-                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontSize: isMobile
+                            ? 20
+                            : isTablet
+                                ? 22
+                                : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
@@ -457,7 +329,6 @@ class _BusHomeState extends State<BusHome> {
                 ),
               ),
               Divider(height: 1, thickness: 1),
-              // Options list
               Container(
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.of(context).size.height * 0.6,
@@ -465,7 +336,6 @@ class _BusHomeState extends State<BusHome> {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      // Show All Routes option
                       InkWell(
                         onTap: () {
                           setState(() {
@@ -474,9 +344,10 @@ class _BusHomeState extends State<BusHome> {
                           Navigator.of(context).pop();
                         },
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 16),
                           decoration: BoxDecoration(
-                            color: _selectedWeekday == null 
+                            color: _selectedWeekday == null
                                 ? Color(0xFF0091AD).withOpacity(0.1)
                                 : Colors.transparent,
                             border: Border(
@@ -494,12 +365,12 @@ class _BusHomeState extends State<BusHome> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: _selectedWeekday == null 
+                                    color: _selectedWeekday == null
                                         ? Color(0xFF0091AD)
                                         : Colors.grey.shade400,
                                     width: 2,
                                   ),
-                                  color: _selectedWeekday == null 
+                                  color: _selectedWeekday == null
                                       ? Color(0xFF0091AD)
                                       : Colors.transparent,
                                 ),
@@ -520,11 +391,15 @@ class _BusHomeState extends State<BusHome> {
                               Text(
                                 'Show All Days',
                                 style: GoogleFonts.outfit(
-                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-                                  fontWeight: _selectedWeekday == null 
-                                      ? FontWeight.w600 
+                                  fontSize: isMobile
+                                      ? 16
+                                      : isTablet
+                                          ? 18
+                                          : 20,
+                                  fontWeight: _selectedWeekday == null
+                                      ? FontWeight.w600
                                       : FontWeight.w500,
-                                  color: _selectedWeekday == null 
+                                  color: _selectedWeekday == null
                                       ? Color(0xFF0091AD)
                                       : Colors.black87,
                                 ),
@@ -533,74 +408,81 @@ class _BusHomeState extends State<BusHome> {
                           ),
                         ),
                       ),
-                      // Weekday options
-                      ...weekdays.map((weekday) => InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedWeekday = weekday;
-                          });
-                          Navigator.of(context).pop();
-                        },
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          decoration: BoxDecoration(
-                            color: _selectedWeekday == weekday 
-                                ? Color(0xFF0091AD).withOpacity(0.1)
-                                : Colors.transparent,
-                            border: Border(
-                              bottom: BorderSide(
-                                color: Colors.grey.shade200,
-                                width: 1,
-                              ),
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: isMobile ? 20 : 24,
-                                height: isMobile ? 20 : 24,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _selectedWeekday == weekday 
-                                        ? Color(0xFF0091AD)
-                                        : Colors.grey.shade400,
-                                    width: 2,
+                      ...weekdays
+                          .map((weekday) => InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    _selectedWeekday = weekday;
+                                  });
+                                  Navigator.of(context).pop();
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 20, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: _selectedWeekday == weekday
+                                        ? Color(0xFF0091AD).withOpacity(0.1)
+                                        : Colors.transparent,
+                                    border: Border(
+                                      bottom: BorderSide(
+                                        color: Colors.grey.shade200,
+                                        width: 1,
+                                      ),
+                                    ),
                                   ),
-                                  color: _selectedWeekday == weekday 
-                                      ? Color(0xFF0091AD)
-                                      : Colors.transparent,
-                                ),
-                                child: _selectedWeekday == weekday
-                                    ? Center(
-                                        child: Container(
-                                          width: isMobile ? 8 : 10,
-                                          height: isMobile ? 8 : 10,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.white,
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: isMobile ? 20 : 24,
+                                        height: isMobile ? 20 : 24,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: _selectedWeekday == weekday
+                                                ? Color(0xFF0091AD)
+                                                : Colors.grey.shade400,
+                                            width: 2,
                                           ),
+                                          color: _selectedWeekday == weekday
+                                              ? Color(0xFF0091AD)
+                                              : Colors.transparent,
                                         ),
-                                      )
-                                    : null,
-                              ),
-                              SizedBox(width: 16),
-                              Text(
-                                weekday,
-                                style: GoogleFonts.outfit(
-                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-                                  fontWeight: _selectedWeekday == weekday 
-                                      ? FontWeight.w600 
-                                      : FontWeight.w500,
-                                  color: _selectedWeekday == weekday 
-                                      ? Color(0xFF0091AD)
-                                      : Colors.black87,
+                                        child: _selectedWeekday == weekday
+                                            ? Center(
+                                                child: Container(
+                                                  width: isMobile ? 8 : 10,
+                                                  height: isMobile ? 8 : 10,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                      SizedBox(width: 16),
+                                      Text(
+                                        weekday,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: isMobile
+                                              ? 16
+                                              : isTablet
+                                                  ? 18
+                                                  : 20,
+                                          fontWeight:
+                                              _selectedWeekday == weekday
+                                                  ? FontWeight.w600
+                                                  : FontWeight.w500,
+                                          color: _selectedWeekday == weekday
+                                              ? Color(0xFF0091AD)
+                                              : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )).toList(),
+                              ))
+                          .toList(),
                     ],
                   ),
                 ),
@@ -615,26 +497,80 @@ class _BusHomeState extends State<BusHome> {
 
   @override
   Widget build(BuildContext context) {
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    // Responsive sizing
-    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
-    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final titleFontSize = isMobile ? 25.0 : isTablet ? 28.0 : 32.0;
-    final busListingsFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final busNameFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final buttonFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final iconSize = isMobile ? 40.0 : isTablet ? 48.0 : 56.0;
-    final expandedHeight = isMobile ? 70.0 : isTablet ? 80.0 : 90.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final verticalPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    final containerPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    final marginSpacing = isMobile ? 6.0 : isTablet ? 8.0 : 10.0;
-    final horizontalMargin = isMobile ? 10.0 : isTablet ? 12.0 : 16.0;
-    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
-    
+
+    final drawerHeaderFontSize = isMobile
+        ? 30.0
+        : isTablet
+            ? 34.0
+            : 38.0;
+    final drawerItemFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final titleFontSize = isMobile
+        ? 25.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final busListingsFontSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final busNameFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final buttonFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final iconSize = isMobile
+        ? 40.0
+        : isTablet
+            ? 48.0
+            : 56.0;
+    final expandedHeight = isMobile
+        ? 70.0
+        : isTablet
+            ? 80.0
+            : 90.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final containerPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final marginSpacing = isMobile
+        ? 6.0
+        : isTablet
+            ? 8.0
+            : 10.0;
+    final horizontalMargin = isMobile
+        ? 10.0
+        : isTablet
+            ? 12.0
+            : 16.0;
+    final buttonHeight = isMobile
+        ? 50.0
+        : isTablet
+            ? 55.0
+            : 60.0;
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: Drawer(
@@ -751,7 +687,8 @@ class _BusHomeState extends State<BusHome> {
                   alignment: Alignment.bottomCenter,
                   child: Container(
                     padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding, vertical: verticalPadding),
+                        horizontal: horizontalPadding,
+                        vertical: verticalPadding),
                     decoration: BoxDecoration(
                       color: const Color(0xFF007A8F),
                       borderRadius: BorderRadius.circular(16),
@@ -783,7 +720,6 @@ class _BusHomeState extends State<BusHome> {
               padding: EdgeInsets.all(containerPadding),
               child: Column(
                 children: [
-                  // Weekday filter
                   if (_selectedWeekday != null)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -817,8 +753,6 @@ class _BusHomeState extends State<BusHome> {
                         )
                       ],
                     ),
-                  
-                  // Availability filter - Now Scrollable
                   Container(
                     margin: EdgeInsets.only(top: 12),
                     child: Row(
@@ -827,7 +761,11 @@ class _BusHomeState extends State<BusHome> {
                         Text(
                           'Filter:',
                           style: GoogleFonts.outfit(
-                            fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+                            fontSize: isMobile
+                                ? 14
+                                : isTablet
+                                    ? 16
+                                    : 18,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -844,7 +782,7 @@ class _BusHomeState extends State<BusHome> {
                                 _buildFilterChip('Unavailable', 'unavailable'),
                                 SizedBox(width: 8),
                                 _buildFilterChip('Reserved', 'reserved'),
-                                SizedBox(width: 8), // Extra space at the end
+                                SizedBox(width: 8),
                               ],
                             ),
                           ),
@@ -865,20 +803,40 @@ class _BusHomeState extends State<BusHome> {
                     (context, index) {
                       final bus = _getFilteredBuses()[index];
                       final plateNumber = bus['plateNumber'] as String? ?? '';
-                      final effectiveDate = _selectedWeekday != null ? _getDateFromWeekday(_selectedWeekday!) : DateTime.now();
-                      final conductor = bus['conductorData'] as Map<String, dynamic>?;
-                      final isGrayedOutDueToCoding = _selectedWeekday != null ? ReservationService.isBusGrayedOutDueToCoding(plateNumber, effectiveDate) : false;
-                      final isReservedForDate = conductor != null && _selectedWeekday != null ? ReservationService.isBusReservedForDate(conductor, effectiveDate) : false;
-                      final isReserved = conductor != null ? ReservationService.getBusAvailabilityStatus(conductor) == 'reserved' : false;
-                      final isGrayedOut = isGrayedOutDueToCoding || isReservedForDate || (isReserved && _selectedWeekday == null);
-                      final isSelected = _selectedBusIds.contains(bus['id']);
-                      
+                      final conductor =
+                          bus['conductorData'] as Map<String, dynamic>?;
+                      final busAvailabilityStatus = conductor != null
+                          ? ReservationService.getBusAvailabilityStatus(
+                              conductor)
+                          : 'available';
+
+                      // Determine if bus should be grayed out
+                      bool isGrayedOut = false;
+
+                      // Gray out if reserved OR pending (both are unavailable for new reservations)
+                      if (busAvailabilityStatus == 'reserved' ||
+                          busAvailabilityStatus == 'pending' ||
+                          busAvailabilityStatus == 'unavailable') {
+                        isGrayedOut = true;
+                      } else if (_selectedWeekday != null) {
+                        final selectedDate =
+                            _getDateFromWeekday(_selectedWeekday!);
+                        final isAvailableOnSelectedDay =
+                            ReservationService.isBusAvailableForReservation(
+                                plateNumber, selectedDate);
+                        isGrayedOut = !isAvailableOnSelectedDay;
+                      }
+
+                      final isSelected = _selectedBusId == bus['id'];
+
                       return Container(
                         margin: EdgeInsets.symmetric(
-                            vertical: marginSpacing, horizontal: horizontalMargin),
+                            vertical: marginSpacing,
+                            horizontal: horizontalMargin),
                         padding: EdgeInsets.all(containerPadding),
                         decoration: BoxDecoration(
-                          color: isGrayedOut ? Colors.grey.shade100 : Colors.white,
+                          color:
+                              isGrayedOut ? Colors.grey.shade100 : Colors.white,
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
@@ -899,13 +857,14 @@ class _BusHomeState extends State<BusHome> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Header with icon, name, and checkbox
                             Row(
                               children: [
                                 Icon(
                                   Icons.directions_bus,
                                   size: iconSize,
-                                  color: isGrayedOut ? Colors.grey.shade500 : Color(0xFF0091AD),
+                                  color: isGrayedOut
+                                      ? Colors.grey.shade500
+                                      : Color(0xFF0091AD),
                                 ),
                                 SizedBox(width: isMobile ? 12 : 16),
                                 Expanded(
@@ -914,80 +873,83 @@ class _BusHomeState extends State<BusHome> {
                                     style: GoogleFonts.outfit(
                                       fontSize: busNameFontSize,
                                       fontWeight: FontWeight.bold,
-                                      color: isGrayedOut ? Colors.grey.shade600 : Color(0xFF0091AD),
+                                      color: isGrayedOut
+                                          ? Colors.grey.shade600
+                                          : Color(0xFF0091AD),
                                     ),
                                     overflow: TextOverflow.visible,
                                     maxLines: 2,
                                   ),
                                 ),
-                                Checkbox(
+                                Radio<String>(
                                   activeColor: Color(0xFF0091AD),
-                                  value: _selectedBusIds.contains(bus['id']),
-                                  onChanged: isGrayedOut ? null : (bool? selected) {
-                                  // Double check if bus is available for the current/selected date
-                                  final conductor = bus['conductorData'] as Map<String, dynamic>?;
-                                  final effectiveDate = _selectedWeekday != null ? _getDateFromWeekday(_selectedWeekday!) : DateTime.now();
-                                  final busAvailabilityStatus = conductor != null ? ReservationService.getBusAvailabilityStatus(conductor) : 'available';
-                                  
-                                  bool isBusActuallyAvailable;
-                                  if (_selectedWeekday != null) {
-                                    final isOnCodingDay = ReservationService.isBusAvailableForReservation(plateNumber, effectiveDate);
-                                    final isReservedForDate = conductor != null ? ReservationService.isBusReservedForDate(conductor, effectiveDate) : false;
-                                    isBusActuallyAvailable = isOnCodingDay && busAvailabilityStatus == 'available' && !isReservedForDate;
-                                  } else {
-                                    final isReserved = busAvailabilityStatus == 'reserved';
-                                    isBusActuallyAvailable = busAvailabilityStatus == 'available' && !isReserved;
-                                  }
-                                    
-                                    if (!isBusActuallyAvailable) {
-                                      String reason = '';
-                                      if (_selectedWeekday != null) {
-                                        final isOnCodingDay = ReservationService.isBusAvailableForReservation(plateNumber, effectiveDate);
-                                        final isReservedForDate = conductor != null ? ReservationService.isBusReservedForDate(conductor, effectiveDate) : false;
-                                        if (!isOnCodingDay) {
-                                          reason = '(not on coding day)';
-                                        } else if (busAvailabilityStatus == 'pending') {
-                                          reason = '(payment pending)';
-                                        } else if (isReservedForDate) {
-                                          reason = '(reserved for this date)';
-                                        }
-                                      } else {
-                                        if (busAvailabilityStatus == 'pending') {
-                                          reason = '(payment pending)';
-                                        } else if (busAvailabilityStatus == 'reserved') {
-                                          reason = '(reserved)';
-                                        } else {
-                                          reason = '(conductor busy)';
-                                        }
-                                      }
-                                      
-                                      // Show a snackbar or toast to inform user why they can't select
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Bus is not available $reason'),
-                                          duration: Duration(seconds: 2),
-                                          backgroundColor: Colors.red.shade400,
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    
-                                    setState(() {
-                                      final id = bus['id'];
-                                      if (selected == true) {
-                                        _selectedBusIds.add(id);
-                                      } else {
-                                        _selectedBusIds.remove(id);
-                                      }
-                                    });
-                                  },
+                                  value: bus['id'],
+                                  groupValue: _selectedBusId,
+                                  onChanged: isGrayedOut
+                                      ? null
+                                      : (String? value) {
+                                          // Verify bus is actually available
+                                          if (busAvailabilityStatus !=
+                                              'available') {
+                                            String reason = busAvailabilityStatus ==
+                                                    'pending'
+                                                ? '(payment pending)'
+                                                : busAvailabilityStatus ==
+                                                        'reserved'
+                                                    ? '(already reserved and verified)'
+                                                    : '(not available)';
+
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                    'Bus is not available $reason'),
+                                                duration: Duration(seconds: 2),
+                                                backgroundColor:
+                                                    Colors.red.shade400,
+                                              ),
+                                            );
+                                            return;
+                                          }
+
+                                          // If weekday filter is active, check coding day
+                                          if (_selectedWeekday != null) {
+                                            final selectedDate =
+                                                _getDateFromWeekday(
+                                                    _selectedWeekday!);
+                                            final isAvailableOnDay =
+                                                ReservationService
+                                                    .isBusAvailableForReservation(
+                                                        plateNumber,
+                                                        selectedDate);
+
+                                            if (!isAvailableOnDay) {
+                                              ScaffoldMessenger.of(context)
+                                                  .showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                      'Bus is not available on $_selectedWeekday'),
+                                                  duration:
+                                                      Duration(seconds: 2),
+                                                  backgroundColor:
+                                                      Colors.red.shade400,
+                                                ),
+                                              );
+                                              return;
+                                            }
+                                          }
+
+                                          setState(() {
+                                            _selectedBusId = value;
+                                          });
+                                        },
                                 ),
                               ],
                             ),
                             SizedBox(height: isMobile ? 12 : 16),
-                            // Details section
                             Padding(
-                              padding: EdgeInsets.only(left: isMobile ? 10 : 16), // Align with text after icon
+                              padding:
+                                  EdgeInsets.only(left: isMobile ? 10 : 16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -995,31 +957,12 @@ class _BusHomeState extends State<BusHome> {
                                     text: TextSpan(
                                       children: [
                                         TextSpan(
-                                          text: 'Plate: ',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: '${bus['plateNumber']}',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.normal,
-                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  RichText(
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
                                           text: 'Available: ',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                                            color: isGrayedOut
+                                                ? Colors.grey.shade600
+                                                : Colors.black,
                                           ),
                                         ),
                                         TextSpan(
@@ -1027,7 +970,9 @@ class _BusHomeState extends State<BusHome> {
                                                   bus['codingDays'])
                                               .join(', '),
                                           style: GoogleFonts.outfit(
-                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
+                                            color: isGrayedOut
+                                                ? Colors.grey.shade500
+                                                : Colors.grey[800],
                                           ),
                                         ),
                                       ],
@@ -1041,20 +986,23 @@ class _BusHomeState extends State<BusHome> {
                                           text: 'Price: ',
                                           style: GoogleFonts.outfit(
                                             fontWeight: FontWeight.bold,
-                                            color: isGrayedOut ? Colors.grey.shade600 : Colors.black,
+                                            color: isGrayedOut
+                                                ? Colors.grey.shade600
+                                                : Colors.black,
                                           ),
                                         ),
                                         TextSpan(
                                           text: '₱${bus['Price']}',
                                           style: GoogleFonts.outfit(
-                                            color: isGrayedOut ? Colors.grey.shade500 : Colors.grey[800],
+                                            color: isGrayedOut
+                                                ? Colors.grey.shade500
+                                                : Colors.grey[800],
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
                                   SizedBox(height: 4),
-                                  // Conductor information
                                   _buildConductorInfo(bus),
                                 ],
                               ),
@@ -1068,7 +1016,6 @@ class _BusHomeState extends State<BusHome> {
                 ),
         ],
       ),
-
       bottomNavigationBar: SafeArea(
         bottom: true,
         top: false,
@@ -1078,18 +1025,18 @@ class _BusHomeState extends State<BusHome> {
           padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: _selectedBusIds.isNotEmpty
+              backgroundColor: _selectedBusId != null
                   ? const Color(0xFF0091AD)
                   : Colors.grey.shade400,
               minimumSize: Size(double.infinity, buttonHeight),
             ),
-            onPressed: _selectedBusIds.isNotEmpty
+            onPressed: _selectedBusId != null
                 ? () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ReservationForm(
-                          selectedBusIds: _selectedBusIds.toList(),
+                          selectedBusIds: [_selectedBusId!],
                         ),
                       ),
                     );

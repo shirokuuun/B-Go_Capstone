@@ -13,7 +13,8 @@ class PreTicketQrs extends StatefulWidget {
   State<PreTicketQrs> createState() => _PreTicketQrsState();
 }
 
-class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMixin {
+class _PreTicketQrsState extends State<PreTicketQrs>
+    with TickerProviderStateMixin {
   late Stream<List<Map<String, dynamic>>> _ticketsStream;
   late TabController _tabController;
   String _selectedFilter = 'all';
@@ -23,7 +24,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
     _ticketsStream = _fetchTicketsStream();
-    
+
     _tabController.addListener(() {
       if (_tabController.indexIsChanging) {
         setState(() {
@@ -59,7 +60,7 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -131,43 +132,118 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
   Stream<List<Map<String, dynamic>>> _fetchTicketsStream() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value([]);
-    
+
     final col = FirebaseFirestore.instance
         .collection('users')
         .doc(user.uid)
         .collection('preTickets');
-    
+
     final now = DateTime.now();
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
-    
+
     return col
         .where('createdAt', isGreaterThanOrEqualTo: thirtyDaysAgo)
         .snapshots()
-        .map((snapshot) {
-      final tickets = snapshot.docs
-          .map((doc) {
-            final data = doc.data();
-            data['id'] = doc.id;
-            return data;
-          })
-          .toList()
-        ..sort((a, b) => (b['createdAt'] as Timestamp)
-            .compareTo(a['createdAt'] as Timestamp));
-      
+        .asyncMap((snapshot) async {
+      final tickets = <Map<String, dynamic>>[];
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        data['id'] = doc.id;
+
+        // ✅ NEW: Check conductor's collection for the real status
+        final actualStatus = await _checkConductorStatus(doc.id);
+        if (actualStatus != null) {
+          data['status'] = actualStatus;
+        }
+
+        tickets.add(data);
+      }
+
+      tickets.sort((a, b) =>
+          (b['createdAt'] as Timestamp).compareTo(a['createdAt'] as Timestamp));
+
       return tickets;
     });
+  }
+
+  /// ✅ NEW METHOD: Check the actual status from conductor's collection
+  Future<String?> _checkConductorStatus(String ticketId) async {
+    try {
+      // Search through all conductors' preTickets collections
+      final conductorsSnapshot =
+          await FirebaseFirestore.instance.collection('conductors').get();
+
+      for (var conductorDoc in conductorsSnapshot.docs) {
+        final preTicketRef =
+            conductorDoc.reference.collection('preTickets').doc(ticketId);
+
+        final preTicketSnap = await preTicketRef.get();
+
+        if (preTicketSnap.exists) {
+          final ticketData = preTicketSnap.data() as Map<String, dynamic>;
+
+          // Check if ticket is accomplished
+          final status = ticketData['status'] ?? '';
+          final hasDropOffTimestamp = ticketData['dropOffTimestamp'] != null;
+          final hasCompletedAt = ticketData['completedAt'] != null;
+          final geofenceStatus = ticketData['geofenceStatus'] ?? '';
+          final tripCompleted = ticketData['tripCompleted'] ?? false;
+
+          if (status.toLowerCase() == 'accomplished' ||
+              status.toLowerCase() == 'completed' ||
+              hasDropOffTimestamp ||
+              hasCompletedAt ||
+              geofenceStatus == 'completed' ||
+              tripCompleted == true) {
+            return 'accomplished';
+          }
+
+          // Check remittance collection as well
+          final now = DateTime.now();
+          final dateId =
+              "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+          final remittanceTickets = await conductorDoc.reference
+              .collection('remittance')
+              .doc(dateId)
+              .collection('tickets')
+              .where('documentId', isEqualTo: ticketId)
+              .get();
+
+          if (remittanceTickets.docs.isNotEmpty) {
+            final remittanceTicket = remittanceTickets.docs.first.data();
+            final remittanceStatus = remittanceTicket['status'] ?? '';
+            final isActive = remittanceTicket['active'] ?? true;
+
+            if (remittanceStatus.toLowerCase() == 'accomplished' ||
+                remittanceStatus.toLowerCase() == 'completed' ||
+                !isActive) {
+              return 'accomplished';
+            }
+          }
+
+          return status.isNotEmpty ? status : null;
+        }
+      }
+
+      return null;
+    } catch (e) {
+      print('Error checking conductor status: $e');
+      return null;
+    }
   }
 
   Future<void> _deleteTicket(String ticketId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    
+
     try {
       final col = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preTickets');
-      
+
       await col.doc(ticketId).delete();
     } catch (e) {
       print('Error deleting ticket: $e');
@@ -178,18 +254,18 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
   Future<void> _cancelTicket(String ticketId) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    
+
     try {
       final col = FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .collection('preTickets');
-      
+
       await col.doc(ticketId).update({
         'status': 'cancelled',
         'cancelledAt': FieldValue.serverTimestamp(),
       });
-      
+
       _showCustomSnackBar('Ticket cancelled successfully', 'success');
     } catch (e) {
       print('Error cancelling ticket: $e');
@@ -241,12 +317,28 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
   Widget build(BuildContext context) {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    final appBarFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final tabFontSize = isMobile ? 12.0 : isTablet ? 14.0 : 16.0;
-    final cardPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    
+
+    final appBarFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final tabFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 14.0
+            : 16.0;
+    final cardPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF0091AD),
@@ -288,29 +380,36 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           final allTickets = snapshot.data ?? [];
-          
+
           return TabBarView(
             controller: _tabController,
             children: List.generate(5, (index) {
-              String filter = ['all', 'pending', 'boarded', 'accomplished', 'cancelled'][index];
-              
+              String filter = [
+                'all',
+                'pending',
+                'boarded',
+                'accomplished',
+                'cancelled'
+              ][index];
+
               List<Map<String, dynamic>> tickets;
               if (filter == 'all') {
                 tickets = allTickets;
               } else {
                 tickets = allTickets.where((t) {
-                  final status = (t['status'] ?? 'pending').toString().toLowerCase();
+                  final status =
+                      (t['status'] ?? 'pending').toString().toLowerCase();
                   return status == filter;
                 }).toList();
               }
-              
+
               if (tickets.isEmpty) {
-                String emptyMessage = filter == 'all' 
+                String emptyMessage = filter == 'all'
                     ? 'No pre-tickets found.'
                     : 'No $filter pre-tickets found.';
-                    
+
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -343,14 +442,15 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                   ),
                 );
               }
-              
+
               return ListView.separated(
                 padding: EdgeInsets.all(horizontalPadding),
                 itemCount: tickets.length,
                 separatorBuilder: (_, __) => SizedBox(height: cardPadding),
                 itemBuilder: (context, i) {
                   final ticket = tickets[i];
-                  final status = (ticket['status'] ?? 'pending').toString().toLowerCase();
+                  final status =
+                      (ticket['status'] ?? 'pending').toString().toLowerCase();
 
                   return Dismissible(
                     key: Key(ticket['id'] ?? i.toString()),
@@ -408,19 +508,32 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                             ),
                           ],
                         ),
-                        padding: EdgeInsets.symmetric(vertical: cardPadding, horizontal: cardPadding),
+                        padding: EdgeInsets.symmetric(
+                            vertical: cardPadding, horizontal: cardPadding),
                         child: Row(
                           children: [
                             Container(
-                              width: isMobile ? 60.0 : isTablet ? 70.0 : 80.0,
-                              height: isMobile ? 60.0 : isTablet ? 70.0 : 80.0,
+                              width: isMobile
+                                  ? 60.0
+                                  : isTablet
+                                      ? 70.0
+                                      : 80.0,
+                              height: isMobile
+                                  ? 60.0
+                                  : isTablet
+                                      ? 70.0
+                                      : 80.0,
                               decoration: BoxDecoration(
                                 color: Colors.grey[100],
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Icon(
                                 Icons.receipt_long,
-                                size: isMobile ? 24.0 : isTablet ? 28.0 : 32.0,
+                                size: isMobile
+                                    ? 24.0
+                                    : isTablet
+                                        ? 28.0
+                                        : 32.0,
                                 color: Colors.grey[600],
                               ),
                             ),
@@ -457,7 +570,8 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                                             horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: _getStatusColor(status),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: Text(
                                           _getStatusText(status),
@@ -473,7 +587,8 @@ class _PreTicketQrsState extends State<PreTicketQrs> with TickerProviderStateMix
                                 ],
                               ),
                             ),
-                            Icon(Icons.chevron_right, color: Colors.grey, size: 28),
+                            Icon(Icons.chevron_right,
+                                color: Colors.grey, size: 28),
                           ],
                         ),
                       ),
@@ -532,48 +647,75 @@ class TicketDetailsPage extends StatelessWidget {
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: isCancelled ? Colors.red[100] :
-                         isAccomplished ? Colors.purple[100] : 
-                         isBoarded ? Colors.blue[100] : 
-                         isPending ? Colors.orange[100] : Colors.green[100],
+                  color: isCancelled
+                      ? Colors.red[100]
+                      : isAccomplished
+                          ? Colors.purple[100]
+                          : isBoarded
+                              ? Colors.blue[100]
+                              : isPending
+                                  ? Colors.orange[100]
+                                  : Colors.green[100],
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isCancelled ? Icons.cancel :
-                  isAccomplished ? Icons.flag_circle :
-                  isBoarded ? Icons.directions_bus :
-                  isPending ? Icons.pending : Icons.check_circle,
-                  color: isCancelled ? Colors.red[600] :
-                         isAccomplished ? Colors.purple[600] :
-                         isBoarded ? Colors.blue[600] :
-                         isPending ? Colors.orange[600] : Colors.green[600],
+                  isCancelled
+                      ? Icons.cancel
+                      : isAccomplished
+                          ? Icons.flag_circle
+                          : isBoarded
+                              ? Icons.directions_bus
+                              : isPending
+                                  ? Icons.pending
+                                  : Icons.check_circle,
+                  color: isCancelled
+                      ? Colors.red[600]
+                      : isAccomplished
+                          ? Colors.purple[600]
+                          : isBoarded
+                              ? Colors.blue[600]
+                              : isPending
+                                  ? Colors.orange[600]
+                                  : Colors.green[600],
                   size: 50,
                 ),
               ),
               SizedBox(height: 16),
               Text(
-                isCancelled ? 'Ticket Cancelled' :
-                isAccomplished ? 'Journey Completed!' :
-                isBoarded ? 'Successfully Boarded!' :
-                isPending ? 'Ticket Pending' : 'Ticket Confirmed!',
+                isCancelled
+                    ? 'Ticket Cancelled'
+                    : isAccomplished
+                        ? 'Journey Completed!'
+                        : isBoarded
+                            ? 'Successfully Boarded!'
+                            : isPending
+                                ? 'Ticket Pending'
+                                : 'Ticket Confirmed!',
                 style: GoogleFonts.outfit(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: isCancelled ? Colors.red[700] :
-                         isAccomplished ? Colors.purple[700] :
-                         isBoarded ? Colors.blue[700] :
-                         isPending ? Colors.orange[700] : Colors.green[700],
+                  color: isCancelled
+                      ? Colors.red[700]
+                      : isAccomplished
+                          ? Colors.purple[700]
+                          : isBoarded
+                              ? Colors.blue[700]
+                              : isPending
+                                  ? Colors.orange[700]
+                                  : Colors.green[700],
                 ),
               ),
               SizedBox(height: 8),
               Text(
-                isCancelled ? ''
-                : isAccomplished ? 'You have successfully completed your journey'
-                : isBoarded 
-                  ? 'You have successfully boarded the bus'
-                  : isPending 
-                    ? 'Your ticket is waiting to be scanned'
-                    : 'Your pre-ticket has been confirmed',
+                isCancelled
+                    ? ''
+                    : isAccomplished
+                        ? 'You have successfully completed your journey'
+                        : isBoarded
+                            ? 'You have successfully boarded the bus'
+                            : isPending
+                                ? 'Your ticket is waiting to be scanned'
+                                : 'Your pre-ticket has been confirmed',
                 style: GoogleFonts.outfit(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -587,46 +729,74 @@ class TicketDetailsPage extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: isCancelled ? Colors.red[50] :
-                         isAccomplished ? Colors.purple[50] :
-                         isBoarded ? Colors.blue[50] :
-                         isPending ? Colors.orange[50] : Colors.grey[50],
+                  color: isCancelled
+                      ? Colors.red[50]
+                      : isAccomplished
+                          ? Colors.purple[50]
+                          : isBoarded
+                              ? Colors.blue[50]
+                              : isPending
+                                  ? Colors.orange[50]
+                                  : Colors.grey[50],
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isCancelled ? Colors.red[200]! :
-                                    isAccomplished ? Colors.purple[200]! :
-                                    isBoarded ? Colors.blue[200]! :
-                                    isPending ? Colors.orange[200]! : Colors.grey[300]!),
+                  border: Border.all(
+                      color: isCancelled
+                          ? Colors.red[200]!
+                          : isAccomplished
+                              ? Colors.purple[200]!
+                              : isBoarded
+                                  ? Colors.blue[200]!
+                                  : isPending
+                                      ? Colors.orange[200]!
+                                      : Colors.grey[300]!),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      isCancelled ? 'Ticket Cancelled' :
-                      isAccomplished ? 'Journey Completed' :
-                      isBoarded ? 'Boarding Confirmed' :
-                      isPending ? 'Boarding QR Code' : 'Boarding QR Code',
+                      isCancelled
+                          ? 'Ticket Cancelled'
+                          : isAccomplished
+                              ? 'Journey Completed'
+                              : isBoarded
+                                  ? 'Boarding Confirmed'
+                                  : isPending
+                                      ? 'Boarding QR Code'
+                                      : 'Boarding QR Code',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: isCancelled ? Colors.red[700] :
-                               isAccomplished ? Colors.purple[700] :
-                               isBoarded ? Colors.blue[700] :
-                               isPending ? Colors.orange[700] : Colors.black87,
+                        color: isCancelled
+                            ? Colors.red[700]
+                            : isAccomplished
+                                ? Colors.purple[700]
+                                : isBoarded
+                                    ? Colors.blue[700]
+                                    : isPending
+                                        ? Colors.orange[700]
+                                        : Colors.black87,
                       ),
                     ),
                     SizedBox(height: 8),
                     Text(
-                      isCancelled ? 'This ticket was cancelled'
-                      : isAccomplished ? 'Your journey has been completed successfully'
-                      : isBoarded 
-                        ? 'This QR code has been scanned and validated'
-                        : 'Show this to the conductor when boarding',
+                      isCancelled
+                          ? 'This ticket was cancelled'
+                          : isAccomplished
+                              ? 'Your journey has been completed successfully'
+                              : isBoarded
+                                  ? 'This QR code has been scanned and validated'
+                                  : 'Show this to the conductor when boarding',
                       style: GoogleFonts.outfit(
                         fontSize: 14,
-                        color: isCancelled ? Colors.red[600] :
-                               isAccomplished ? Colors.purple[600] :
-                               isBoarded ? Colors.blue[600] :
-                               isPending ? Colors.orange[600] : Colors.grey[600],
+                        color: isCancelled
+                            ? Colors.red[600]
+                            : isAccomplished
+                                ? Colors.purple[600]
+                                : isBoarded
+                                    ? Colors.blue[600]
+                                    : isPending
+                                        ? Colors.orange[600]
+                                        : Colors.grey[600],
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -638,52 +808,18 @@ class TicketDetailsPage extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: isCancelled ? Colors.red[200]! :
-                                            isAccomplished ? Colors.purple[200]! :
-                                            isBoarded ? Colors.blue[200]! :
-                                            isPending ? Colors.orange[200]! : Colors.grey[300]!),
+                          border: Border.all(
+                              color: isCancelled
+                                  ? Colors.red[200]!
+                                  : isAccomplished
+                                      ? Colors.purple[200]!
+                                      : isBoarded
+                                          ? Colors.blue[200]!
+                                          : isPending
+                                              ? Colors.orange[200]!
+                                              : Colors.grey[300]!),
                         ),
                         child: isCancelled
-                          ? Stack(
-                              children: [
-                                QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 350.0,
-                                  backgroundColor: Colors.white,
-                                ),
-                                Positioned.fill(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withOpacity(0.8),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.cancel,
-                                            color: Colors.white,
-                                            size: 60,
-                                          ),
-                                          SizedBox(height: 8),
-                                          Text(
-                                            'CANCELLED',
-                                            style: GoogleFonts.outfit(
-                                              color: Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : isAccomplished 
                             ? Stack(
                                 children: [
                                   QrImageView(
@@ -695,21 +831,22 @@ class TicketDetailsPage extends StatelessWidget {
                                   Positioned.fill(
                                     child: Container(
                                       decoration: BoxDecoration(
-                                        color: Colors.purple.withOpacity(0.8),
+                                        color: Colors.red.withOpacity(0.8),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Center(
                                         child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
                                           children: [
                                             Icon(
-                                              Icons.flag_circle,
+                                              Icons.cancel,
                                               color: Colors.white,
                                               size: 60,
                                             ),
                                             SizedBox(height: 8),
                                             Text(
-                                              'COMPLETED',
+                                              'CANCELLED',
                                               style: GoogleFonts.outfit(
                                                 color: Colors.white,
                                                 fontSize: 18,
@@ -723,52 +860,99 @@ class TicketDetailsPage extends StatelessWidget {
                                   ),
                                 ],
                               )
-                            : isBoarded 
-                              ? Stack(
-                                  children: [
-                                    QrImageView(
-                                      data: qrData,
-                                      version: QrVersions.auto,
-                                      size: 350.0,
-                                      backgroundColor: Colors.white,
-                                    ),
-                                    Positioned.fill(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.blue.withOpacity(0.8),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Center(
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.check_circle,
-                                                color: Colors.white,
-                                                size: 60,
-                                              ),
-                                              SizedBox(height: 8),
-                                              Text(
-                                                'SCANNED',
-                                                style: GoogleFonts.outfit(
+                            : isAccomplished
+                                ? Stack(
+                                    children: [
+                                      QrImageView(
+                                        data: qrData,
+                                        version: QrVersions.auto,
+                                        size: 350.0,
+                                        backgroundColor: Colors.white,
+                                      ),
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color:
+                                                Colors.purple.withOpacity(0.8),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Center(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.flag_circle,
                                                   color: Colors.white,
-                                                  fontSize: 18,
-                                                  fontWeight: FontWeight.bold,
+                                                  size: 60,
                                                 ),
-                                              ),
-                                            ],
+                                                SizedBox(height: 8),
+                                                Text(
+                                                  'COMPLETED',
+                                                  style: GoogleFonts.outfit(
+                                                    color: Colors.white,
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                )
-                              : QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 350.0,
-                                  backgroundColor: Colors.white,
-                                ),
+                                    ],
+                                  )
+                                : isBoarded
+                                    ? Stack(
+                                        children: [
+                                          QrImageView(
+                                            data: qrData,
+                                            version: QrVersions.auto,
+                                            size: 350.0,
+                                            backgroundColor: Colors.white,
+                                          ),
+                                          Positioned.fill(
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue
+                                                    .withOpacity(0.8),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                              child: Center(
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.white,
+                                                      size: 60,
+                                                    ),
+                                                    SizedBox(height: 8),
+                                                    Text(
+                                                      'SCANNED',
+                                                      style: GoogleFonts.outfit(
+                                                        color: Colors.white,
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : QrImageView(
+                                        data: qrData,
+                                        version: QrVersions.auto,
+                                        size: 350.0,
+                                        backgroundColor: Colors.white,
+                                      ),
                       ),
                     ),
                   ],
@@ -806,13 +990,17 @@ class TicketDetailsPage extends StatelessWidget {
                         '${ticket['totalFare'] ?? ticket['fare'] ?? '0.00'} PHP'),
                     _buildDetailRow('Status:', _getStatusText(status)),
                     if (isCancelled && ticket['cancelledAt'] != null)
-                      _buildDetailRow('Cancelled Date:', _formatDate(ticket['cancelledAt']))
+                      _buildDetailRow(
+                          'Cancelled Date:', _formatDate(ticket['cancelledAt']))
                     else if (isAccomplished && ticket['accomplishedAt'] != null)
-                      _buildDetailRow('Completed Date:', _formatDate(ticket['accomplishedAt']))
+                      _buildDetailRow('Completed Date:',
+                          _formatDate(ticket['accomplishedAt']))
                     else if (isBoarded && ticket['boardedAt'] != null)
-                      _buildDetailRow('Boarded Date:', _formatDate(ticket['boardedAt']))
+                      _buildDetailRow(
+                          'Boarded Date:', _formatDate(ticket['boardedAt']))
                     else if (ticket['createdAt'] != null)
-                      _buildDetailRow('Created Date:', _formatDate(ticket['createdAt'])),
+                      _buildDetailRow(
+                          'Created Date:', _formatDate(ticket['createdAt'])),
                     SizedBox(height: 16),
 
                     // Passenger Details
@@ -846,15 +1034,26 @@ class TicketDetailsPage extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: isCancelled ? Colors.red[50] :
-                         isAccomplished ? Colors.purple[50] :
-                         isBoarded ? Colors.green[50] :
-                         isPending ? Colors.orange[50] : Colors.blue[50],
+                  color: isCancelled
+                      ? Colors.red[50]
+                      : isAccomplished
+                          ? Colors.purple[50]
+                          : isBoarded
+                              ? Colors.green[50]
+                              : isPending
+                                  ? Colors.orange[50]
+                                  : Colors.blue[50],
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isCancelled ? Colors.red[200]! :
-                                    isAccomplished ? Colors.purple[200]! :
-                                    isBoarded ? Colors.green[200]! :
-                                    isPending ? Colors.orange[200]! : Colors.blue[200]!),
+                  border: Border.all(
+                      color: isCancelled
+                          ? Colors.red[200]!
+                          : isAccomplished
+                              ? Colors.purple[200]!
+                              : isBoarded
+                                  ? Colors.green[200]!
+                                  : isPending
+                                      ? Colors.orange[200]!
+                                      : Colors.blue[200]!),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -862,29 +1061,48 @@ class TicketDetailsPage extends StatelessWidget {
                     Row(
                       children: [
                         Icon(
-                          isCancelled ? Icons.cancel :
-                          isAccomplished ? Icons.flag_circle :
-                          isBoarded ? Icons.check_circle :
-                          isPending ? Icons.pending : Icons.info, 
-                          color: isCancelled ? Colors.red[700] :
-                                 isAccomplished ? Colors.purple[700] :
-                                 isBoarded ? Colors.green[700] :
-                                 isPending ? Colors.orange[700] : Colors.blue[700], 
-                          size: 20
-                        ),
+                            isCancelled
+                                ? Icons.cancel
+                                : isAccomplished
+                                    ? Icons.flag_circle
+                                    : isBoarded
+                                        ? Icons.check_circle
+                                        : isPending
+                                            ? Icons.pending
+                                            : Icons.info,
+                            color: isCancelled
+                                ? Colors.red[700]
+                                : isAccomplished
+                                    ? Colors.purple[700]
+                                    : isBoarded
+                                        ? Colors.green[700]
+                                        : isPending
+                                            ? Colors.orange[700]
+                                            : Colors.blue[700],
+                            size: 20),
                         SizedBox(width: 8),
                         Text(
-                          isCancelled ? 'Ticket Cancelled' :
-                          isAccomplished ? 'Journey Completed' :
-                          isBoarded ? 'Boarding Complete' :
-                          isPending ? 'Pending Scan' : 'Important Notes',
+                          isCancelled
+                              ? 'Ticket Cancelled'
+                              : isAccomplished
+                                  ? 'Journey Completed'
+                                  : isBoarded
+                                      ? 'Boarding Complete'
+                                      : isPending
+                                          ? 'Pending Scan'
+                                          : 'Important Notes',
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: isCancelled ? Colors.red[700] :
-                                   isAccomplished ? Colors.purple[700] :
-                                   isBoarded ? Colors.green[700] :
-                                   isPending ? Colors.orange[700] : Colors.blue[700],
+                            color: isCancelled
+                                ? Colors.red[700]
+                                : isAccomplished
+                                    ? Colors.purple[700]
+                                    : isBoarded
+                                        ? Colors.green[700]
+                                        : isPending
+                                            ? Colors.orange[700]
+                                            : Colors.blue[700],
                           ),
                         ),
                       ],
@@ -993,7 +1211,7 @@ class TicketDetailsPage extends StatelessWidget {
 
   String _formatDate(dynamic date) {
     if (date == null) return 'N/A';
-    
+
     DateTime dateTime;
     if (date is Timestamp) {
       dateTime = date.toDate();
@@ -1002,7 +1220,7 @@ class TicketDetailsPage extends StatelessWidget {
     } else {
       return 'N/A';
     }
-    
+
     return "${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}";
   }
 

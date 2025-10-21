@@ -117,6 +117,64 @@ class _ConductorMapsState extends State<ConductorMaps>
     return BitmapDescriptor.hueAzure;
   }
 
+  Future<void> _syncPreTicketPassengerCount() async {
+    if (_isDisposed) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final conductorQuery = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorQuery.docs.isEmpty) return;
+
+      final conductorDocId = conductorQuery.docs.first.id;
+      final conductorData = conductorQuery.docs.first.data();
+
+      // 🔥 ONLY SYNC IF THERE'S NO ACTIVE TRIP
+      final activeTrip = conductorData['activeTrip'];
+      if (activeTrip != null && activeTrip['isActive'] == true) {
+        print('⏭️ Skipping sync - active trip in progress');
+        return;
+      }
+
+      // Get current passenger count from conductor document
+      final currentPassengerCount = conductorData['passengerCount'] ?? 0;
+
+      print('🔍 Pre-ticket sync check:');
+      print('   Current passenger count: $currentPassengerCount');
+      print('   Active trip: ${activeTrip != null ? 'Yes' : 'No'}');
+
+      // 🔥 ONLY RESET TO 0 IF NO ACTIVE TRIP AND COUNT IS WRONG
+      if (activeTrip == null && currentPassengerCount > 0) {
+        print(
+            '⚠️ No active trip but passenger count is $currentPassengerCount - resetting to 0');
+
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .update({
+          'passengerCount': 0,
+          'lastSynced': FieldValue.serverTimestamp(),
+        });
+
+        if (mounted && !_isDisposed) {
+          setState(() {
+            passengerCount = 0;
+          });
+        }
+
+        print('✅ Passenger count reset to 0');
+      }
+    } catch (e) {
+      print('❌ Error syncing pre-ticket passenger count: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -148,6 +206,9 @@ class _ConductorMapsState extends State<ConductorMaps>
         _loadPreTickets();
         _loadManualTickets();
         _loadConductorData();
+
+        // 🔥 ADD THIS LINE - Sync pre-ticket passenger count
+        await _syncPreTicketPassengerCount();
       }
     } catch (e) {
       print('Safe initialization error: $e');
@@ -232,11 +293,13 @@ class _ConductorMapsState extends State<ConductorMaps>
     if (totalMarkers > maxTotalMarkers) {
       _cachedMarkers.clear();
       _lastMarkerCacheKey = '';
-      print('Cleared marker cache due to size ($totalMarkers > $maxTotalMarkers)');
+      print(
+          'Cleared marker cache due to size ($totalMarkers > $maxTotalMarkers)');
     }
 
     if (_routeDestinations.length > MAX_DESTINATIONS_CACHE) {
-      _routeDestinations = _routeDestinations.take(MAX_DESTINATIONS_CACHE).toList();
+      _routeDestinations =
+          _routeDestinations.take(MAX_DESTINATIONS_CACHE).toList();
       print('Trimmed destinations cache to ${MAX_DESTINATIONS_CACHE}');
     }
   }
@@ -347,7 +410,8 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     if (_currentPosition == null || !_isAppActive) return;
 
-    _locationTimer = Timer.periodic(Duration(seconds: _locationUpdateInterval), (timer) {
+    _locationTimer =
+        Timer.periodic(Duration(seconds: _locationUpdateInterval), (timer) {
       if (_isDisposed || !mounted || !_isAppActive) {
         timer.cancel();
         return;
@@ -367,7 +431,8 @@ class _ConductorMapsState extends State<ConductorMaps>
         _activePreTickets.length +
         _activeManualTickets.length;
     if (passengerMarkerCount > MAX_PASSENGER_MARKERS + 30) {
-      print('Skipping location update due to memory pressure (${passengerMarkerCount} passenger markers)');
+      print(
+          'Skipping location update due to memory pressure (${passengerMarkerCount} passenger markers)');
       return;
     }
 
@@ -469,16 +534,19 @@ class _ConductorMapsState extends State<ConductorMaps>
                     }
                   : null,
             });
-            print('✅ Updated passenger pre-booking $passengerId status to $status');
+            print(
+                '✅ Updated passenger pre-booking $passengerId status to $status');
           } else {
-            print('❌ Passenger pre-booking document does not exist at users/$actualUserId/preBookings/$passengerId');
+            print(
+                '❌ Passenger pre-booking document does not exist at users/$actualUserId/preBookings/$passengerId');
           }
         } catch (userUpdateError) {
           print('❌ Error updating passenger pre-booking: $userUpdateError');
           print('   Stack trace: ${StackTrace.current}');
         }
       } else {
-        print('⚠️ Skipping passenger update - userId is empty or disposed (actualUserId: $actualUserId)');
+        print(
+            '⚠️ Skipping passenger update - userId is empty or disposed (actualUserId: $actualUserId)');
       }
     } catch (e) {
       print('❌ Error updating pre-booking status: $e');
@@ -532,7 +600,8 @@ class _ConductorMapsState extends State<ConductorMaps>
                 }
               : null,
         });
-        print('Updated remittance ticket for pre-booking $preBookingId to $status');
+        print(
+            'Updated remittance ticket for pre-booking $preBookingId to $status');
 
         if (userId != null && !_isDisposed) {
           try {
@@ -554,9 +623,11 @@ class _ConductorMapsState extends State<ConductorMaps>
                       }
                     : null,
               });
-              print('✅ Synced status to passenger collection for $preBookingId');
+              print(
+                  '✅ Synced status to passenger collection for $preBookingId');
             } else {
-              print('❌ Passenger pre-booking document does not exist at users/$userId/preBookings/$preBookingId');
+              print(
+                  '❌ Passenger pre-booking document does not exist at users/$userId/preBookings/$preBookingId');
             }
           } catch (userSyncError) {
             print('⚠️ Failed to sync to passenger collection: $userSyncError');
@@ -572,7 +643,8 @@ class _ConductorMapsState extends State<ConductorMaps>
       String preBookingId, String status) async {
     if (_isDisposed) return;
 
-    print('🔄 _updateScannedQRCodeStatus called for preBookingId: $preBookingId');
+    print(
+        '🔄 _updateScannedQRCodeStatus called for preBookingId: $preBookingId');
     print('   Target status: $status');
 
     try {
@@ -630,10 +702,13 @@ class _ConductorMapsState extends State<ConductorMaps>
                 }
               : null,
         });
-        print('✅ Successfully updated scannedQRCode for $preBookingId to $status');
+        print(
+            '✅ Successfully updated scannedQRCode for $preBookingId to $status');
       } else {
-        print('❌ No scannedQRCode document found with bookingId: $preBookingId');
-        print('   This means the QR code was not scanned or used a different ID');
+        print(
+            '❌ No scannedQRCode document found with bookingId: $preBookingId');
+        print(
+            '   This means the QR code was not scanned or used a different ID');
       }
     } catch (e) {
       print('❌ Error updating scanned QR code status: $e');
@@ -757,7 +832,8 @@ class _ConductorMapsState extends State<ConductorMaps>
           backgroundColor: Colors.green[600],
           duration: Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: EdgeInsets.all(16),
         ),
       );
@@ -788,11 +864,14 @@ class _ConductorMapsState extends State<ConductorMaps>
         // Sync passenger count directly from Firebase
         final firebasePassengerCount = conductorData['passengerCount'] ?? 0;
 
-        if (passengerCount != firebasePassengerCount && mounted && !_isDisposed) {
+        if (passengerCount != firebasePassengerCount &&
+            mounted &&
+            !_isDisposed) {
           setState(() {
             passengerCount = firebasePassengerCount;
           });
-          print('Synced passenger count from Firebase: $firebasePassengerCount');
+          print(
+              'Synced passenger count from Firebase: $firebasePassengerCount');
         }
 
         bool shouldRefresh = false;
@@ -888,7 +967,8 @@ class _ConductorMapsState extends State<ConductorMaps>
             setState(() {
               _activeManualTickets = manualTickets;
             });
-            print('Loaded ${_activeManualTickets.length} active manual tickets for geofencing');
+            print(
+                'Loaded ${_activeManualTickets.length} active manual tickets for geofencing');
           }
         } catch (e) {
           print('Error processing manual tickets: $e');
@@ -950,21 +1030,25 @@ class _ConductorMapsState extends State<ConductorMaps>
         try {
           List<Map<String, dynamic>> activeBookings = [];
 
-          print('📊 Processing ${preBookingsSnapshot.docs.length} pre-bookings from conductor collection...');
+          print(
+              '📊 Processing ${preBookingsSnapshot.docs.length} pre-bookings from conductor collection...');
 
           for (var doc in preBookingsSnapshot.docs) {
             final data = doc.data();
             final status = data['status'] ?? '';
             final scannedBy = data['scannedBy'];
 
-            print('  📋 Pre-booking ${doc.id}: status="$status", from="${data['from']}", to="${data['to']}", scannedBy=${scannedBy != null}');
+            print(
+                '  📋 Pre-booking ${doc.id}: status="$status", from="${data['from']}", to="${data['to']}", scannedBy=${scannedBy != null}');
 
             final isForCurrentTrip = activeTripId == null ||
                 data['tripId'] == activeTripId ||
                 data['tripId'] == null;
 
-            final isActive = (status == 'paid' || status == 'boarded' || scannedBy != null) &&
-                            status != 'accomplished';
+            final isActive = (status == 'paid' ||
+                    status == 'boarded' ||
+                    scannedBy != null) &&
+                status != 'accomplished';
 
             if (status == 'accomplished') {
               print('  ⏭️ SKIPPING - already accomplished');
@@ -981,7 +1065,8 @@ class _ConductorMapsState extends State<ConductorMaps>
               Map<String, double>? fromCoords;
               Map<String, double>? toCoords;
 
-              if (data['fromLatitude'] == null || data['fromLongitude'] == null) {
+              if (data['fromLatitude'] == null ||
+                  data['fromLongitude'] == null) {
                 fromCoords = _getCoordinatesForPlace(data['from'] ?? '');
               }
               if (data['toLatitude'] == null || data['toLongitude'] == null) {
@@ -994,8 +1079,10 @@ class _ConductorMapsState extends State<ConductorMaps>
                 passengerLat = _convertToDouble(data['passengerLatitude']);
                 passengerLng = _convertToDouble(data['passengerLongitude']);
               } else {
-                passengerLat = toCoords?['latitude'] ?? _convertToDouble(data['toLatitude']);
-                passengerLng = toCoords?['longitude'] ?? _convertToDouble(data['toLongitude']);
+                passengerLat = toCoords?['latitude'] ??
+                    _convertToDouble(data['toLatitude']);
+                passengerLng = toCoords?['longitude'] ??
+                    _convertToDouble(data['toLongitude']);
               }
 
               activeBookings.add({
@@ -1004,10 +1091,14 @@ class _ConductorMapsState extends State<ConductorMaps>
                 'from': data['from'],
                 'to': data['to'],
                 'quantity': data['quantity'] ?? 1,
-                'fromLatitude': fromCoords?['latitude'] ?? _convertToDouble(data['fromLatitude']),
-                'fromLongitude': fromCoords?['longitude'] ?? _convertToDouble(data['fromLongitude']),
-                'toLatitude': toCoords?['latitude'] ?? _convertToDouble(data['toLatitude']),
-                'toLongitude': toCoords?['longitude'] ?? _convertToDouble(data['toLongitude']),
+                'fromLatitude': fromCoords?['latitude'] ??
+                    _convertToDouble(data['fromLatitude']),
+                'fromLongitude': fromCoords?['longitude'] ??
+                    _convertToDouble(data['fromLongitude']),
+                'toLatitude': toCoords?['latitude'] ??
+                    _convertToDouble(data['toLatitude']),
+                'toLongitude': toCoords?['longitude'] ??
+                    _convertToDouble(data['toLongitude']),
                 'passengerLatitude': passengerLat,
                 'passengerLongitude': passengerLng,
                 'status': actualStatus,
@@ -1031,7 +1122,8 @@ class _ConductorMapsState extends State<ConductorMaps>
             _debouncedRefreshMarkers();
             _isProcessingBookings = false;
 
-            print('Loaded ${_activeBookings.length} active pre-bookings for geofencing');
+            print(
+                'Loaded ${_activeBookings.length} active pre-bookings for geofencing');
           });
         } catch (e) {
           print('Error processing pre-bookings: $e');
@@ -1068,14 +1160,28 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
 
       final conductorDocId = conductorQuery.docs.first.id;
+      final conductorData = conductorQuery.docs.first.data();
 
-      final preTicketsStream = FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorDocId)
-          .collection('preTickets')
-          .where('route', isEqualTo: widget.route)
-          .where('status', isEqualTo: 'boarded')
-          .snapshots();
+      // 🔥 GET CURRENT TRIP ID
+      final activeTripId = conductorData['activeTrip']?['tripId'];
+
+      // 🔥 FILTER BY CURRENT TRIP
+      final preTicketsStream = activeTripId != null
+          ? FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('preTickets')
+              .where('route', isEqualTo: widget.route)
+              .where('tripId', isEqualTo: activeTripId)
+              .where('status', isEqualTo: 'boarded')
+              .snapshots()
+          : FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('preTickets')
+              .where('route', isEqualTo: widget.route)
+              .where('status', isEqualTo: 'boarded')
+              .snapshots();
 
       _preTicketsSubscription = preTicketsStream.listen((preTicketsSnapshot) {
         if (_isDisposed || !mounted || !_isAppActive) {
@@ -1086,9 +1192,27 @@ class _ConductorMapsState extends State<ConductorMaps>
         try {
           List<Map<String, dynamic>> activePreTickets = [];
 
+          print(
+              '📊 Processing ${preTicketsSnapshot.docs.length} pre-tickets...');
+
           for (var doc in preTicketsSnapshot.docs) {
             final data = doc.data();
             final status = data['status'] ?? '';
+            final docTripId = data['tripId'];
+
+            print(
+                '  📋 Pre-ticket ${doc.id}: status="$status", tripId="$docTripId"');
+
+            // 🔥 VERIFY TRIP ID MATCHES
+            final isForCurrentTrip = activeTripId == null ||
+                docTripId == activeTripId ||
+                docTripId == null;
+
+            if (!isForCurrentTrip) {
+              print(
+                  '  ⏭️ SKIPPING - not for current trip (expected: $activeTripId, got: $docTripId)');
+              continue;
+            }
 
             if (status == 'boarded') {
               Map<String, double>? fromCoords;
@@ -1122,7 +1246,10 @@ class _ConductorMapsState extends State<ConductorMaps>
                     _convertToDouble(data['passengerLongitude']),
                 'status': status,
                 'ticketType': 'preTicket',
+                'tripId': docTripId,
               });
+
+              print('  ✅ ACTIVE - added to list');
             }
           }
 
@@ -1139,7 +1266,8 @@ class _ConductorMapsState extends State<ConductorMaps>
             _debouncedRefreshMarkers();
             _isProcessingPreTickets = false;
 
-            print('Loaded ${_activePreTickets.length} active pre-tickets for geofencing');
+            print(
+                'Loaded ${_activePreTickets.length} active pre-tickets for current trip');
           });
         } catch (e) {
           print('Error processing pre-tickets: $e');
@@ -1331,7 +1459,8 @@ class _ConductorMapsState extends State<ConductorMaps>
     _lastMarkerCacheKey = cacheKey;
     _lastMarkerRefresh = now;
 
-    print('Created ${markers.length} markers total (${passengerMarkers.length} passengers + 1 conductor)');
+    print(
+        'Created ${markers.length} markers total (${passengerMarkers.length} passengers + 1 conductor)');
     return markers;
   }
 
@@ -1396,7 +1525,8 @@ class _ConductorMapsState extends State<ConductorMaps>
       }
     }
 
-    print('Created ${markers.length} guaranteed route markers from ${filteredDestinations.length} destinations');
+    print(
+        'Created ${markers.length} guaranteed route markers from ${filteredDestinations.length} destinations');
     return markers;
   }
 
@@ -1405,7 +1535,8 @@ class _ConductorMapsState extends State<ConductorMaps>
 
     final availableSlots = MAX_PASSENGER_MARKERS;
 
-    print('Creating smart passenger markers with ${availableSlots} available slots');
+    print(
+        'Creating smart passenger markers with ${availableSlots} available slots');
 
     List<Map<String, dynamic>> allPassengers = [
       ..._activeBookings.map((b) => {...b, 'ticketType': 'preBooking'}),
@@ -1460,7 +1591,8 @@ class _ConductorMapsState extends State<ConductorMaps>
       });
 
       prioritizedPassengers = allPassengers.take(availableSlots).toList();
-      print('Prioritized ${prioritizedPassengers.length} passengers out of ${allPassengers.length}');
+      print(
+          'Prioritized ${prioritizedPassengers.length} passengers out of ${allPassengers.length}');
     } else {
       prioritizedPassengers = allPassengers;
     }
@@ -1550,7 +1682,8 @@ class _ConductorMapsState extends State<ConductorMaps>
   }
 
   void _refreshPassengerCount() {
-    print('Passenger count refresh called - current count: $passengerCount (from Firebase)');
+    print(
+        'Passenger count refresh called - current count: $passengerCount (from Firebase)');
   }
 
   void _showLocationError(String errorMessage) {
@@ -2100,6 +2233,11 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   });
 
   final conductorDocId = conductorDoc.docs.first.id;
+
+  // 🔥 GET CURRENT TRIP ID - Cast to Map<String, dynamic> first
+  final conductorData = conductorDoc.docs.first.data() as Map<String, dynamic>;
+  final activeTripId = conductorData['activeTrip']?['tripId'];
+
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
@@ -2113,6 +2251,11 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'qr': true,
     'status': 'boarded',
     'data': data,
+    'route': data['route'], // 🔥 ADD ROUTE
+    'tripId': activeTripId, // 🔥 ADD TRIP ID
+    'from': data['from'], // 🔥 ADD FROM
+    'to': data['to'], // 🔥 ADD TO
+    'quantity': quantity, // 🔥 ADD QUANTITY
   });
 
   await FirebaseFirestore.instance

@@ -7,6 +7,8 @@ import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:b_go/auth/auth_services.dart';
 import 'package:responsive_framework/responsive_framework.dart';
+import 'package:flutter/services.dart';
+import 'dart:math' as math;
 
 class EditProfile extends StatefulWidget {
   const EditProfile({super.key});
@@ -34,7 +36,6 @@ class _EditProfileState extends State<EditProfile> {
       _nameController.text = user.displayName ?? '';
       _emailController.text = user.email ?? '';
       _currentProfileImageUrl = user.photoURL;
-      // Optionally fetch phone from Firestore if not in Auth
       FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -46,7 +47,6 @@ class _EditProfileState extends State<EditProfile> {
       });
     }
 
-    // Add listener to email controller to trigger rebuild when text changes
     _emailController.addListener(() {
       setState(() {});
     });
@@ -61,7 +61,6 @@ class _EditProfileState extends State<EditProfile> {
     super.dispose();
   }
 
-  // Custom snackbar widget
   void _showCustomSnackBar(String message, String type) {
     Color backgroundColor;
     IconData icon;
@@ -135,37 +134,25 @@ class _EditProfileState extends State<EditProfile> {
     );
   }
 
-
-
-  // Validate email and password for phone users
   String? _validateEmailAndPassword() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
 
-    // Check if user has email (was registered with email)
     bool hasEmail = user.email != null && user.email!.isNotEmpty;
 
-    // If user doesn't have email (phone user) and wants to add email
     if (!hasEmail && _emailController.text.trim().isNotEmpty) {
-      // Must provide password for email login
       if (_passwordController.text.trim().isEmpty) {
         return 'Password is required when adding email for login';
       }
-
-      // Validate password strength
       if (_passwordController.text.length < 6) {
         return 'Password must be at least 6 characters long';
       }
     }
 
-    // If user has email and wants to change it
     if (hasEmail && _emailController.text.trim() != user.email) {
-      // Must provide password for email change
       if (_passwordController.text.trim().isEmpty) {
         return 'Password is required when changing email';
       }
-
-      // Validate password strength
       if (_passwordController.text.length < 6) {
         return 'Password must be at least 6 characters long';
       }
@@ -178,9 +165,9 @@ class _EditProfileState extends State<EditProfile> {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512, // Size restriction
+        maxWidth: 512,
         maxHeight: 512,
-        imageQuality: 80, // Compress image
+        imageQuality: 80,
       );
 
       if (image != null) {
@@ -200,7 +187,6 @@ class _EditProfileState extends State<EditProfile> {
     if (user == null) return;
 
     try {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -213,7 +199,6 @@ class _EditProfileState extends State<EditProfile> {
         },
       );
 
-      // Upload image to Firebase Storage
       final storageRef = FirebaseStorage.instance
           .ref()
           .child('profile_images')
@@ -223,10 +208,8 @@ class _EditProfileState extends State<EditProfile> {
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      // Update user profile with new photo URL
       await user.updatePhotoURL(downloadUrl);
 
-      // Update Firestore
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -235,18 +218,14 @@ class _EditProfileState extends State<EditProfile> {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // Update local state
       setState(() {
         _currentProfileImageUrl = downloadUrl;
-        _selectedImage = null; // Clear selected image after upload
+        _selectedImage = null;
       });
 
-      // Close loading dialog
       Navigator.of(context).pop();
-
       _showCustomSnackBar('Profile picture updated successfully!', 'success');
     } catch (e) {
-      // Close loading dialog
       Navigator.of(context).pop();
       _showCustomSnackBar('Failed to upload profile picture: $e', 'error');
     }
@@ -254,13 +233,11 @@ class _EditProfileState extends State<EditProfile> {
 
   Future<void> _linkEmailToAccount(String email, String password) async {
     try {
-      // Create email credential
       final emailCredential = EmailAuthProvider.credential(
         email: email,
         password: password,
       );
 
-      // Link the email credential to the current user
       await FirebaseAuth.instance.currentUser!
           .linkWithCredential(emailCredential);
 
@@ -284,14 +261,11 @@ class _EditProfileState extends State<EditProfile> {
 
   @override
   Widget build(BuildContext context) {
-    // App color palette
     final primaryTeal = const Color(0xFF0091AD);
     
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     
-    // Responsive sizing
     final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
     final sectionFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
     final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
@@ -300,7 +274,6 @@ class _EditProfileState extends State<EditProfile> {
     final avatarRadius = isMobile ? 60.0 : isTablet ? 70.0 : 80.0;
     final cameraIconSize = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
     
-    // Responsive padding and spacing
     final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
     final profileSpacing = isMobile ? 24.0 : isTablet ? 32.0 : 40.0;
 
@@ -327,7 +300,6 @@ class _EditProfileState extends State<EditProfile> {
         child: SingleChildScrollView(
             child: Column(
               children: [
-              // Profile Picture Section
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(profileSpacing),
@@ -389,7 +361,6 @@ class _EditProfileState extends State<EditProfile> {
                 ),
               ),
               
-              // About You Section
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -460,21 +431,21 @@ class _EditProfileState extends State<EditProfile> {
                             label: 'Phone No.',
                             value: _phoneController.text.isNotEmpty ? _phoneController.text : 'Enter your phone number',
                             icon: Icons.phone,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => _EditFieldPage(
-                                  title: 'Edit Phone Number',
-                                  initialValue: _phoneController.text,
-                                  icon: Icons.phone,
-                                  keyboardType: TextInputType.phone,
-                                  onSave: (value) {
-                                    _phoneController.text = value;
-                                    setState(() {});
-                                  },
+                            onTap: () async {
+                              // Navigate to phone editing with OTP
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => _EditPhoneWithOTPPage(
+                                    initialPhone: _phoneController.text,
+                                    onSave: (value) {
+                                      _phoneController.text = value;
+                                      setState(() {});
+                                    },
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                             iconSize: iconSize,
                             titleFontSize: titleFontSize,
                             trailingIconSize: trailingIconSize,
@@ -504,7 +475,6 @@ class _EditProfileState extends State<EditProfile> {
                       ),
                     ),
                     
-                    // Email verification status
                       if (_emailController.text.isNotEmpty &&
                           FirebaseAuth.instance.currentUser?.email != null &&
                         FirebaseAuth.instance.currentUser?.email!.isNotEmpty == true) ...[
@@ -552,7 +522,6 @@ class _EditProfileState extends State<EditProfile> {
                         ),
                       ],
                     
-                    // Helper text for phone users adding email
                       if (_emailController.text.isNotEmpty &&
                           (FirebaseAuth.instance.currentUser?.email == null ||
                             FirebaseAuth.instance.currentUser?.email!.isEmpty == true)) ...[
@@ -584,41 +553,12 @@ class _EditProfileState extends State<EditProfile> {
                     
                 SizedBox(height: 32),
                     
-                    // Action buttons
                     Center(
                       child: Column(
                         children: [
-                          // Only show "Link Email for Login" button if user has no email or email is not verified
-                          if (_emailController.text.isNotEmpty && 
-                              _passwordController.text.isNotEmpty &&
-                              (FirebaseAuth.instance.currentUser?.email == null ||
-                               FirebaseAuth.instance.currentUser?.email!.isEmpty == true ||
-                               FirebaseAuth.instance.currentUser?.emailVerified == false)) ...[
-                            ElevatedButton(
-                              onPressed: () async {
-                                await _linkEmailToAccount(_emailController.text.trim(), _passwordController.text);
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                elevation: 4,
-                                padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
-                              ),
-                              child: Text(
-                                'Link Email for Login',
-                                style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                            SizedBox(height: 16),
-                          ],
-                          
                 ElevatedButton(
                   onPressed: () async {
                     if (_formKey.currentState!.validate()) {
-                      // Additional validation for email and password
                       String? validationError = _validateEmailAndPassword();
                       if (validationError != null) {
                         _showCustomSnackBar(validationError, 'warning');
@@ -629,17 +569,7 @@ class _EditProfileState extends State<EditProfile> {
                       if (user != null) {
                         try {
                           String newEmail = _emailController.text.trim();
-                          String newPhone = _phoneController.text.trim();
-                          // Ensure phone starts with +63
-                          if (!newPhone.startsWith('+63')) {
-                            if (newPhone.startsWith('0')) {
-                              newPhone = '+63' + newPhone.substring(1);
-                            } else {
-                              newPhone = '+63' + newPhone;
-                            }
-                          }
 
-                          // Show loading indicator
                           showDialog(
                             context: context,
                             barrierDismissible: false,
@@ -652,43 +582,33 @@ class _EditProfileState extends State<EditProfile> {
                             },
                           );
 
-                          // Update Firebase Auth profile first
                           await user.updateDisplayName(_nameController.text);
 
-                          // Check if user is adding email for the first time (phone user)
                               bool isPhoneUser = user.email == null || user.email!.isEmpty;
 
                           if (isPhoneUser && newEmail.isNotEmpty) {
-                            // Phone user is adding email for the first time
                             try {
-                              // Create email credential and link it
                                   final emailCredential = EmailAuthProvider.credential(
                                 email: newEmail,
                                 password: _passwordController.text,
                               );
 
-                              // Link the email credential to the current user
                               await user.linkWithCredential(emailCredential);
 
-                              // Update Firestore
                               await FirebaseFirestore.instance
                                   .collection('users')
                                   .doc(user.uid)
                                   .update({
                                 'name': _nameController.text,
                                 'email': newEmail,
-                                'phone': newPhone,
-                                    'authMethod': 'phone_email', // Indicate both methods are available
+                                    'authMethod': 'phone_email',
                                 'updatedAt': FieldValue.serverTimestamp(),
                               });
 
-                              // Send verification email
                               await user.sendEmailVerification();
 
-                              // Close loading dialog
                               Navigator.of(context).pop();
 
-                              // Show verification dialog
                               await showDialog(
                                 context: context,
                                 builder: (context) => AlertDialog(
@@ -711,10 +631,8 @@ class _EditProfileState extends State<EditProfile> {
                                 ),
                               );
 
-                              // Show success message
                               _showCustomSnackBar('Email linked successfully! Please check your email for verification.', 'success');
 
-                              // Navigate back to profile page
                               if (mounted) {
                                 Navigator.pop(context);
                               }
@@ -742,7 +660,6 @@ class _EditProfileState extends State<EditProfile> {
                             }
                           }
 
-                          // If email changed, use verifyBeforeUpdateEmail for secure update
                           if (newEmail != user.email && newEmail.isNotEmpty) {
                             try {
                               await user.verifyBeforeUpdateEmail(newEmail);
@@ -761,11 +678,9 @@ class _EditProfileState extends State<EditProfile> {
                                   ],
                                 ),
                               );
-                              // Don't sign out - let user continue using the app
                               return;
                             } on FirebaseAuthException catch (e) {
                               Navigator.of(context).pop();
-                                  print('FirebaseAuthException: ${e.code} - ${e.message}');
                               if (e.code == 'requires-recent-login') {
                                 await showDialog(
                                   context: context,
@@ -793,38 +708,29 @@ class _EditProfileState extends State<EditProfile> {
                             }
                           }
 
-                          // Update Firestore with all user data
                           await FirebaseFirestore.instance
                               .collection('users')
                               .doc(user.uid)
                               .update({
                             'name': _nameController.text,
                             'email': newEmail,
-                            'phone': newPhone,
                             'updatedAt': FieldValue.serverTimestamp(),
                           });
 
-                          // Update password if provided
                           if (_passwordController.text.isNotEmpty) {
                             await user.updatePassword(_passwordController.text);
                           }
 
-                          // Close loading dialog
                           Navigator.of(context).pop();
-
-                          // Show success message
                           _showCustomSnackBar('Profile updated successfully!', 'success');
 
-                          // Navigate back to profile page
                           if (mounted) {
                             Navigator.pop(context);
                           }
                         } on FirebaseAuthException catch (e) {
-                          // Close loading dialog
                           Navigator.of(context).pop();
                           String message;
                           if (e.code == 'requires-recent-login') {
-                            // Prompt user to reauthenticate and log out
                             await showDialog(
                               context: context,
                               builder: (context) => AlertDialog(
@@ -860,7 +766,6 @@ class _EditProfileState extends State<EditProfile> {
                           }
                           _showCustomSnackBar(message, 'error');
                         } catch (e) {
-                          // Close loading dialog
                           Navigator.of(context).pop();
                           _showCustomSnackBar('An unexpected error occurred. Please try again.', 'error');
                         }
@@ -966,6 +871,521 @@ class _ProfileField extends StatelessWidget {
   }
 }
 
+// NEW: Edit Phone with OTP Page
+class _EditPhoneWithOTPPage extends StatefulWidget {
+  final String initialPhone;
+  final Function(String) onSave;
+
+  const _EditPhoneWithOTPPage({
+    required this.initialPhone,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditPhoneWithOTPPage> createState() => _EditPhoneWithOTPPageState();
+}
+
+class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
+  late TextEditingController _phoneController;
+  final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
+  String? _verificationId;
+  bool _showOTPFields = false;
+  
+  // OTP Controllers
+  final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
+  final List<FocusNode> focusNodes = List.generate(6, (index) => FocusNode());
+  
+  int _resendCountdown = 30;
+  bool _canResend = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _phoneController = TextEditingController(text: widget.initialPhone);
+    
+    // Add listeners for OTP fields
+    for (int i = 0; i < 6; i++) {
+      otpControllers[i].addListener(() {
+        if (otpControllers[i].text.length == 1 && i < 5) {
+          focusNodes[i + 1].requestFocus();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    for (var controller in otpControllers) {
+      controller.dispose();
+    }
+    for (var node in focusNodes) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(message, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500)),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  void _startResendCountdown() {
+    setState(() {
+      _canResend = false;
+      _resendCountdown = 30;
+    });
+    
+    Future.delayed(Duration(seconds: 1), () {
+      if (mounted) {
+        if (_resendCountdown > 0) {
+          setState(() {
+            _resendCountdown--;
+          });
+          _startResendCountdown();
+        } else {
+          setState(() {
+            _canResend = true;
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _sendOTP() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    String phone = _phoneController.text.trim();
+    if (!phone.startsWith('+63')) {
+      if (phone.startsWith('0')) {
+        phone = '+63' + phone.substring(1);
+      } else {
+        phone = '+63' + phone;
+      }
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phone,
+        verificationCompleted: (PhoneAuthCredential credential) async {},
+        verificationFailed: (FirebaseAuthException e) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Failed to send OTP. Please try again.';
+          });
+          _showCustomSnackBar('Failed to send OTP: ${e.message}', 'error');
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          setState(() {
+            _verificationId = verificationId;
+            _showOTPFields = true;
+            _isLoading = false;
+          });
+          _startResendCountdown();
+          _showCustomSnackBar('OTP sent to $phone', 'success');
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          setState(() {
+            _verificationId = verificationId;
+          });
+        },
+      );
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to send OTP';
+      });
+      _showCustomSnackBar('Error: $e', 'error');
+    }
+  }
+
+  Future<void> _verifyOTP() async {
+    String otp = otpControllers.map((controller) => controller.text).join();
+    
+    if (otp.length != 6) {
+      setState(() {
+        _errorMessage = "Please enter the complete 6-digit code";
+      });
+      return;
+    }
+
+    if (_verificationId == null) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: otp,
+      );
+
+      // Link phone credential to current user
+      await FirebaseAuth.instance.currentUser!.linkWithCredential(credential);
+
+      String phone = _phoneController.text.trim();
+      if (!phone.startsWith('+63')) {
+        if (phone.startsWith('0')) {
+          phone = '+63' + phone.substring(1);
+        } else {
+          phone = '+63' + phone;
+        }
+      }
+
+      // Update Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .update({
+        'phone': phone,
+        'isPhoneVerified': true,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      _showCustomSnackBar('Phone number verified successfully!', 'success');
+      
+      // Call the onSave callback and pop
+      widget.onSave(phone);
+      Navigator.of(context).pop();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = "Incorrect code. Please try again";
+      });
+      
+      for (var controller in otpControllers) {
+        controller.clear();
+      }
+      focusNodes[0].requestFocus();
+    }
+  }
+
+  Future<void> _resendOTP() async {
+    if (!_canResend) return;
+    await _sendOTP();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryTeal = const Color(0xFF0091AD);
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    
+    final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
+    final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
+    final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
+    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
+    final otpFieldSize = isMobile ? 40.0 : isTablet ? 50.0 : 60.0;
+    final otpFieldMargin = isMobile ? 4.0 : isTablet ? 8.0 : 12.0;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: primaryTeal,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: iconSize),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          _showOTPFields ? 'Verify Phone Number' : 'Edit Phone Number',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: appBarFontSize,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(horizontalPadding),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!_showOTPFields) ...[
+                  SizedBox(height: 32),
+                  Text(
+                    'Enter your new phone number',
+                    style: GoogleFonts.outfit(
+                      fontSize: titleFontSize + 2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'We\'ll send you a verification code',
+                    style: GoogleFonts.outfit(
+                      fontSize: titleFontSize - 2,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  SizedBox(height: 24),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: 'Phone Number',
+                      prefixIcon: Icon(Icons.phone, color: primaryTeal),
+                      hintText: '+639171234567',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: primaryTeal),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    ),
+                    style: GoogleFonts.outfit(fontSize: titleFontSize),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Phone number is required';
+                      }
+                      return null;
+                    },
+                  ),
+                ] else ...[
+                  SizedBox(height: 32),
+                  Text(
+                    'Enter Verification Code',
+                    style: GoogleFonts.outfit(
+                      fontSize: isMobile ? 20.0 : 24.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    "We've sent a 6-digit code to ${_phoneController.text}",
+                    style: GoogleFonts.outfit(
+                      fontSize: isMobile ? 14.0 : 16.0,
+                      color: Colors.black54,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 32),
+                  
+                  // OTP Fields
+                  Center(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final availableWidth = constraints.maxWidth;
+                        final totalFieldWidth = (otpFieldSize * 6) + (otpFieldMargin * 10);
+                        
+                        double finalFieldSize = otpFieldSize;
+                        double finalMargin = otpFieldMargin;
+                        
+                        if (totalFieldWidth > availableWidth) {
+                          finalMargin = math.max(2.0, (availableWidth - (otpFieldSize * 6)) / 10);
+                          if (finalMargin < 2.0) {
+                            finalFieldSize = (availableWidth - (2.0 * 10)) / 6;
+                            finalMargin = 2.0;
+                          }
+                        }
+                        
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(6, (index) {
+                            return Container(
+                              margin: EdgeInsets.symmetric(horizontal: finalMargin),
+                              width: finalFieldSize,
+                              height: finalFieldSize,
+                              child: TextField(
+                                controller: otpControllers[index],
+                                focusNode: focusNodes[index],
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                maxLength: 1,
+                                style: GoogleFonts.outfit(
+                                  fontSize: math.max(16, finalFieldSize * 0.4),
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                                decoration: InputDecoration(
+                                  counterText: "",
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: _errorMessage != null 
+                                          ? Colors.red 
+                                          : (otpControllers[index].text.isNotEmpty 
+                                              ? primaryTeal 
+                                              : Colors.grey.shade300),
+                                      width: 2,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: _errorMessage != null 
+                                          ? Colors.red 
+                                          : Colors.grey.shade300,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                    borderSide: BorderSide(
+                                      color: primaryTeal,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _errorMessage = null;
+                                  });
+                                  
+                                  if (value.isEmpty && index > 0) {
+                                    Future.delayed(Duration(milliseconds: 10), () {
+                                      if (mounted && otpControllers[index].text.isEmpty) {
+                                        focusNodes[index - 1].requestFocus();
+                                      }
+                                    });
+                                  }
+                                },
+                                inputFormatters: [
+                                  LengthLimitingTextInputFormatter(1),
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                              ),
+                            );
+                          }),
+                        );
+                      },
+                    ),
+                  ),
+                  
+                  SizedBox(height: 20),
+                  
+                  if (_errorMessage != null)
+                    Center(
+                      child: Text(
+                        _errorMessage!,
+                        style: GoogleFonts.outfit(
+                          color: Colors.red,
+                          fontSize: isMobile ? 12.0 : 14.0,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  
+                  SizedBox(height: 20),
+                  
+                  Center(
+                    child: GestureDetector(
+                      onTap: _canResend ? _resendOTP : null,
+                      child: Text(
+                        _canResend 
+                            ? "Resend code" 
+                            : "Resend code in $_resendCountdown seconds",
+                        style: GoogleFonts.outfit(
+                          color: _canResend ? primaryTeal : Colors.grey,
+                          fontSize: isMobile ? 12.0 : 14.0,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                
+                SizedBox(height: 40),
+                
+                Center(
+                  child: ElevatedButton(
+                    onPressed: _isLoading 
+                        ? null 
+                        : (_showOTPFields ? _verifyOTP : _sendOTP),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryTeal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 4,
+                      padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                      minimumSize: Size(200, 50),
+                    ),
+                    child: _isLoading
+                        ? SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Text(
+                            _showOTPFields ? 'Verify' : 'Send OTP',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                  ),
+                ),
+                SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EditFieldPage extends StatefulWidget {
   final String title;
   final String initialValue;
@@ -1004,12 +1424,9 @@ class _EditFieldPageState extends State<_EditFieldPage> {
   @override
   Widget build(BuildContext context) {
     final primaryTeal = const Color(0xFF0091AD);
-    
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     
-    // Responsive sizing
     final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
     final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
     final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
@@ -1046,10 +1463,10 @@ class _EditFieldPageState extends State<_EditFieldPage> {
                 TextFormField(
                   controller: _controller,
                   keyboardType: widget.keyboardType,
-      decoration: InputDecoration(
+                  decoration: InputDecoration(
                     labelText: widget.title.replaceAll('Edit ', ''),
                     prefixIcon: Icon(widget.icon, color: primaryTeal),
-        border: OutlineInputBorder(
+                    border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
@@ -1126,12 +1543,9 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
   @override
   Widget build(BuildContext context) {
     final primaryTeal = const Color(0xFF0091AD);
-    
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     
-    // Responsive sizing
     final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
     final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
     final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;

@@ -37,7 +37,6 @@ class _ConductorFromState extends State<ConductorFrom> {
 
   // Thermal Printer Service
   final ThermalPrinterService _printerService = ThermalPrinterService();
-  final Map<String, bool> _printingStates = {};
 
   final Map<String, String> _routeFirestoreNames = {
     'Batangas': 'Batangas',
@@ -111,134 +110,9 @@ class _ConductorFromState extends State<ConductorFrom> {
     return 'Unknown Route';
   }
 
-  Future<void> _printManualTicket(Map<String, dynamic> ticket) async {
-    final ticketId = ticket['id'] as String;
-
-    setState(() {
-      _printingStates[ticketId] = true;
-    });
-
-    try {
-      // If not connected to printer, show connection dialog
-      if (!_printerService.isConnected) {
-        await ThermalPrinterService.showPrinterConnectionDialog(
-          context,
-          (ip, port) async {
-            final connected = await _printerService.connectPrinter(ip, port);
-            if (!connected) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to connect to printer'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-              setState(() {
-                _printingStates[ticketId] = false;
-              });
-              return;
-            }
-
-            // Now print after successful connection
-            await _performPrint(ticket, ticketId);
-          },
-        );
-      } else {
-        // Already connected, just print
-        await _performPrint(ticket, ticketId);
-      }
-    } catch (e) {
-      print('Error printing: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      setState(() {
-        _printingStates[ticketId] = false;
-      });
-    }
-  }
-
-  Future<void> _performPrint(
-      Map<String, dynamic> ticket, String ticketId) async {
-    try {
-      // Extract ticket data
-      final from = ticket['from']?.toString() ?? 'N/A';
-      final to = ticket['to']?.toString() ?? 'N/A';
-      final fromKm =
-          ticket['fromKm']?.toString() ?? ticket['startKm']?.toString() ?? '0';
-      final toKm =
-          ticket['toKm']?.toString() ?? ticket['endKm']?.toString() ?? '0';
-
-      String baseFare = '0.00';
-      final fareData = ticket['farePerPassenger'];
-      if (fareData != null) {
-        if (fareData is List && fareData.isNotEmpty) {
-          baseFare = fareData.first.toString();
-        } else if (fareData is num) {
-          baseFare = fareData.toStringAsFixed(2);
-        } else if (fareData is String) {
-          baseFare = fareData;
-        }
-      }
-
-      final quantity = (ticket['quantity'] as num?)?.toInt() ?? 1;
-      final totalFare = ticket['totalFare']?.toString() ?? '0.00';
-      final discountAmount = ticket['discountAmount']?.toString() ?? '0.00';
-
-      List<String>? discountBreakdown;
-      if (ticket['discountBreakdown'] != null) {
-        discountBreakdown = List<String>.from(
-            (ticket['discountBreakdown'] as List).map((e) => e.toString()));
-      }
-
-      // Print receipt
-      final success = await _printerService.printManualTicket(
-        route: getRouteLabel(selectedPlaceCollection),
-        from: from,
-        to: to,
-        fromKm: fromKm,
-        toKm: toKm,
-        baseFare: baseFare,
-        quantity: quantity,
-        totalFare: totalFare,
-        discountAmount: discountAmount,
-        discountBreakdown: discountBreakdown,
-      );
-
-      if (mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Receipt printed successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to print receipt'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } finally {
-      setState(() {
-        _printingStates[ticketId] = false;
-      });
-    }
-  }
-
   Future<void> _printScannedTicket(
       Map<String, dynamic> ticketData, String ticketType) async {
     try {
-      // If not connected to printer, show connection dialog
       if (!_printerService.isConnected) {
         await ThermalPrinterService.showPrinterConnectionDialog(
           context,
@@ -250,13 +124,10 @@ class _ConductorFromState extends State<ConductorFrom> {
               }
               return;
             }
-
-            // Now print after successful connection
             await _performScannedTicketPrint(ticketData, ticketType);
           },
         );
       } else {
-        // Already connected, just print
         await _performScannedTicketPrint(ticketData, ticketType);
       }
     } catch (e) {
@@ -270,7 +141,6 @@ class _ConductorFromState extends State<ConductorFrom> {
   Future<void> _performScannedTicketPrint(
       Map<String, dynamic> ticketData, String ticketType) async {
     try {
-      // Extract ticket data
       final from = ticketData['from']?.toString() ?? 'N/A';
       final to = ticketData['to']?.toString() ?? 'N/A';
       final fromKm = ticketData['fromKm']?.toString() ?? '0';
@@ -301,7 +171,6 @@ class _ConductorFromState extends State<ConductorFrom> {
             (ticketData['discountBreakdown'] as List).map((e) => e.toString()));
       }
 
-      // Print receipt
       final success = await _printerService.printManualTicket(
         route: getRouteLabel(selectedPlaceCollection),
         from: from,
@@ -539,12 +408,9 @@ class _ConductorFromState extends State<ConductorFrom> {
         final success = result['success'] as bool;
 
         if (success) {
-          _refreshPassengerCount();
-
           final ticketType = result['type'] as String;
           final ticketData = result['data'] as Map<String, dynamic>;
 
-          // Show success message with custom snackbar
           if (ticketType == 'preTicket') {
             _showCustomSnackBar(
               'Pre-ticket scanned successfully!',
@@ -557,7 +423,6 @@ class _ConductorFromState extends State<ConductorFrom> {
             );
           }
 
-          // Automatically print the ticket
           await _printScannedTicket(ticketData, ticketType);
         } else {
           final error =
@@ -571,10 +436,6 @@ class _ConductorFromState extends State<ConductorFrom> {
         'error',
       );
     }
-  }
-
-  void _refreshPassengerCount() {
-    setState(() {});
   }
 
   @override
@@ -887,349 +748,9 @@ class _ConductorFromState extends State<ConductorFrom> {
               },
             ),
           ),
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 24),
-                const Padding(
-                  padding: EdgeInsets.only(left: 26),
-                  child: Text(
-                    "Manually Ticketed Passengers:",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.black87,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: FutureBuilder<List<Map<String, dynamic>>>(
-                    key: const ValueKey('manual_tickets_future'),
-                    future: _getManualTickets(),
-                    builder: (context, snapshot) {
-                      if (!mounted) {
-                        return const SizedBox.shrink();
-                      }
-
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      } else if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      } else if (!snapshot.hasData ||
-                          snapshot.data == null ||
-                          snapshot.data!.isEmpty) {
-                        return Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'No manually ticketed passengers yet',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final manualTickets = snapshot.data!;
-                      return ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: manualTickets.length,
-                        itemBuilder: (context, index) {
-                          final ticket = manualTickets[index];
-                          final ticketId = ticket['id'] as String;
-                          final status = ticket['status'] ?? 'boarded';
-                          final isAccomplished = status == 'accomplished';
-                          final isPrinting = _printingStates[ticketId] ?? false;
-
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: isAccomplished
-                                  ? Colors.green[50]
-                                  : Colors.blue[50],
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isAccomplished
-                                    ? Colors.green[300]!
-                                    : Colors.blue[300]!,
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${ticket['from']} → ${ticket['to']}',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Passengers: ${ticket['quantity']}',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Fare: ₱${ticket['totalFare']}',
-                                            style: const TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Column(
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 12,
-                                            vertical: 6,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: isAccomplished
-                                                ? Colors.green[100]
-                                                : Colors.blue[100],
-                                            borderRadius:
-                                                BorderRadius.circular(20),
-                                          ),
-                                          child: Text(
-                                            isAccomplished
-                                                ? 'ACCOMPLISHED'
-                                                : 'BOARDED',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                              color: isAccomplished
-                                                  ? Colors.green[700]
-                                                  : Colors.blue[700],
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            // Print button
-                                            ElevatedButton(
-                                              onPressed: isPrinting
-                                                  ? null
-                                                  : () => _printManualTicket(
-                                                      ticket),
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor:
-                                                    const Color(0xFF0091AD),
-                                                foregroundColor: Colors.white,
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 8,
-                                                ),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(20),
-                                                ),
-                                                minimumSize: const Size(40, 36),
-                                              ),
-                                              child: isPrinting
-                                                  ? const SizedBox(
-                                                      width: 16,
-                                                      height: 16,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2,
-                                                      ),
-                                                    )
-                                                  : const Icon(Icons.print,
-                                                      size: 18),
-                                            ),
-                                            if (!isAccomplished) ...[
-                                              const SizedBox(width: 8),
-                                              ElevatedButton(
-                                                onPressed: () =>
-                                                    _markTicketAccomplished(
-                                                        ticket),
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      Colors.green[600],
-                                                  foregroundColor: Colors.white,
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 8,
-                                                  ),
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            20),
-                                                  ),
-                                                ),
-                                                child: const Text(
-                                                  'Mark Done',
-                                                  style:
-                                                      TextStyle(fontSize: 11),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
-  }
-
-  Future<List<Map<String, dynamic>>> _getManualTickets() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return [];
-
-      final conductorDoc = await FirebaseFirestore.instance
-          .collection('conductors')
-          .where('uid', isEqualTo: user.uid)
-          .limit(1)
-          .get();
-
-      if (conductorDoc.docs.isEmpty) return [];
-
-      final conductorId = conductorDoc.docs.first.id;
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-      return await RouteService.getManualTickets(conductorId, today);
-    } catch (e) {
-      print('Error fetching manual tickets: $e');
-      return [];
-    }
-  }
-
-  Future<void> _markTicketAccomplished(Map<String, dynamic> ticket) async {
-    if (!mounted) return;
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      final conductorDoc = await FirebaseFirestore.instance
-          .collection('conductors')
-          .where('uid', isEqualTo: user.uid)
-          .limit(1)
-          .get();
-
-      if (conductorDoc.docs.isEmpty) return;
-
-      final conductorId = conductorDoc.docs.first.id;
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final ticketId = ticket['id'] as String;
-      final quantity = ticket['quantity'] as int;
-      final from = ticket['from'] as String;
-      final to = ticket['to'] as String;
-
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Confirm Passenger Drop-off'),
-          content: Text(
-              'Mark $quantity passenger(s) from $from to $to as accomplished?\n\nThis will decrease the passenger count by $quantity.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green[600],
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true && mounted) {
-        await PassengerStatusService.markManualTicketAccomplished(
-          conductorId: conductorId,
-          date: today,
-          ticketId: ticketId,
-          quantity: quantity,
-          from: from,
-          to: to,
-        );
-
-        if (mounted) {
-          setState(() {});
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                '$quantity passenger(s) from $from to $to marked as accomplished. Passenger count decreased by $quantity.',
-              ),
-              backgroundColor: Colors.green[600],
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
-
-        print(
-            'Manual ticket accomplished: $ticketId, decremented passenger count by $quantity');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-      print('Error marking ticket accomplished: $e');
-    }
   }
 }
 
@@ -1707,14 +1228,12 @@ class _QRScanPageState extends State<QRScanPage> {
               final data = parseQRData(qrData);
               await storePreTicketToFirestore(data);
 
-              // Return both success flag and ticket data for printing
               Navigator.of(context).pop({
                 'success': true,
                 'type': data['type'] ?? 'preTicket',
                 'data': data,
               });
             } catch (e) {
-              // Show error in the parent screen
               Navigator.of(context).pop({
                 'success': false,
                 'error': e.toString().replaceAll('Exception: ', ''),
@@ -1863,7 +1382,6 @@ Future<int> _getNextTicketNumber(
   }
 }
 
-// ✅ UPDATED _processPreTicket WITH userId FIX
 Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
   final conductorDocId = conductorDoc.docs.first.id;
@@ -1879,7 +1397,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   print('🔍 Quantity: $quantity');
   print('🔍 QR Data: $data');
 
-  // Search for pre-ticket
   final preTicketsQuery = await FirebaseFirestore.instance
       .collectionGroup('preTickets')
       .where('qrData', isEqualTo: qrDataString)
@@ -1893,7 +1410,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   final pendingPreTicket = preTicketsQuery.docs.first;
   final preTicketData = pendingPreTicket.data();
 
-  // ✅ Get userId from the pre-ticket
   final userId = preTicketData['userId'];
 
   print('🔍 Pre-ticket userId: $userId');
@@ -1907,7 +1423,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     throw Exception('This pre-ticket has already been scanned and boarded.');
   }
 
-  // ✅ Update status to boarded
   await pendingPreTicket.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
@@ -1916,7 +1431,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'tripId': activeTripId,
   });
 
-  // ✅ Store in conductor's preTickets collection WITH userId
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
@@ -1943,7 +1457,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
 
   print('✅ Saved pre-ticket with userId: $userId');
 
-  // ✅ Save to remittance collection
   try {
     final ticketNumber =
         await _getNextTicketNumber(conductorDocId, formattedDate);
@@ -2004,7 +1517,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-ticket to remittance: $e');
   }
 
-  // ✅ Save to dailyTrips
   try {
     final dailyTripDoc = await FirebaseFirestore.instance
         .collection('conductors')
@@ -2049,7 +1561,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-ticket to dailyTrips: $e');
   }
 
-  // ✅ CRITICAL: Only increment passenger count ONCE when boarding
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
@@ -2059,7 +1570,6 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   print('✅ === PRE-TICKET SCAN COMPLETE ===\n');
 }
 
-// ✅ FIXED _processPreBooking - Updates existing remittance ticket instead of creating duplicate
 Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     QuerySnapshot conductorDoc, int quantity, String qrDataString) async {
   final conductorDocId = conductorDoc.docs.first.id;
@@ -2079,7 +1589,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   String? bookingId;
   String? userId;
 
-  // ✅ STRATEGY 1: Search by booking ID
   final dataBookingId = data['bookingId'] ?? data['id'];
   if (dataBookingId != null) {
     print('🔍 Strategy 1: Searching by booking ID: $dataBookingId');
@@ -2110,7 +1619,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
-  // ✅ STRATEGY 2: Search by QR data string
   if (paidPreBooking == null) {
     print('🔍 Strategy 2: Searching by QR data string');
     try {
@@ -2143,7 +1651,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
-  // ✅ STRATEGY 3: Search by route details
   if (paidPreBooking == null && data['from'] != null && data['to'] != null) {
     print('🔍 Strategy 3: Searching by from/to/quantity');
     try {
@@ -2194,7 +1701,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     throw Exception('This pre-booking has already been scanned and boarded.');
   }
 
-  // ✅ Update status from "paid" → "boarded" in original location
   await paidPreBooking.reference.update({
     'status': 'boarded',
     'boardingStatus': 'boarded',
@@ -2205,7 +1711,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   });
   print('✅ Updated original pre-booking to "boarded"');
 
-  // ✅ Update in conductor's preBookings collection (if exists)
   try {
     final conductorPreBookingRef = FirebaseFirestore.instance
         .collection('conductors')
@@ -2247,7 +1752,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     print('⚠️ Error updating conductor preBooking: $e');
   }
 
-  // ✅ Update in user's preBookings collection
   if (userId != null) {
     try {
       await FirebaseFirestore.instance
@@ -2269,9 +1773,7 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
-  // ✅ CRITICAL FIX: Update existing remittance ticket instead of creating new one
   try {
-    // Find the existing remittance ticket for this pre-booking
     final existingTicketQuery = await FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorDocId)
@@ -2283,7 +1785,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         .get();
 
     if (existingTicketQuery.docs.isNotEmpty) {
-      // ✅ Update the existing ticket to "boarded" status
       final existingTicketDoc = existingTicketQuery.docs.first;
       await existingTicketDoc.reference.update({
         'status': 'boarded',
@@ -2297,7 +1798,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
       print(
           '✅ Updated existing remittance ticket ${existingTicketDoc.id} from "paid" to "boarded"');
     } else {
-      // ✅ If no existing ticket found, create one (fallback for edge cases)
       print('⚠️ No existing remittance ticket found, creating new one');
 
       final ticketNumber =
@@ -2363,7 +1863,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     print('❌ Error updating remittance ticket: $e');
   }
 
-  // ✅ Save to dailyTrips
   try {
     final dailyTripDoc = await FirebaseFirestore.instance
         .collection('conductors')
@@ -2409,7 +1908,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-booking to dailyTrips: $e');
   }
 
-  // ✅ Add to scannedQRCodes collection as "boarded"
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)
@@ -2439,7 +1937,6 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
   });
   print('✅ Added to scannedQRCodes as "boarded"');
 
-  // ✅ CRITICAL: Only increment passenger count when status changes from 'paid' to 'boarded'
   await FirebaseFirestore.instance
       .collection('conductors')
       .doc(conductorDocId)

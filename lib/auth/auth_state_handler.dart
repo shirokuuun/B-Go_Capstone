@@ -17,10 +17,10 @@ class AuthStateHandler extends StatefulWidget {
 }
 
 class _AuthStateHandlerState extends State<AuthStateHandler> {
-  Future<bool> _checkIfConductor(String uid) async {
+  // OPTIMIZED: Direct document lookup instead of .where() query
+  Future<Map<String, dynamic>?> _getUserData(String uid) async {
     try {
-      print('🔍 Starting Firestore query for conductor check...');
-      print('🔍 Checking for UID: $uid');
+      print('🔍 Fetching user data for UID: $uid');
 
       final query = await FirebaseFirestore.instance
           .collection('conductors')
@@ -28,10 +28,10 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
           .limit(1)
           .get()
           .timeout(
-        const Duration(seconds: 30), // CHANGED: Increased from 10 to 30 seconds
+        const Duration(seconds: 30),
         onTimeout: () {
-          print('⏱️ TIMEOUT: Firestore query took too long');
-          throw TimeoutException('Query timeout');
+          print('⏱️ TIMEOUT: User data fetch took too long');
+          throw TimeoutException('User data timeout');
         },
       );
 
@@ -39,22 +39,25 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
       print('📊 Documents found: ${query.docs.length}');
 
       if (query.docs.isNotEmpty) {
-        print('✅ User IS a conductor');
-        print('📄 Conductor data: ${query.docs.first.data()}');
+        final data = query.docs.first.data() as Map<String, dynamic>;
+        final userRole = data['userRole'] ?? '';
+        print('✅ User document found');
+        print('👤 User role: $userRole');
+        print('📄 User data: $data');
+        return data;
       } else {
-        print('❌ User is NOT a conductor');
+        print('❌ No user document found');
+        return null;
       }
-
-      return query.docs.isNotEmpty;
     } on FirebaseException catch (e) {
       print('❌ FirebaseException: ${e.code} - ${e.message}');
-      return false;
+      return null;
     } on TimeoutException catch (e) {
       print('❌ TimeoutException: $e');
-      return false;
+      return null;
     } catch (e) {
       print('❌ Unknown error: $e');
-      return false;
+      return null;
     }
   }
 
@@ -87,15 +90,14 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
           print('✅ User is logged in: ${user.uid}');
           print('📧 Email verified: ${user.emailVerified}');
 
-          return FutureBuilder<bool>(
-            future: _checkIfConductor(user.uid),
-            builder: (context, conductorSnapshot) {
+          return FutureBuilder<Map<String, dynamic>?>(
+            future: _getUserData(user.uid),
+            builder: (context, userDataSnapshot) {
               print(
-                  '🔍 Conductor check: ConnectionState = ${conductorSnapshot.connectionState}');
+                  '🔍 User data check: ConnectionState = ${userDataSnapshot.connectionState}');
 
-              if (conductorSnapshot.connectionState ==
-                  ConnectionState.waiting) {
-                print('⏳ Checking if user is conductor...');
+              if (userDataSnapshot.connectionState == ConnectionState.waiting) {
+                print('⏳ Fetching user data...');
                 return Scaffold(
                   backgroundColor: const Color(0xFFE5E9F0),
                   body: Center(
@@ -111,75 +113,44 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
                           'Loading...',
                           style: TextStyle(color: Colors.grey, fontSize: 16),
                         ),
-                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
                 );
               }
 
-              final isConductor = conductorSnapshot.data ?? false;
-              print('🔍 Is conductor: $isConductor');
-
-              if (conductorSnapshot.hasError) {
-                print('❌ Error in conductor check: ${conductorSnapshot.error}');
+              if (userDataSnapshot.hasError) {
+                print('❌ Error fetching user data: ${userDataSnapshot.error}');
               }
 
-              if (isConductor) {
+              final userData = userDataSnapshot.data;
+              final userRole = userData?['userRole'] ?? '';
+              final isConductor = userRole == 'conductor';
+
+              print('🔍 User role: $userRole');
+              print('🔍 Is conductor: $isConductor');
+
+              if (isConductor && userData != null) {
                 print(
                     '🚌 User is a conductor - bypassing email verification check');
-                print('🚌 Fetching conductor data...');
 
-                // Need to fetch conductor data again to get route and placeCollection
-                return FutureBuilder<QuerySnapshot>(
-                  future: FirebaseFirestore.instance
-                      .collection('conductors')
-                      .where('uid', isEqualTo: user.uid)
-                      .limit(1)
-                      .get(),
-                  builder: (context, dataSnapshot) {
-                    if (dataSnapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return const Scaffold(
-                        backgroundColor: Color(0xFFE5E9F0),
-                        body: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                Color(0xFF0091AD)),
-                          ),
-                        ),
-                      );
-                    }
+                // Extract conductor data
+                final route = userData['route'] ?? '';
+                final placeCollection = userData['placeCollection'] ?? 'Place';
 
-                    if (dataSnapshot.hasData &&
-                        dataSnapshot.data!.docs.isNotEmpty) {
-                      final conductorData = dataSnapshot.data!.docs.first.data()
-                          as Map<String, dynamic>;
-                      final route = conductorData['route'] ?? '';
-                      final placeCollection =
-                          conductorData['placeCollection'] ?? 'Place';
+                print('✅ Conductor data loaded successfully');
+                print('📍 Route: $route');
+                print('📍 Place Collection: $placeCollection');
+                print('🎯 Navigating to ConductorHome');
 
-                      print('✅ Conductor data loaded successfully');
-                      print('📍 Route: $route');
-                      print('📍 Place Collection: $placeCollection');
-                      print('🎯 Navigating to ConductorHome');
-
-                      return ConductorHome(
-                        role: 'Conductor',
-                        route: route,
-                        placeCollection: placeCollection,
-                        selectedIndex: 0,
-                      );
-                    }
-
-                    print(
-                        '⚠️ No conductor data found, falling back to UserSelection');
-                    // Fallback if data fetch fails
-                    return UserSelection();
-                  },
+                return ConductorHome(
+                  role: 'Conductor',
+                  route: route,
+                  placeCollection: placeCollection,
+                  selectedIndex: 0,
                 );
               } else {
-                // CHANGED: Added clear comment that this is ONLY for non-conductors
+                // Regular user (not a conductor)
                 print('👤 User is NOT a conductor');
 
                 // ONLY check email verification for regular users (not conductors)

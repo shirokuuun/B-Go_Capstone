@@ -1,10 +1,10 @@
+import 'package:b_go/pages/passenger/services/pre_book_payment.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:responsive_framework/responsive_framework.dart';
-import 'package:b_go/pages/passenger/services/pre_book.dart';
 
 class ReservationConfirm extends StatefulWidget {
   const ReservationConfirm({super.key});
@@ -126,7 +126,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
       return bookings;
     }
     return bookings.where((booking) {
-      final status = booking['status'] ?? 'pending_payment';
+      final status = _getEffectiveStatus(booking);
       
       switch (_selectedFilter) {
         case 'pending':
@@ -161,7 +161,8 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
   }
 
   void _showBookingDetails(Map<String, dynamic> booking) {
-    if (booking['status'] == 'pending_payment') {
+    final effectiveStatus = _getEffectiveStatus(booking);
+    if (effectiveStatus == 'pending_payment') {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -183,7 +184,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                 Navigator.of(context).pop();
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(
-                    builder: (context) => PreBookSummaryPage(
+                    builder: (context) => PreBookPaymentPage(
                       bookingId: booking['id'] ?? '',
                       route: booking['route'],
                       directionLabel: booking['direction'],
@@ -263,6 +264,31 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
       default:
         return 'UNKNOWN';
     }
+  }
+
+  /// Get the effective status of a booking, considering tripEnded flag
+  /// This is a fallback in case the Firestore update didn't propagate
+  String _getEffectiveStatus(Map<String, dynamic> booking) {
+    final status = booking['status'] ?? 'pending_payment';
+    final tripEnded = booking['tripEnded'] == true;
+    final cancelledAt = booking['cancelledAt'];
+    
+    // Debug logging
+    print('📊 Booking ${booking['id']}: status=$status, tripEnded=$tripEnded, cancelledAt=$cancelledAt');
+    
+    // If trip ended and booking is still in 'paid' status (not boarded), it should be cancelled
+    if (tripEnded && status == 'paid') {
+      print('⚠️ Booking ${booking['id']}: Detected paid booking with tripEnded=true, forcing status to cancelled');
+      return 'cancelled';
+    }
+    
+    // If there's a cancelledAt timestamp but status isn't cancelled, force it
+    if (cancelledAt != null && status != 'cancelled') {
+      print('⚠️ Booking ${booking['id']}: Detected cancelledAt but status is $status, forcing to cancelled');
+      return 'cancelled';
+    }
+    
+    return status;
   }
 
   void _showCustomSnackBar(String message, String type) {
@@ -414,7 +440,7 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                   default:
                     statusToMatch = filter;
                 }
-                bookings = allBookings.where((b) => b['status'] == statusToMatch).toList();
+                bookings = allBookings.where((b) => _getEffectiveStatus(b) == statusToMatch).toList();
               }
               
               if (bookings.isEmpty) {
@@ -567,11 +593,11 @@ class _ReservationConfirmState extends State<ReservationConfirm> with TickerProv
                                         padding: EdgeInsets.symmetric(
                                             horizontal: 8, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: _getStatusColor(booking['status'] ?? 'pending_payment'),
+                                          color: _getStatusColor(_getEffectiveStatus(booking)),
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          _getStatusText(booking['status'] ?? 'pending_payment'),
+                                          _getStatusText(_getEffectiveStatus(booking)),
                                           style: GoogleFonts.outfit(
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -611,7 +637,21 @@ class BookingDetailsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final qrData = booking['qrData'] ?? '{}';
-    final status = booking['status'] ?? 'paid';
+    final rawStatus = booking['status'] ?? 'paid';
+    final tripEnded = booking['tripEnded'] == true;
+    final cancelledAt = booking['cancelledAt'];
+    
+    // Calculate effective status (handle tripEnded edge case)
+    String status = rawStatus;
+    if (tripEnded && rawStatus == 'paid') {
+      status = 'cancelled'; // Force cancelled if trip ended but still marked as paid
+      print('⚠️ BookingDetails: Forcing status to cancelled (tripEnded=true, rawStatus=paid)');
+    }
+    if (cancelledAt != null && rawStatus != 'cancelled') {
+      status = 'cancelled';
+      print('⚠️ BookingDetails: Forcing status to cancelled (cancelledAt exists)');
+    }
+    
     final isBoarded = status == 'boarded';
     final isAccomplished = status == 'accomplished';
     final isCancelled = status == 'cancelled';

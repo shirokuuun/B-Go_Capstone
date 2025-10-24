@@ -112,6 +112,86 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
     }
   }
 
+  // ✅ Custom Snackbar Method
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      case 'info':
+        backgroundColor = Colors.blue;
+        icon = Icons.info;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
+        duration: Duration(seconds: 3),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
+      ),
+    );
+  }
+
   Future<void> _startNewTrip() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -131,31 +211,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         final isLocationTrackingActive = conductorData['isOnline'] ?? false;
 
         if (!isLocationTrackingActive) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Location tracking must be active before starting a trip. Please enable location tracking in the Dashboard first.',
-                style: GoogleFonts.outfit(fontSize: 14),
-              ),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 4),
-              action: SnackBarAction(
-                label: 'Go to Dashboard',
-                textColor: Colors.white,
-                onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (context) => ConductorHome(
-                        route: widget.route,
-                        role: widget.role,
-                        placeCollection: selectedPlaceCollection,
-                        selectedIndex: 0,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+          _showCustomSnackBar(
+            'Location tracking must be active before starting a trip. Please enable location tracking in the Dashboard first.',
+            'warning',
           );
           return;
         }
@@ -177,12 +235,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
                 dailyTripData?['isRoundTripComplete'] ?? false;
 
             if (!isRoundTripComplete) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'You have an incomplete round trip. Please complete the current round trip first.'),
-                  backgroundColor: Colors.orange,
-                ),
+              _showCustomSnackBar(
+                'You have an incomplete round trip. Please complete the current round trip first.',
+                'warning',
               );
               return;
             }
@@ -371,6 +426,12 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           currentTripId = tripId;
         });
 
+        // ✅ Show success message
+        _showCustomSnackBar(
+          'Trip started successfully!',
+          'success',
+        );
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -382,8 +443,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error starting trip: $e')),
+      _showCustomSnackBar(
+        'Error starting trip: ${e.toString()}',
+        'error',
       );
     }
   }
@@ -661,10 +723,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
             Navigator.of(context).pop(); // Close loading dialog
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(
-                      'Trip $currentTrip completed. Starting Trip ${currentTrip + 1} (return direction).')),
+            _showCustomSnackBar(
+              'Trip $currentTrip completed. Starting Trip ${currentTrip + 1} (return direction).',
+              'info',
             );
           } else if (currentTrip % 2 == 0) {
             await FirebaseFirestore.instance
@@ -701,10 +762,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
             Navigator.of(context).pop(); // Close loading dialog
 
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(
-                      'Round trip completed successfully! You can now start a new trip.')),
+            _showCustomSnackBar(
+              'Round trip completed successfully! You can now start a new trip.',
+              'success',
             );
           }
         } else {
@@ -730,8 +790,9 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
           Navigator.of(context).pop(); // Close loading dialog
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Trip completed successfully!')),
+          _showCustomSnackBar(
+            'Trip completed successfully!',
+            'success',
           );
         }
       } catch (e) {
@@ -758,18 +819,17 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
         Navigator.of(context).pop(); // Close loading dialog
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Trip completed successfully!')),
+        _showCustomSnackBar(
+          'Trip completed successfully!',
+          'success',
         );
       }
     } catch (e) {
       Navigator.of(context).pop(); // Close loading dialog
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error ending trip: $e'),
-          backgroundColor: Colors.red,
-        ),
+      _showCustomSnackBar(
+        'Error ending trip: ${e.toString()}',
+        'error',
       );
     } finally {
       setState(() {

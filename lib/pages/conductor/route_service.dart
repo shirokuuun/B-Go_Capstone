@@ -164,6 +164,42 @@ class RouteService {
     return null; // Not found
   }
 
+
+  // ✅ NEW METHOD: Creates or updates the remittance document for the given date
+  // This ensures the remittance collection has a document even before any tickets are scanned
+  static Future<void> ensureRemittanceDocumentExists(
+      String conductorId, String date) async {
+    try {
+      print('📋 Ensuring remittance document exists for date: $date');
+      
+      final remittanceDocRef = FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('remittance')
+          .doc(date);
+
+      final remittanceDoc = await remittanceDocRef.get();
+
+      if (!remittanceDoc.exists) {
+        // Create the remittance document if it doesn't exist
+        await remittanceDocRef.set({
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'date': date,
+        });
+        print('✅ Created remittance document for date: $date');
+      } else {
+        // Update the lastUpdated timestamp
+        await remittanceDocRef.update({
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+        print('✅ Updated remittance document for date: $date');
+      }
+    } catch (e) {
+      print('❌ Error ensuring remittance document exists: $e');
+    }
+  }
+
   static Future<String> saveTrip({
     required String route,
     required String from,
@@ -246,6 +282,9 @@ class RouteService {
       print('⚠️ Error getting active trip ID: $e');
     }
 
+    // ✅ NEW: Ensure remittance document exists when trip starts
+    await ensureRemittanceDocumentExists(conductorId, formattedDate);
+
     try {
       await FirebaseFirestore.instance
           .collection('conductors')
@@ -302,8 +341,6 @@ class RouteService {
     });
 
     print('✅ Manual ticket saved with tripId: $activeTripId');
-
-    // Also save to daily trip structure (trip1 or trip2)
     try {
       final dailyTripDoc = await FirebaseFirestore.instance
           .collection('conductors')

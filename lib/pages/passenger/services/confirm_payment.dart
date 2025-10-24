@@ -519,24 +519,81 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
     }
   }
 
-  /// Helper method to update status in remittance collection
+  /// ✅ IMPROVED: Helper method to save paid pre-booking to remittance/tickets collection
+  /// This ensures paid pre-bookings appear EVERYWHERE (trip pages AND trip summary)
   Future<void> _updateRemittanceStatus(
       String conductorId, String formattedDate, String status) async {
     try {
+      // Get the booking data to save to remittance
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('preBookings')
+          .doc(widget.bookingId)
+          .get();
+
+      if (!bookingDoc.exists) {
+        print('❌ PreBook: Booking not found in conductor preBookings');
+        return;
+      }
+
+      final bookingData = bookingDoc.data()!;
+
+      // ✅ IMPROVED: Explicitly set all required fields to ensure compatibility
       await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
           .collection('remittance')
           .doc(formattedDate)
-          .collection('preBookings')
+          .collection('tickets')
           .doc(widget.bookingId)
-          .update({
+          .set({
+        // Required fields for Trip Page
+        'from': bookingData['from'] ?? '',
+        'to': bookingData['to'] ?? '',
+        'totalFare': bookingData['totalFare']?.toString() ?? '0.00',
+        'quantity': bookingData['quantity'] ?? 1,
+        'timestamp': bookingData['timestamp'] ?? FieldValue.serverTimestamp(),
+        
+        // Additional fields
+        'startKm': bookingData['fromKm'] ?? 0,
+        'endKm': bookingData['toKm'] ?? 0,
+        'totalKm': (bookingData['toKm'] ?? 0) - (bookingData['fromKm'] ?? 0),
+        'farePerPassenger': bookingData['farePerPassenger'] ?? [bookingData['totalFare'] ?? 37],
+        'discountAmount': bookingData['discountAmount'] ?? '0.00',
+        'discountBreakdown': bookingData['discountBreakdown'] ?? [],
+        'route': bookingData['route'] ?? '',
+        'direction': bookingData['direction'] ?? '',
+        'placeCollection': bookingData['placeCollection'] ?? 'Place',
+        
+        // Status and type fields
         'status': status,
         'paidAt': FieldValue.serverTimestamp(),
         'paymentMethod': 'simulated',
-      });
+        'documentType': 'preBooking',
+        'ticketType': 'preBooking',
+        'active': true,
+        
+        // Booking metadata
+        'userId': bookingData['userId'],
+        'conductorId': conductorId,
+        'conductorName': bookingData['conductorName'],
+        'busNumber': bookingData['busNumber'],
+        'tripId': bookingData['tripId'],
+        'preBookingId': widget.bookingId,
+        'qrData': bookingData['qrData'],
+        
+        // Passenger info (optional)
+        'passengerLatitude': bookingData['passengerLatitude'],
+        'passengerLongitude': bookingData['passengerLongitude'],
+        
+        // Boarding status
+        'boardingStatus': bookingData['boardingStatus'] ?? 'pending',
+      }, SetOptions(merge: true));
 
-      print('✅ PreBook: Updated remittance status to $status');
+      print('✅ PreBook: Saved to remittance/tickets collection with status $status');
+      print('✅ PreBook: Ticket ID: ${widget.bookingId}');
+      print('✅ PreBook: From: ${bookingData['from']} → To: ${bookingData['to']}');
     } catch (e) {
       print('❌ PreBook: Error updating remittance status: $e');
     }

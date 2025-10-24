@@ -317,6 +317,25 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           print('Error creating/updating daily trip document: $e');
         }
 
+        // ✅ NEW: Create remittance document when trip starts
+        // This ensures Trip Page can fetch tickets properly
+        try {
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('remittance')
+              .doc(today)
+              .set({
+            'createdAt': FieldValue.serverTimestamp(),
+            'lastUpdated': FieldValue.serverTimestamp(),
+            'date': today,
+          }, SetOptions(merge: true));
+
+          print('✅ Created remittance document for $today');
+        } catch (e) {
+          print('❌ Error creating remittance document: $e');
+        }
+
         final dailyTripDoc = await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorDocId)
@@ -556,25 +575,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             '✅ Deleted ${scannedQRsToDelete.docs.length} scanned QR codes from trip $endingTripId');
       } catch (e) {
         print('⚠️ Error deleting scanned QR codes: $e');
-      }
-
-      // Only delete pre-bookings that were NOT accomplished
-      try {
-        final preBookingsToDelete = await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorDocId)
-            .collection('preBookings')
-            .where('tripId', isEqualTo: endingTripId)
-            .get();
-
-        for (var doc in preBookingsToDelete.docs) {
-          await doc.reference.delete();
-        }
-
-        print(
-            '✅ Deleted ${preBookingsToDelete.docs.length} pre-bookings from trip $endingTripId');
-      } catch (e) {
-        print('⚠️ Error deleting pre-bookings: $e');
       }
 
       // Process trip end with respect to accomplished pre-bookings

@@ -1773,36 +1773,39 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
     }
   }
 
+  // ✅ FIXED: Check if ticket exists using the booking ID as document ID
   try {
-    final existingTicketQuery = await FirebaseFirestore.instance
+    print('🔍 Checking if remittance ticket exists with ID: $bookingId');
+    
+    final existingTicketRef = FirebaseFirestore.instance
         .collection('conductors')
         .doc(conductorDocId)
         .collection('remittance')
         .doc(formattedDate)
         .collection('tickets')
-        .where('documentId', isEqualTo: bookingId)
-        .where('documentType', isEqualTo: 'preBooking')
-        .get();
+        .doc(bookingId);  // ✅ Use booking ID as document ID
+    
+    final existingTicketDoc = await existingTicketRef.get();
 
-    if (existingTicketQuery.docs.isNotEmpty) {
-      final existingTicketDoc = existingTicketQuery.docs.first;
-      await existingTicketDoc.reference.update({
+    if (existingTicketDoc.exists) {
+      // ✅ TICKET EXISTS - UPDATE IT (don't create duplicate!)
+      print('✅ Found existing remittance ticket, updating to boarded');
+      
+      await existingTicketRef.update({
         'status': 'boarded',
         'scannedBy': user.uid,
         'scannedAt': FieldValue.serverTimestamp(),
         'boardedAt': FieldValue.serverTimestamp(),
+        'boardingStatus': 'boarded',
         'tripId': activeTripId,
         'active': true,
       });
 
-      print(
-          '✅ Updated existing remittance ticket ${existingTicketDoc.id} from "paid" to "boarded"');
+      print('✅ Updated existing remittance ticket from "paid" to "boarded"');
     } else {
+      // ⚠️ TICKET DOESN'T EXIST - CREATE IT
+      // This happens if pre-booking wasn't paid through the app
       print('⚠️ No existing remittance ticket found, creating new one');
-
-      final ticketNumber =
-          await _getNextTicketNumber(conductorDocId, formattedDate);
-      final ticketDocId = 'ticket $ticketNumber';
 
       final remittanceData = {
         'active': true,
@@ -1836,18 +1839,12 @@ Future<void> _processPreBooking(Map<String, dynamic> data, User user,
         'boardedAt': FieldValue.serverTimestamp(),
         'userId': userId,
         'bookingId': bookingId,
+        'preBookingId': bookingId,
       };
 
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorDocId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .collection('tickets')
-          .doc(ticketDocId)
-          .set(remittanceData);
+      await existingTicketRef.set(remittanceData);  // ✅ Use same ref with booking ID
 
-      print('✅ Created new remittance ticket as $ticketDocId');
+      print('✅ Created new remittance ticket with ID: $bookingId');
     }
 
     await FirebaseFirestore.instance

@@ -1,17 +1,15 @@
+import 'package:b_go/pages/passenger/services/pre_book_payment.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:b_go/pages/conductor/route_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async'; // Added for Timer
-import 'package:b_go/pages/passenger/profile/Settings/reservation_confirm.dart';
 import 'package:geolocator/geolocator.dart'; // Added for location tracking
 import 'package:b_go/pages/passenger/services/passenger_location_service.dart';
 import 'dart:convert'; // Added for JSON encoding
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:b_go/pages/passenger/services/geofencing_service.dart';
-import 'package:b_go/services/payment_service.dart';
-import 'package:b_go/services/realtime_location_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -26,163 +24,321 @@ class PreBook extends StatefulWidget {
   static Future<void> processTripEndForPreBookings(
       String conductorId, String date, String? tripId) async {
     try {
-      print(
-          '🔄 PreBook: Processing trip end for pre-bookings - Conductor: $conductorId, Date: $date, Trip: $tripId');
+      print('🔄 PreBook: ========================================');
+      print('🔄 PreBook: Processing trip end for pre-bookings');
+      print('🔍 PreBook: Conductor ID: $conductorId');
+      print('🔍 PreBook: Date: $date');
+      print('🔍 PreBook: Trip ID: $tripId');
 
-      // Get all pre-bookings for this conductor's active trip
-      QuerySnapshot preBookingsSnapshot;
-      if (tripId != null) {
-        // Get pre-bookings for specific trip
-        preBookingsSnapshot = await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorId)
-            .collection('preBookings')
-            .where('tripId', isEqualTo: tripId)
-            .get();
-      } else {
-        // Fallback: get all pre-bookings for this conductor and date
-        preBookingsSnapshot = await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorId)
-            .collection('preBookings')
-            .where('createdAt',
-                isGreaterThanOrEqualTo: DateTime.parse('$date 00:00:00'))
-            .where('createdAt', isLessThan: DateTime.parse('$date 23:59:59'))
-            .get();
+      // STEP 1: Get the current trip number from dailyTrips document
+      final dailyTripsDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('dailyTrips')
+          .doc(date)
+          .get();
+
+      if (!dailyTripsDoc.exists) {
+        print('❌ PreBook: No dailyTrips document found for date $date');
+        return;
       }
 
+      final dailyTripData = dailyTripsDoc.data();
+      final currentTrip = dailyTripData?['currentTrip'] ?? 1;
+      final tripCollection = 'trip$currentTrip';
+
+      print('📍 PreBook: Current trip number: $currentTrip');
+      print('📍 PreBook: Trip collection: $tripCollection');
       print(
-          '🔄 PreBook: Found ${preBookingsSnapshot.docs.length} pre-bookings to process');
+          '📍 PreBook: Looking in path: conductors/$conductorId/dailyTrips/$date/$tripCollection/preBookings/preBookings/');
+
+      // STEP 2: Get all ACTIVE pre-bookings for this trip from dailyTrips
+      final preBookingsRef = FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(conductorId)
+          .collection('dailyTrips')
+          .doc(date)
+          .collection(tripCollection)
+          .doc('preBookings')
+          .collection('preBookings');
+
+      print('🔍 PreBook: Querying for active bookings...');
+
+      QuerySnapshot preBookingsSnapshot =
+          await preBookingsRef.where('active', isEqualTo: true).get();
+
+      print(
+          '🔄 PreBook: Found ${preBookingsSnapshot.docs.length} ACTIVE pre-bookings to process');
+
+      if (preBookingsSnapshot.docs.isEmpty) {
+        print('✅ PreBook: No active pre-bookings to process for this trip');
+        return;
+      }
 
       int accomplishedCount = 0;
       int cancelledCount = 0;
       int skippedCount = 0;
 
+      // STEP 3: Process each booking
       for (var preBookingDoc in preBookingsSnapshot.docs) {
-        final preBookingData = preBookingDoc.data();
-        final preBookingId = preBookingDoc.id;
-        final originalUserId =
-            (preBookingData as Map<String, dynamic>?)?['userId'] as String?;
-        final currentStatus = preBookingData?['status'] as String?;
+        final preBookingData = preBookingDoc.data() as Map<String, dynamic>;
+        final preBookingId = preBookingData['preBookingId'] ?? preBookingDoc.id;
+        final originalUserId = preBookingData['userId'] as String?;
+        final currentStatus = preBookingData['status'] as String?;
 
-        print(
-            '📋 PreBook: Processing booking $preBookingId - current status: $currentStatus');
+        print('');
+        print('📋 PreBook: ========================================');
+        print('📋 PreBook: Processing booking ID: $preBookingId');
+        print('📋 PreBook: Document ID: ${preBookingDoc.id}');
+        print('📋 PreBook: Status: $currentStatus');
+        print('📋 PreBook: User ID: $originalUserId');
+        print('📋 PreBook: Active: ${preBookingData['active']}');
+        print('📋 PreBook: Trip ID: ${preBookingData['tripId']}');
 
-        // CRITICAL: Skip if already accomplished by geofencing
+        // STEP 4: Check if accomplished by geofencing
         if (currentStatus == 'accomplished' ||
-            preBookingData?['dropOffTimestamp'] != null ||
-            preBookingData?['geofenceStatus'] == 'completed' ||
-            preBookingData?['tripCompleted'] == true) {
+            preBookingData['dropOffTimestamp'] != null ||
+            preBookingData['geofenceStatus'] == 'completed' ||
+            preBookingData['tripCompleted'] == true) {
           print(
-              '✅ PreBook: Skipping $preBookingId - already accomplished by geofencing (status=$currentStatus, dropOffTimestamp=${preBookingData?['dropOffTimestamp'] != null}, geofenceStatus=${preBookingData?['geofenceStatus']})');
+              '✅ PreBook: Booking is ACCOMPLISHED - preserving and copying to remittance');
+
+          // Copy to remittance so it shows in trip pages
+          try {
+            print('📦 PreBook: Copying accomplished booking to remittance...');
+
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorId)
+                .collection('remittance')
+                .doc(date)
+                .collection('tickets')
+                .doc(preBookingId)
+                .set({
+              'from': preBookingData['from'],
+              'to': preBookingData['to'],
+              'totalFare': preBookingData['totalFare'],
+              'quantity': preBookingData['quantity'],
+              'discountAmount': preBookingData['discountAmount'] ?? 0,
+              'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
+              'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
+              'startKm': preBookingData['fromKm'] ?? 0,
+              'endKm': preBookingData['toKm'] ?? 0,
+              'timestamp': preBookingData['timestamp'],
+              'status': 'accomplished',
+              'ticketType': 'preBooking',
+              'boardedAt': preBookingData['boardedAt'],
+              'scannedBy': preBookingData['scannedBy'],
+              'boardingStatus': preBookingData['boardingStatus'],
+              'dropOffTimestamp': preBookingData['dropOffTimestamp'],
+              'dropOffLocation': preBookingData['dropOffLocation'],
+              'geofenceStatus': preBookingData['geofenceStatus'],
+              'preBookingId': preBookingId,
+              'userId': originalUserId,
+              'tripId': preBookingData['tripId'],
+              'paidAt': preBookingData['paidAt'],
+              'route': preBookingData['route'],
+              'direction': preBookingData['direction'],
+            });
+
+            print(
+                '✅ PreBook: Successfully copied accomplished booking to remittance');
+            print(
+                '   Path: conductors/$conductorId/remittance/$date/tickets/$preBookingId');
+          } catch (e) {
+            print(
+                '❌ PreBook: Error copying accomplished booking to remittance: $e');
+          }
+
           accomplishedCount++;
           continue;
         }
 
-        // CRITICAL: Skip if already completed or cancelled
+        // Skip if already completed or cancelled
         if (currentStatus == 'completed' || currentStatus == 'cancelled') {
-          print('⏭️ PreBook: Skipping $preBookingId - already $currentStatus');
+          print('⏭️ PreBook: SKIPPING - Already $currentStatus');
           skippedCount++;
           continue;
         }
 
-        // Check if this is a boarded pre-booking that should be moved to remittance
+        // Verify userId exists
+        if (originalUserId == null || originalUserId.isEmpty) {
+          print(
+              '❌ PreBook: ERROR - userId is null or empty, cannot update passenger booking');
+          print('📊 PreBook: Booking data: $preBookingData');
+          skippedCount++;
+          continue;
+        }
+
+        // STEP 5: Cancel bookings that are BOARDED but not dropped off
+        // STEP 5: Mark boarded bookings as accomplished (they completed the trip!)
         if (currentStatus == 'boarded') {
           print(
-              '🚫 PreBook: Cancelling $preBookingId - passenger did not drop off (userId=$originalUserId)');
+              '✅ PreBook: ACCOMPLISHING - Passenger boarded (treating as completed)');
 
-          // Move boarded pre-booking to remittance collection with cancelled status
-          await _moveBoardedPreBookingToRemittance(
-            conductorId,
-            date,
-            preBookingId,
-            preBookingData as Map<String, dynamic>,
-            isCancelled: true,
-          );
-
-          // Update passenger's pre-booking to cancelled status
-          if (originalUserId != null) {
-            try {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(originalUserId)
-                  .collection('preBookings')
-                  .doc(preBookingId)
-                  .update({
-                'status': 'cancelled',
-                'cancelledAt': FieldValue.serverTimestamp(),
-                'cancelledReason': 'Trip ended before drop-off',
-                'tripEnded': true,
-              });
-              print(
-                  '✅ PreBook: Updated passenger pre-booking $preBookingId to cancelled');
-            } catch (e) {
-              print('⚠️ PreBook: Could not update passenger pre-booking: $e');
-            }
+          // Update in dailyTrips collection
+          try {
+            print('🔄 PreBook: Updating dailyTrips booking...');
+            await preBookingsRef.doc(preBookingDoc.id).update({
+              'status': 'accomplished',
+              'accomplishedAt': FieldValue.serverTimestamp(),
+              'tripEnded': true,
+              'active': false,
+            });
+            print('✅ PreBook: DailyTrips booking updated to accomplished');
+          } catch (e) {
+            print('❌ PreBook: Error updating dailyTrips booking: $e');
           }
 
-          cancelledCount++;
-        } else if (currentStatus == 'paid') {
-          // For paid but not boarded pre-bookings, also cancel them
-          print(
-              '🚫 PreBook: Cancelling $preBookingId - paid but never boarded (userId=$originalUserId)');
+          // Update passenger's booking
+          try {
+            print('🔄 PreBook: Updating passenger booking...');
+            print('   Collection: users/$originalUserId/preBookings/');
+            print('   Document: $preBookingId');
 
-          // Mark as cancelled in conductor's preBookings collection
-          await FirebaseFirestore.instance
-              .collection('conductors')
-              .doc(conductorId)
-              .collection('preBookings')
-              .doc(preBookingId)
-              .update({
-            'status': 'cancelled',
-            'cancelledAt': FieldValue.serverTimestamp(),
-            'cancelledReason': 'Trip ended - no show',
-            'tripEnded': true,
-          });
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(originalUserId)
+                .collection('preBookings')
+                .doc(preBookingId)
+                .update({
+              'status': 'accomplished',
+              'accomplishedAt': FieldValue.serverTimestamp(),
+              'tripEnded': true,
+            });
 
-          // Update passenger's pre-booking to cancelled status
-          if (originalUserId != null) {
-            try {
-              await FirebaseFirestore.instance
-                  .collection('users')
-                  .doc(originalUserId)
-                  .collection('preBookings')
-                  .doc(preBookingId)
-                  .update({
-                'status': 'cancelled',
-                'cancelledAt': FieldValue.serverTimestamp(),
-                'cancelledReason': 'Trip ended - no show',
-                'tripEnded': true,
-              });
-              print(
-                  '✅ PreBook: Updated passenger pre-booking $preBookingId to cancelled');
-            } catch (e) {
-              print('⚠️ PreBook: Could not update passenger pre-booking: $e');
-            }
+            print('✅ PreBook: Passenger booking updated to accomplished!');
+          } catch (e) {
+            print('❌ PreBook: CRITICAL ERROR updating passenger booking: $e');
+            print('   User ID: $originalUserId');
+            print('   Booking ID: $preBookingId');
           }
 
-          // Move to dailyTrips and remittance collections with cancelled status
-          await _movePreBookingToTripEndCollections(
-            conductorId,
-            date,
-            preBookingId,
-            preBookingData as Map<String, dynamic>,
-            isCancelled: true,
-          );
+          // Copy to remittance so it shows in trip pages
+          try {
+            print('📦 PreBook: Copying accomplished booking to remittance...');
+
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorId)
+                .collection('remittance')
+                .doc(date)
+                .collection('tickets')
+                .doc(preBookingId)
+                .set({
+              'from': preBookingData['from'],
+              'to': preBookingData['to'],
+              'totalFare': preBookingData['totalFare'],
+              'quantity': preBookingData['quantity'],
+              'discountAmount': preBookingData['discountAmount'] ?? 0,
+              'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
+              'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
+              'startKm': preBookingData['fromKm'] ?? 0,
+              'endKm': preBookingData['toKm'] ?? 0,
+              'timestamp': preBookingData['timestamp'],
+              'status': 'accomplished',
+              'ticketType': 'preBooking',
+              'boardedAt': preBookingData['boardedAt'],
+              'scannedBy': preBookingData['scannedBy'],
+              'boardingStatus': 'accomplished',
+              'preBookingId': preBookingId,
+              'userId': originalUserId,
+              'tripId': preBookingData['tripId'],
+              'paidAt': preBookingData['paidAt'],
+              'route': preBookingData['route'],
+              'direction': preBookingData['direction'],
+            }, SetOptions(merge: true));
+
+            print(
+                '✅ PreBook: Successfully copied accomplished booking to remittance');
+          } catch (e) {
+            print(
+                '❌ PreBook: Error copying accomplished booking to remittance: $e');
+          }
+
+          accomplishedCount++;
+        }
+        // STEP 6: Cancel bookings that are PAID but never boarded (NO SHOW)
+        else if (currentStatus == 'paid') {
+          print('🚫 PreBook: CANCELLING - Paid but never boarded (NO SHOW)');
+
+          // Update in dailyTrips collection
+          try {
+            print('🔄 PreBook: Updating dailyTrips booking...');
+            await preBookingsRef.doc(preBookingDoc.id).update({
+              'status': 'cancelled',
+              'cancelledAt': FieldValue.serverTimestamp(),
+              'cancelledReason': 'Trip ended - no show',
+              'tripEnded': true,
+              'active': false,
+            });
+            print('✅ PreBook: DailyTrips booking updated to cancelled');
+          } catch (e) {
+            print('❌ PreBook: Error updating dailyTrips booking: $e');
+          }
+
+          // Update passenger's booking
+          try {
+            print('🔄 PreBook: Updating passenger booking...');
+            print('   Collection: users/$originalUserId/preBookings/');
+            print('   Document: $preBookingId');
+
+            final passengerBookingRef = FirebaseFirestore.instance
+                .collection('users')
+                .doc(originalUserId)
+                .collection('preBookings')
+                .doc(preBookingId);
+
+            // Check if document exists first
+            final docSnapshot = await passengerBookingRef.get();
+            if (!docSnapshot.exists) {
+              print('❌ PreBook: ERROR - Passenger booking document not found!');
+              print('   Path: users/$originalUserId/preBookings/$preBookingId');
+              cancelledCount++;
+              continue;
+            }
+
+            print('📄 PreBook: Document exists, updating now...');
+
+            await passengerBookingRef.update({
+              'status': 'cancelled',
+              'cancelledAt': FieldValue.serverTimestamp(),
+              'cancelledReason': 'Trip ended - no show',
+              'tripEnded': true,
+            });
+
+            print('✅ PreBook: Passenger booking updated to cancelled!');
+            print('   ✓ status: cancelled');
+            print('   ✓ tripEnded: true');
+            print('   ✓ cancelledReason: Trip ended - no show');
+          } catch (e) {
+            print('❌ PreBook: CRITICAL ERROR updating passenger booking: $e');
+            print('   User ID: $originalUserId');
+            print('   Booking ID: $preBookingId');
+          }
 
           cancelledCount++;
         } else {
-          print('⚠️ PreBook: Unknown status for $preBookingId: $currentStatus');
+          print('⚠️ PreBook: UNKNOWN STATUS - $currentStatus (not processing)');
           skippedCount++;
         }
       }
 
-      print('✅ PreBook: Trip end processing complete:');
-      print('   - Accomplished (preserved): $accomplishedCount');
-      print('   - Cancelled (no drop-off): $cancelledCount');
-      print('   - Skipped (already processed): $skippedCount');
-    } catch (e) {
-      print('❌ PreBook: Error processing trip end for pre-bookings: $e');
+      print('');
+      print('🎉 PreBook: ========================================');
+      print('✅ PreBook: Trip end processing COMPLETE!');
+      print(
+          '   📊 Total bookings processed: ${preBookingsSnapshot.docs.length}');
+      print(
+          '   ✅ Accomplished (preserved & copied to remittance): $accomplishedCount');
+      print('   🚫 Cancelled (no drop-off/no-show): $cancelledCount');
+      print('   ⏭️  Skipped (already processed): $skippedCount');
+      print('🎉 PreBook: ========================================');
+    } catch (e, stackTrace) {
+      print('❌ PreBook: FATAL ERROR processing trip end for pre-bookings!');
+      print('❌ PreBook: Error: $e');
+      print('📚 PreBook: Stack trace:');
+      print(stackTrace);
       rethrow;
     }
   }
@@ -2363,7 +2519,7 @@ class _ReceiptModal extends StatelessWidget {
               // Navigate to summary page with booking ID
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (context) => PreBookSummaryPage(
+                  builder: (context) => PreBookPaymentPage(
                     bookingId: bookingId,
                     route: route,
                     directionLabel: directionLabel,
@@ -2406,884 +2562,6 @@ class _ReceiptModal extends StatelessWidget {
               style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600])),
         ),
       ],
-    );
-  }
-}
-
-// New Summary Page for Pre-Booking
-class PreBookSummaryPage extends StatefulWidget {
-  final String bookingId;
-  final String route;
-  final String directionLabel;
-  final Map<String, dynamic> fromPlace;
-  final Map<String, dynamic> toPlace;
-  final int quantity;
-  final List<String> fareTypes;
-  final double baseFare;
-  final double totalAmount;
-  final List<String> discountBreakdown;
-  final List<double> passengerFares;
-  final DateTime? paymentDeadline; // Add payment deadline parameter
-
-  const PreBookSummaryPage({
-    Key? key,
-    required this.bookingId,
-    required this.route,
-    required this.directionLabel,
-    required this.fromPlace,
-    required this.toPlace,
-    required this.quantity,
-    required this.fareTypes,
-    required this.baseFare,
-    required this.totalAmount,
-    required this.discountBreakdown,
-    required this.passengerFares,
-    this.paymentDeadline,
-  }) : super(key: key);
-
-  @override
-  State<PreBookSummaryPage> createState() => _PreBookSummaryPageState();
-}
-
-class _PreBookSummaryPageState extends State<PreBookSummaryPage>
-    with WidgetsBindingObserver {
-  late Timer _timer;
-  late Timer _paymentStatusTimer;
-  late DateTime _deadline;
-  int _remainingSeconds = 600; // 10 minutes in seconds
-  final RealtimeLocationService _locationService = RealtimeLocationService();
-
-  @override
-  void initState() {
-    super.initState();
-    // Use passed deadline or create new one
-    _deadline =
-        widget.paymentDeadline ?? DateTime.now().add(Duration(minutes: 10));
-    _startTimer();
-    _startPaymentStatusCheck();
-
-    // Add app lifecycle observer for background/foreground handling
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        _remainingSeconds = _deadline.difference(DateTime.now()).inSeconds;
-        if (_remainingSeconds <= 0) {
-          _timer.cancel();
-          _paymentStatusTimer.cancel();
-          _showTimeoutDialog();
-        }
-      });
-    });
-  }
-
-  void _startPaymentStatusCheck() {
-    _paymentStatusTimer = Timer.periodic(Duration(seconds: 10), (timer) {
-      _checkPaymentStatus();
-    });
-  }
-
-  void _showTimeoutDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: Text('Payment Timeout', style: GoogleFonts.outfit(fontSize: 20)),
-        content: Text(
-          'Your payment time has expired. The pre-booking has been cancelled.',
-          style: GoogleFonts.outfit(fontSize: 14),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              // Navigate back to home page
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/home',
-                (route) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF0091AD),
-            ),
-            child: Text('OK',
-                style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    switch (state) {
-      case AppLifecycleState.paused:
-      case AppLifecycleState.inactive:
-        // App is going to background - switch to background tracking
-        _locationService.handleAppBackgrounded();
-        break;
-      case AppLifecycleState.resumed:
-        // App is coming to foreground - switch back to foreground tracking
-        _locationService.handleAppForegrounded();
-        break;
-      case AppLifecycleState.detached:
-        // App is being terminated - stop all tracking
-        _locationService.stopTracking();
-        break;
-      default:
-        break;
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    _paymentStatusTimer.cancel();
-
-    // Remove app lifecycle observer
-    WidgetsBinding.instance.removeObserver(this);
-
-    // Don't stop real-time location tracking when page is disposed
-    // The location service should continue running for the conductor to see real-time updates
-    // It will be stopped when the passenger is scanned by the conductor
-    super.dispose();
-  }
-
-  Future<void> cancelPreBooking(BuildContext context) async {
-    try {
-      // Delete the booking from Firestore
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        _showCustomSnackBar(
-            'User not authenticated. Please try again.', 'error');
-        return;
-      }
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('preBookings')
-          .doc(widget.bookingId)
-          .delete();
-
-      _showCustomSnackBar('Pre-booking cancelled and deleted!', 'success');
-
-      // Navigate back to home page by popping all pages until we reach the home page
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/home',
-        (route) => false, // Remove all previous routes
-      );
-    } catch (e) {
-      print('Error cancelling booking: $e');
-      _showCustomSnackBar(
-          'Error cancelling booking. Please try again.', 'error');
-    }
-  }
-
-  String _formatTime(int seconds) {
-    int minutes = seconds ~/ 60;
-    int remainingSeconds = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final now = DateTime.now();
-    final formattedDate =
-        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final formattedTime =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    final startKm = widget.fromPlace['km'] is num
-        ? widget.fromPlace['km']
-        : num.tryParse(widget.fromPlace['km'].toString()) ?? 0;
-    final endKm = widget.toPlace['km'] is num
-        ? widget.toPlace['km']
-        : num.tryParse(widget.toPlace['km'].toString()) ?? 0;
-    final distance = endKm - startKm;
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0091AD),
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            // Go back to the previous page (PreBook)
-            Navigator.of(context).pop();
-          },
-        ),
-        title: Text('Payment Page',
-            style: GoogleFonts.outfit(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16)),
-        centerTitle: false,
-      ),
-      body: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(height: size.height * 0.04),
-            // Timer Section
-            Container(
-              padding: EdgeInsets.all(20),
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: _remainingSeconds <= 60
-                    ? Colors.red[50]
-                    : Colors.orange[50],
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: _remainingSeconds <= 60
-                      ? Colors.red[200]!
-                      : Colors.orange[200]!,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.timer,
-                    color: _remainingSeconds <= 60 ? Colors.red : Colors.orange,
-                    size: 32,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Payment Deadline',
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: _remainingSeconds <= 60
-                          ? Colors.red[700]
-                          : Colors.orange[700],
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    _formatTime(_remainingSeconds),
-                    style: GoogleFonts.outfit(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: _remainingSeconds <= 60
-                          ? Colors.red[700]
-                          : Colors.orange[700],
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    _remainingSeconds <= 60
-                        ? 'HURRY! Payment expires soon!'
-                        : 'Complete payment within the time limit',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      color: _remainingSeconds <= 60
-                          ? Colors.red[700]
-                          : Colors.orange[700],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-            // Booking Details
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Booking Details:',
-                          style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w600, fontSize: 18)),
-                      SizedBox(height: 16),
-                      _buildDetailRow('Route:', widget.route),
-                      _buildDetailRow('Direction:', widget.directionLabel),
-                      _buildDetailRow('Date:', formattedDate),
-                      _buildDetailRow('Time:', formattedTime),
-                      _buildDetailRow('From:', widget.fromPlace['name']),
-                      _buildDetailRow('To:', widget.toPlace['name']),
-                      _buildDetailRow('From KM:',
-                          '${(widget.fromPlace['km'] as num?)?.toInt() ?? 0}'),
-                      _buildDetailRow('To KM:',
-                          '${(widget.toPlace['km'] as num?)?.toInt() ?? 0}'),
-                      _buildDetailRow('Selected Distance:',
-                          '${distance.toStringAsFixed(1)} km'),
-                      _buildDetailRow('Full Trip Fare (Regular):',
-                          '${widget.baseFare.toStringAsFixed(2)} PHP'),
-                      _buildDetailRow('Quantity:', '${widget.quantity}'),
-                      _buildDetailRow('Total Amount:',
-                          '${widget.totalAmount.toStringAsFixed(2)} PHP'),
-                      SizedBox(height: 16),
-                      Text('Passenger Details:',
-                          style: GoogleFonts.outfit(
-                              fontWeight: FontWeight.w600, fontSize: 16)),
-                      SizedBox(height: 8),
-                      ...widget.discountBreakdown.map((e) => Padding(
-                            padding: EdgeInsets.only(bottom: 4),
-                            child: Text(e,
-                                style: GoogleFonts.outfit(fontSize: 14)),
-                          )),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Action Buttons
-            Padding(
-              padding:
-                  const EdgeInsets.only(bottom: 24.0, left: 16.0, right: 16.0),
-              child: Column(
-                children: [
-                  // Main Action Buttons Row
-                  Row(
-                    children: [
-                      // Cancel Button
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          height: 56,
-                          margin: EdgeInsets.only(right: 8),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
-                            onPressed: () => cancelPreBooking(context),
-                            child: Text('Cancel Pre-Booking',
-                                style: GoogleFonts.outfit(
-                                    color: Colors.white, fontSize: 12)),
-                          ),
-                        ),
-                      ),
-                      // Pay Now Button
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          height: 56,
-                          margin: EdgeInsets.only(left: 8),
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.lightGreen[400],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(28),
-                              ),
-                            ),
-                            onPressed: () {
-                              _simulatePaymentAndRedirect();
-                            },
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.payment,
-                                    color: Colors.white, size: 18),
-                                SizedBox(width: 6),
-                                Text('Pay Now',
-                                    style: GoogleFonts.outfit(
-                                        color: Colors.white, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _simulatePaymentAndRedirect() async {
-    try {
-      // Show confirmation dialog
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Confirm Payment',
-              style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
-          content: Text(
-            'This will pay your pre book ticket. Continue?',
-            style: GoogleFonts.outfit(fontSize: 14, color: Colors.grey[600]),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text('Cancel',
-                  style: GoogleFonts.outfit(
-                      fontSize: 14, color: Colors.grey[600])),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF0091AD),
-              ),
-              child: Text('Continue',
-                  style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed == true) {
-        // Simulate payment completion
-        final success =
-            await PaymentService.simulatePaymentCompletion(widget.bookingId);
-
-        if (success) {
-          // Update pre-booking status to 'paid' in all collections
-          await _updatePreBookingStatusToPaid();
-
-          // Start real-time location tracking for the paid booking
-          print(
-              '🚀 Starting real-time location tracking for booking: ${widget.bookingId}');
-          final trackingStarted =
-              await _locationService.startTracking(widget.bookingId);
-
-          if (trackingStarted) {
-            print('✅ Real-time location tracking started successfully');
-            _showCustomSnackBar(
-                'Booking has been paid successfully! Real-time location tracking started.',
-                'success');
-          } else {
-            print('❌ Failed to start real-time location tracking');
-            _showCustomSnackBar(
-                'Booking has been paid successfully! Location tracking may not be available.',
-                'success');
-          }
-
-          Future.delayed(Duration(seconds: 2), () {
-            if (mounted) {
-              Navigator.of(context).pushNamedAndRemoveUntil(
-                '/home',
-                (route) => false, // Remove all previous routes
-              );
-            }
-          });
-        } else {
-          _showCustomSnackBar(
-              '❌ Failed to simulate payment. Please try again.', 'error');
-        }
-      }
-    } catch (e) {
-      print('Error simulating payment: $e');
-      _showCustomSnackBar(
-          '❌ Error simulating payment. Please try again.', 'error');
-    }
-  }
-
-// Helper method to update pre-booking status to 'paid' in all collections
-  Future<void> _updatePreBookingStatusToPaid() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) return;
-
-      print(
-          '💾 PreBook: Updating pre-booking status to paid for booking: ${widget.bookingId}');
-
-      // Update in user's preBookings collection
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('preBookings')
-          .doc(widget.bookingId)
-          .update({
-        'status': 'paid',
-        'paidAt': FieldValue.serverTimestamp(),
-        'paymentMethod': 'simulated',
-      });
-
-      // Update in conductor's collections if conductor is selected
-      if (widget.route.isNotEmpty) {
-        // Find conductor by route to update their collections
-        final conductorQuery = await FirebaseFirestore.instance
-            .collection('conductors')
-            .where('route', isEqualTo: widget.route)
-            .limit(1)
-            .get();
-
-        if (conductorQuery.docs.isNotEmpty) {
-          final conductorId = conductorQuery.docs.first.id;
-          final now = DateTime.now();
-          final formattedDate =
-              "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-
-          // Update in conductor's preBookings collection
-          await FirebaseFirestore.instance
-              .collection('conductors')
-              .doc(conductorId)
-              .collection('preBookings')
-              .doc(widget.bookingId)
-              .update({
-            'status': 'paid',
-            'paidAt': FieldValue.serverTimestamp(),
-            'paymentMethod': 'simulated',
-          });
-
-          // Update in dailyTrips collection
-          await _updateDailyTripsStatus(conductorId, formattedDate, 'paid');
-
-          // ✅ NOW add to remittance when paid
-          await _addToRemittanceWhenPaid(conductorId, formattedDate);
-
-          print(
-              '✅ PreBook: Successfully updated all conductor collections to paid status');
-        }
-      }
-
-      print('✅ PreBook: Pre-booking status updated to paid successfully');
-    } catch (e) {
-      print('❌ PreBook: Error updating pre-booking status to paid: $e');
-    }
-  }
-
-// ✅ NEW METHOD: Add pre-booking to remittance when paid
-  Future<void> _addToRemittanceWhenPaid(
-      String conductorId, String formattedDate) async {
-    try {
-      // Get pre-booking data from conductor's preBookings collection
-      final preBookingDoc = await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('preBookings')
-          .doc(widget.bookingId)
-          .get();
-
-      if (!preBookingDoc.exists) {
-        print('⚠️ PreBook: Pre-booking not found in conductor collection');
-        return;
-      }
-
-      final preBookingData = preBookingDoc.data()!;
-
-      // Get the next ticket number for this date
-      final ticketsSnapshot = await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .collection('tickets')
-          .get();
-
-      final ticketNumber = ticketsSnapshot.docs.length + 1;
-      final ticketDocId = 'ticket $ticketNumber';
-
-      // Prepare remittance data
-      final remittanceData = {
-        'active': true,
-        'discountAmount': '0.00',
-        'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
-        'documentId': widget.bookingId,
-        'documentType': 'preBooking',
-        'endKm': preBookingData['toKm'],
-        'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
-        'from': preBookingData['from'],
-        'quantity': preBookingData['quantity'],
-        'startKm': preBookingData['fromKm'],
-        'status': 'paid',
-        'ticketType': 'preBooking',
-        'timestamp': FieldValue.serverTimestamp(),
-        'to': preBookingData['to'],
-        'totalFare': preBookingData['totalFare'],
-        'totalKm':
-            (preBookingData['toKm'] as num) - (preBookingData['fromKm'] as num),
-        'route': preBookingData['route'],
-        'direction': preBookingData['direction'],
-        'conductorId': conductorId,
-        'conductorName': preBookingData['conductorName'],
-        'busNumber': preBookingData['busNumber'],
-        'tripId': preBookingData['tripId'],
-        'createdAt': preBookingData['createdAt'],
-        'paidAt': FieldValue.serverTimestamp(),
-        'paymentMethod': 'simulated',
-      };
-
-      // Save to remittance tickets subcollection
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .collection('tickets')
-          .doc(ticketDocId)
-          .set(remittanceData);
-
-      // Update lastUpdated on date document
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .set({
-        'lastUpdated': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print('✅ PreBook: Added paid pre-booking to remittance as $ticketDocId');
-    } catch (e) {
-      print('❌ PreBook: Error adding to remittance: $e');
-    }
-  }
-
-  // Helper method to update status in dailyTrips collection
-  Future<void> _updateDailyTripsStatus(
-      String conductorId, String formattedDate, String status) async {
-    try {
-      final dailyTripDoc = await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('dailyTrips')
-          .doc(formattedDate)
-          .get();
-
-      if (dailyTripDoc.exists) {
-        final dailyTripData = dailyTripDoc.data();
-        final currentTrip = dailyTripData?['currentTrip'] ?? 1;
-        final tripCollection = 'trip$currentTrip';
-
-        await FirebaseFirestore.instance
-            .collection('conductors')
-            .doc(conductorId)
-            .collection('dailyTrips')
-            .doc(formattedDate)
-            .collection(tripCollection)
-            .doc('preBookings')
-            .collection('preBookings')
-            .doc(widget.bookingId)
-            .update({
-          'status': status,
-          'paidAt': FieldValue.serverTimestamp(),
-          'paymentMethod': 'simulated',
-        });
-
-        print('✅ PreBook: Updated dailyTrips status to $status');
-      }
-    } catch (e) {
-      print('❌ PreBook: Error updating dailyTrips status: $e');
-    }
-  }
-
-  // Helper method to update status in remittance collection
-  Future<void> _updateRemittanceStatus(
-      String conductorId, String formattedDate, String status) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .collection('preBookings')
-          .doc(widget.bookingId)
-          .update({
-        'status': status,
-        'paidAt': FieldValue.serverTimestamp(),
-        'paymentMethod': 'simulated',
-      });
-
-      print('✅ PreBook: Updated remittance status to $status');
-    } catch (e) {
-      print('❌ PreBook: Error updating remittance status: $e');
-    }
-  }
-
-  void _showCustomSnackBar(String message, String type) {
-    Color backgroundColor;
-    IconData icon;
-    Color iconColor;
-
-    switch (type) {
-      case 'success':
-        backgroundColor = Colors.green;
-        icon = Icons.check_circle;
-        iconColor = Colors.white;
-        break;
-      case 'error':
-        backgroundColor = Colors.red;
-        icon = Icons.error;
-        iconColor = Colors.white;
-        break;
-      case 'warning':
-        backgroundColor = Colors.orange;
-        icon = Icons.warning;
-        iconColor = Colors.white;
-        break;
-      default:
-        backgroundColor = Colors.grey;
-        icon = Icons.info;
-        iconColor = Colors.white;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: iconColor,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                icon,
-                size: 12,
-                color: backgroundColor,
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: backgroundColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        margin: EdgeInsets.all(16),
-        action: SnackBarAction(
-          label: '✕',
-          textColor: Colors.white,
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          },
-        ),
-      ),
-    );
-  }
-
-  Future<void> _checkPaymentStatus() async {
-    try {
-      final paymentStatus =
-          await PaymentService.checkPaymentStatus(widget.bookingId);
-
-      print('Payment status check result: $paymentStatus');
-
-      if (paymentStatus != null) {
-        // Handle both API response format and direct Firestore format
-        final status = paymentStatus['status'] ??
-            paymentStatus['paymentStatus'] ??
-            'pending';
-        final isTestMode = paymentStatus['testMode'] ?? false;
-        final paymentError = paymentStatus['paymentError'];
-
-        print(
-            '🔍 Payment status check: $status, testMode: $isTestMode, error: $paymentError');
-
-        if (status == 'paid') {
-          _timer.cancel();
-          _paymentStatusTimer.cancel();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(isTestMode
-                  ? '✅ Test payment successful! Your reservation is confirmed.'
-                  : '✅ Payment successful! Your reservation is confirmed.'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-
-          // Navigate to reservation confirmation page
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(
-              builder: (context) => ReservationConfirm(),
-            ),
-            (route) => false, // Remove all previous routes
-          );
-        } else if (status == 'payment_failed' || status == 'failed') {
-          _timer.cancel();
-          _paymentStatusTimer.cancel();
-
-          String errorMsg = 'Payment failed. Please try again.';
-          if (paymentError != null && paymentError.isNotEmpty) {
-            errorMsg = 'Payment failed: $paymentError';
-          }
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ $errorMsg'),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        } else if (status == 'payment_expired' || status == 'expired') {
-          _timer.cancel();
-          _paymentStatusTimer.cancel();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⏰ Payment session expired. Please try again.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 5),
-            ),
-          );
-        } else if (status == 'cancelled') {
-          _timer.cancel();
-          _paymentStatusTimer.cancel();
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Payment was cancelled.'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        // For 'pending_payment' or 'payment_initiated' status, continue monitoring
-      }
-    } catch (e) {
-      print('Error checking payment status: $e');
-      // Don't show error to user unless it's critical
-    }
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(
-              label,
-              style: GoogleFonts.outfit(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: Colors.black87,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.outfit(
-                fontSize: 14,
-                color: Colors.black54,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

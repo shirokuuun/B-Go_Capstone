@@ -77,17 +77,18 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         setState(() {
           _isTracking = false;
         });
-        _showSnackBar('Location tracking stopped', Colors.orange);
+        _showCustomSnackBar('Location tracking stopped', 'warning');
       } else {
         // Show loading indicator
-        _showSnackBar('Starting location tracking...', Colors.blue);
+        _showCustomSnackBar('Starting location tracking...', 'info');
 
         await _locationService.startLocationTracking();
 
         setState(() {
           _isTracking = true;
         });
-        _showSnackBar('Location tracking started successfully!', Colors.green);
+        _showCustomSnackBar(
+            'Location tracking started successfully!', 'success');
       }
       _updateStatusMessage();
     } catch (e) {
@@ -107,16 +108,85 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         errorMessage = 'Location service not available. Please restart the app';
       }
 
-      _showSnackBar(errorMessage, Colors.red);
+      _showCustomSnackBar(errorMessage, 'error');
     }
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showCustomSnackBar(String message, String type) {
+    Color backgroundColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case 'success':
+        backgroundColor = Colors.green;
+        icon = Icons.check_circle;
+        iconColor = Colors.white;
+        break;
+      case 'error':
+        backgroundColor = Colors.red;
+        icon = Icons.error;
+        iconColor = Colors.white;
+        break;
+      case 'warning':
+        backgroundColor = Colors.orange;
+        icon = Icons.warning;
+        iconColor = Colors.white;
+        break;
+      case 'info':
+        backgroundColor = Colors.blue;
+        icon = Icons.info;
+        iconColor = Colors.white;
+        break;
+      default:
+        backgroundColor = Colors.grey;
+        icon = Icons.info;
+        iconColor = Colors.white;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: color,
+        content: Row(
+          children: [
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: iconColor,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                size: 12,
+                color: backgroundColor,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: GoogleFonts.outfit(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.all(16),
         duration: Duration(seconds: 2),
+        action: SnackBarAction(
+          label: '✕',
+          textColor: Colors.white,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
     );
   }
@@ -205,7 +275,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'This is a manual adjustment when geofencing fails. Use only when passengers have actually been dropped off.',
+                          'This action will be logged for audit purposes',
                           style: GoogleFonts.outfit(
                             fontSize: 12,
                             color: Colors.orange[700],
@@ -224,59 +294,96 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
               child: Text(
                 'Cancel',
                 style: GoogleFonts.outfit(
-                  fontSize: 16,
                   color: Colors.grey[600],
                 ),
               ),
             ),
             ElevatedButton(
               onPressed: () async {
-                final quantityText = quantityController.text.trim();
-                if (quantityText.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Please enter the number of passengers'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                  return;
-                }
-
-                final quantity = int.tryParse(quantityText);
+                final quantity = int.tryParse(quantityController.text);
                 if (quantity == null || quantity <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content:
-                          Text('Please enter a valid number greater than 0'),
-                      backgroundColor: Colors.red,
-                    ),
+                  _showCustomSnackBar(
+                    'Please enter a valid number',
+                    'error',
                   );
                   return;
                 }
 
                 if (quantity > currentPassengerCount) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                          'Cannot subtract more passengers than currently on board'),
-                      backgroundColor: Colors.red,
-                    ),
+                  _showCustomSnackBar(
+                    'Cannot subtract more passengers than current count',
+                    'error',
                   );
                   return;
                 }
 
-                Navigator.of(context).pop();
-                await _adjustPassengerCount(
-                    quantity, reasonController.text.trim());
+                try {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user == null) return;
+
+                  final query = await FirebaseFirestore.instance
+                      .collection('conductors')
+                      .where('uid', isEqualTo: user.uid)
+                      .limit(1)
+                      .get();
+
+                  if (query.docs.isEmpty) return;
+
+                  final conductorDocId = query.docs.first.id;
+                  final now = DateTime.now();
+                  final formattedDate =
+                      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+                  // Update passenger count
+                  await FirebaseFirestore.instance
+                      .collection('conductors')
+                      .doc(conductorDocId)
+                      .collection('dailyTrips')
+                      .doc(formattedDate)
+                      .update({
+                    'passengerCount': FieldValue.increment(-quantity),
+                  });
+
+                  // Log the manual adjustment
+                  await FirebaseFirestore.instance
+                      .collection('conductors')
+                      .doc(conductorDocId)
+                      .collection('dailyTrips')
+                      .doc(formattedDate)
+                      .collection('adjustmentLogs')
+                      .add({
+                    'timestamp': FieldValue.serverTimestamp(),
+                    'quantity': quantity,
+                    'reason': reasonController.text.trim().isEmpty
+                        ? 'No reason provided'
+                        : reasonController.text.trim(),
+                    'conductorName': _conductorName,
+                    'previousCount': currentPassengerCount,
+                    'newCount': currentPassengerCount - quantity,
+                  });
+
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    _showCustomSnackBar(
+                      'Passenger count adjusted successfully',
+                      'success',
+                    );
+                  }
+                } catch (e) {
+                  print('Error adjusting passenger count: $e');
+                  _showCustomSnackBar(
+                    'Failed to adjust passenger count',
+                    'error',
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF0091AD),
                 foregroundColor: Colors.white,
               ),
               child: Text(
-                'Adjust Count',
+                'Confirm',
                 style: GoogleFonts.outfit(
-                  fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -291,7 +398,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        _showSnackBar('User not authenticated', Colors.red);
+        _showCustomSnackBar('User not authenticated', 'error');
         return;
       }
 
@@ -303,7 +410,7 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
           .get();
 
       if (conductorDoc.docs.isEmpty) {
-        _showSnackBar('Conductor data not found', Colors.red);
+        _showCustomSnackBar('Conductor data not found', 'error');
         return;
       }
 
@@ -350,15 +457,14 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
         // You could optionally show a warning to the user here
       }
 
-      _showSnackBar(
-        'Successfully adjusted passenger count: $currentCount → $newCount (-$quantity)',
-        Colors.green,
-      );
+      _showCustomSnackBar(
+          'Successfully adjusted passenger count: $currentCount → $newCount (-$quantity)',
+          'success');
 
       // Refresh the UI
       setState(() {});
     } catch (e) {
-      _showSnackBar('Error adjusting passenger count: $e', Colors.red);
+      _showCustomSnackBar('Error adjusting passenger count: $e', 'error');
       print('Error adjusting passenger count: $e');
     }
   }
@@ -1498,7 +1604,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                       '• Your location updates every 5 seconds\n'
                       '• Check pre-booked passengers for guaranteed seats\n'
                       '• Use the Maps tab to see passenger locations\n'
-                      '• Geofencing automatically decrements passenger count at drop-offs\n'
                       '• Geofence radius: 250 meters for accurate passenger drop-off detection\n'
                       '• If geofencing fails, use "Adjust Count" to manually subtract dropped-off passengers\n'
                       '• Manual adjustments are logged for audit purposes',

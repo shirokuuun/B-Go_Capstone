@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:b_go/services/offline_location_service.dart';
+import 'package:b_go/services/background_location_service.dart';
 
 class RealtimeLocationService {
   static final RealtimeLocationService _instance = RealtimeLocationService._internal();
@@ -222,6 +224,83 @@ class RealtimeLocationService {
   /// Check if a booking is being tracked
   bool isTrackingBooking(String bookingId) {
     return _isTracking && _currentBookingId == bookingId;
+  }
+
+  /// Handle app going to background - switch to background service
+  Future<void> handleAppBackgrounded() async {
+    if (_isTracking && _currentBookingId != null) {
+      print('🔄 RealtimeLocationService: App backgrounded, switching to background service');
+      
+      // Start background service for location tracking
+      final backgroundService = BackgroundLocationService();
+      await backgroundService.startTracking(_currentBookingId!);
+      
+      // Stop realtime tracking to avoid conflicts
+      await stopTracking();
+    }
+  }
+
+  /// Handle app coming to foreground - sync offline locations and resume realtime tracking
+  Future<void> handleAppForegrounded() async {
+    print('🔄 RealtimeLocationService: App foregrounded, syncing offline locations');
+    
+    // Sync any offline locations that were stored while app was backgrounded
+    final offlineService = OfflineLocationService();
+    await offlineService.syncOfflineLocations();
+    
+    // Sync offline locations from background service
+    final backgroundService = BackgroundLocationService();
+    await backgroundService.syncOfflineLocations();
+    
+    // Check if background service is tracking and resume realtime tracking
+    final isBackgroundTracking = await backgroundService.isTracking();
+    if (isBackgroundTracking) {
+      final bookingId = await backgroundService.getCurrentBookingId();
+      if (bookingId != null) {
+        print('🔄 RealtimeLocationService: Resuming realtime tracking for booking $bookingId');
+        await startTracking(bookingId);
+        
+        // Stop background service to avoid conflicts
+        await backgroundService.stopTracking();
+      }
+    }
+  }
+
+  /// Check if there's an active booking that should be tracked (for app startup)
+  Future<void> checkForActiveTracking() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      // Check if there's a paid pre-booking that should be tracked
+      final preBookingsQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('preBookings')
+          .where('status', isEqualTo: 'paid')
+          .where('locationTrackingStopped', isEqualTo: false)
+          .get();
+
+      if (preBookingsQuery.docs.isNotEmpty) {
+        final booking = preBookingsQuery.docs.first;
+        final bookingId = booking.id;
+        final bookingData = booking.data();
+        
+        // Check if location tracking should be active
+        final lastLocationUpdate = bookingData['lastLocationUpdate'] as Timestamp?;
+        if (lastLocationUpdate != null) {
+          final timeSinceLastUpdate = DateTime.now().difference(lastLocationUpdate.toDate());
+          
+          // If last update was within 30 minutes, resume tracking
+          if (timeSinceLastUpdate.inMinutes < 30) {
+            print('🔄 RealtimeLocationService: Resuming tracking for active booking: $bookingId');
+            await startTracking(bookingId);
+          }
+        }
+      }
+    } catch (e) {
+      print('❌ RealtimeLocationService: Error checking for active tracking: $e');
+    }
   }
 
   /// Force update location (for manual refresh)

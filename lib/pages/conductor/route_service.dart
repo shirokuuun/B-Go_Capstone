@@ -796,8 +796,6 @@ class RouteService {
 
             for (var ticketDoc in remittanceTicketsSnapshot.docs) {
               final data = ticketDoc.data();
-              print(
-                  '🔍 Found remittance ticket: ${ticketDoc.id} with data: $data');
 
               allTickets.add({
                 'id': ticketDoc.id,

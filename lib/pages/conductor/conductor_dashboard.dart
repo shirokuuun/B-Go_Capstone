@@ -817,24 +817,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
     );
   }
 
-  // Helper to render list from any docs source
-  Widget _buildScannedListFromDocs(List<QueryDocumentSnapshot> docs) {
-    return Column(
-      children: [
-        Text(
-          '${docs.length} scanned QR code${docs.length == 1 ? '' : 's'}',
-          style: GoogleFonts.outfit(
-            fontSize: 14,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        SizedBox(height: 12),
-        ..._mapDocsToScannedTiles(docs),
-      ],
-    );
-  }
-
   List<Widget> _mapDocsToScannedTiles(List<QueryDocumentSnapshot> docs) {
     return docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
@@ -870,9 +852,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
       // Get status from data
       final status = data['status'] ?? 'boarded';
       final isAccomplished = status == 'accomplished';
-
-      print(
-          '🔍 Dashboard QR tile: from=$from, to=$to, qty=$qty, amount=$amount, status=$status');
 
       return Container(
         margin: EdgeInsets.only(bottom: 8),
@@ -1142,8 +1121,6 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                         // Get pre-booked passengers count
                         final activeTripId =
                             conductorData['activeTrip']?['tripId'];
-                        print('🔍 Dashboard: Active trip ID: $activeTripId');
-                        print('🔍 Dashboard: Conductor data: $conductorData');
                         return StreamBuilder<QuerySnapshot>(
                           stream: activeTripId != null
                               ? FirebaseFirestore.instance
@@ -1165,14 +1142,8 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
                             if (preBookingSnapshot.hasData) {
                               final allPreBookings =
                                   preBookingSnapshot.data!.docs;
-                              print(
-                                  '🔍 Dashboard: Found ${allPreBookings.length} pre-bookings in preBookings collection');
-
                               for (var doc in allPreBookings) {
                                 final data = doc.data() as Map<String, dynamic>;
-                                print(
-                                    '🔍 Dashboard: Pre-booking - Route: ${data['route']}, Status: ${data['status']}, BoardingStatus: ${data['boardingStatus']}, TripId: ${data['tripId']}');
-
                                 final isForCurrentTrip = activeTripId == null ||
                                     data['tripId'] == activeTripId ||
                                     data['tripId'] == null;

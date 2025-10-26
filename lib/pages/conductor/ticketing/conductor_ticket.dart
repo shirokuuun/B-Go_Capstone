@@ -28,7 +28,8 @@ class ConductorTicket extends StatefulWidget {
 class _ConductorTicketState extends State<ConductorTicket> {
   final ThermalPrinterService _printerService = ThermalPrinterService();
   bool _isPrinting = false;
-  bool _hasAttemptedAutoPrint = false; // ✅ Flag to prevent multiple auto-print attempts
+  bool _hasAttemptedAutoPrint =
+      false; // ✅ Flag to prevent multiple auto-print attempts
 
   String getRouteLabel(String placeCollection) {
     final route = widget.route;
@@ -268,7 +269,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
               });
               return;
             }
-            
+
             // Now print after successful connection
             await _performPrint();
           },
@@ -300,7 +301,7 @@ class _ConductorTicketState extends State<ConductorTicket> {
       final to = latestTrip?['to']?.toString() ?? 'N/A';
       final startKm = latestTrip?['startKm']?.toString() ?? '0';
       final endKm = latestTrip?['endKm']?.toString() ?? '0';
-      
+
       String baseFare = '0.00';
       final fareData = latestTrip?['farePerPassenger'];
       if (fareData != null) {
@@ -315,13 +316,14 @@ class _ConductorTicketState extends State<ConductorTicket> {
 
       final quantity = (latestTrip?['quantity'] as num?)?.toInt() ?? 1;
       final totalFare = latestTrip?['totalFare']?.toString() ?? '0.00';
-      final discountAmount = latestTrip?['discountAmount']?.toString() ?? '0.00';
-      
+      final discountAmount =
+          latestTrip?['discountAmount']?.toString() ?? '0.00';
+
       List<String>? discountBreakdown;
       if (latestTrip?['discountBreakdown'] != null) {
         discountBreakdown = List<String>.from(
-          (latestTrip!['discountBreakdown'] as List).map((e) => e.toString())
-        );
+            (latestTrip!['discountBreakdown'] as List)
+                .map((e) => e.toString()));
       }
 
       // Print receipt
@@ -586,9 +588,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
       try {
         DateTime dateTime;
         if (timestamp is Timestamp) {
-          dateTime = timestamp.toDate().add(const Duration(hours: 8));
+          dateTime = timestamp
+              .toDate(); // ✅ FIXED: Use local time without adding hours
         } else if (timestamp is DateTime) {
-          dateTime = timestamp.add(const Duration(hours: 8));
+          dateTime = timestamp; // ✅ FIXED: Use local time without adding hours
         } else {
           dateTime = DateTime.now();
         }
@@ -657,7 +660,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF0091AD)),
                         ),
                       ),
                       const SizedBox(width: 8),

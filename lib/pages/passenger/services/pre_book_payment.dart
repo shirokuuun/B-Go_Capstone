@@ -145,9 +145,6 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
     // Remove app lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
 
-    // Don't stop real-time location tracking when page is disposed
-    // The location service should continue running for the conductor to see real-time updates
-    // It will be stopped when the passenger is scanned by the conductor
     super.dispose();
   }
 
@@ -156,8 +153,10 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
       // Delete the booking from Firestore
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        _showCustomSnackBar(
-            'User not authenticated. Please try again.', 'error');
+        if (mounted) {
+          _showCustomSnackBar(
+              'User not authenticated. Please try again.', 'error');
+        }
         return;
       }
 
@@ -168,17 +167,21 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
           .doc(widget.bookingId)
           .delete();
 
-      _showCustomSnackBar('Pre-booking cancelled and deleted!', 'success');
+      if (mounted) {
+        _showCustomSnackBar('Pre-booking cancelled and deleted!', 'success');
 
-      // Navigate back to home page by popping all pages until we reach the home page
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/home',
-        (route) => false, // Remove all previous routes
-      );
+        // Navigate back to home page by popping all pages until we reach the home page
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/home',
+          (route) => false, // Remove all previous routes
+        );
+      }
     } catch (e) {
       print('Error cancelling booking: $e');
-      _showCustomSnackBar(
-          'Error cancelling booking. Please try again.', 'error');
+      if (mounted) {
+        _showCustomSnackBar(
+            'Error cancelling booking. Please try again.', 'error');
+      }
     }
   }
 
@@ -302,7 +305,6 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
                         ),
                       ),
                       SizedBox(height: 16),
-                      _buildDetailRow('Booking ID', widget.bookingId),
                       _buildDetailRow('Route', widget.route),
                       _buildDetailRow('Direction', widget.directionLabel),
                       _buildDetailRow('Date', formattedDate),
@@ -412,14 +414,17 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
                     ),
                   ),
                   SizedBox(height: 12),
-                  // Cancel Button
+// Cancel Button
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
+                        // Store the current context before showing dialog
+                        final currentContext = context;
+
                         showDialog(
                           context: context,
-                          builder: (context) => AlertDialog(
+                          builder: (dialogContext) => AlertDialog(
                             title: Text('Cancel Booking',
                                 style: GoogleFonts.outfit(fontSize: 18)),
                             content: Text(
@@ -428,14 +433,16 @@ class _PreBookPaymentPageState extends State<PreBookPaymentPage>
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () => Navigator.pop(dialogContext),
                                 child: Text('No',
                                     style: GoogleFonts.outfit(fontSize: 14)),
                               ),
                               ElevatedButton(
                                 onPressed: () {
-                                  Navigator.pop(context);
-                                  cancelPreBooking(context);
+                                  Navigator.pop(
+                                      dialogContext); // Close dialog first
+                                  // Use the stored context for cancelling
+                                  cancelPreBooking(currentContext);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.red,

@@ -1441,33 +1441,76 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
   final pendingPreTicket = preTicketsQuery.docs.first;
   final preTicketData = pendingPreTicket.data();
 
-  final userId = preTicketData['userId'];
+  // Extract userId - CRITICAL FIX
+  String? userId = preTicketData['userId'];
+
+  // If userId is not in preTicket, try to get it from the parent collection
+  if (userId == null) {
+    print(
+        '⚠️ WARNING: userId not found in pre-ticket, attempting to extract from parent path');
+    try {
+      // The path is usually: users/{userId}/preTickets/{ticketId}
+      final pathSegments = pendingPreTicket.reference.parent.path.split('/');
+      if (pathSegments.length >= 2 && pathSegments[0] == 'users') {
+        userId = pathSegments[1];
+        print('✅ Extracted userId from path: $userId');
+      }
+    } catch (e) {
+      print('❌ Failed to extract userId from path: $e');
+    }
+  }
+
+  // If still no userId, check if it's in the QR data
+  if (userId == null && data['userId'] != null) {
+    userId = data['userId'].toString();
+    print('✅ Got userId from QR data: $userId');
+  }
 
   print('🔍 Pre-ticket userId: $userId');
   print('🔍 Pre-ticket data: $preTicketData');
 
   if (userId == null) {
-    print('⚠️ WARNING: Pre-ticket userId is null!');
+    print('❌ ERROR: Cannot proceed without userId!');
+    throw Exception('Invalid pre-ticket: Missing user information');
   }
 
   if (preTicketData['status'] == 'boarded') {
     throw Exception('This pre-ticket has already been scanned and boarded.');
   }
 
+  // Update pre-ticket status
   await pendingPreTicket.reference.update({
     'status': 'boarded',
     'boardedAt': FieldValue.serverTimestamp(),
     'scannedBy': user.uid,
     'scannedAt': FieldValue.serverTimestamp(),
-    'tripId': activeTripId,
+    'tripId': activeTripId ?? '',
+    'userId': userId, // Ensure userId is saved
   });
 
-  await FirebaseFirestore.instance
-      .collection('conductors')
-      .doc(conductorDocId)
-      .collection('preTickets')
-      .doc(pendingPreTicket.id)
-      .set({
+  // Helper function to safely get numeric values
+  num _getNumValue(dynamic value, [num defaultValue = 0]) {
+    if (value == null) return defaultValue;
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
+  // Helper function to safely get string values
+  String _getStringValue(dynamic value, [String defaultValue = '']) {
+    if (value == null) return defaultValue;
+    return value.toString();
+  }
+
+  // Helper function to safely get list values
+  List<dynamic> _getListValue(dynamic value) {
+    if (value == null) return [];
+    if (value is List) return value;
+    return [];
+  }
+
+  // Save to conductor's preTickets collection with validation
+  final conductorPreTicketData = {
     'qrData': qrDataString,
     'originalDocumentId': pendingPreTicket.id,
     'originalCollection': pendingPreTicket.reference.parent.path,
@@ -1475,19 +1518,38 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     'scannedBy': user.uid,
     'qr': true,
     'status': 'boarded',
-    'data': data,
-    'tripId': activeTripId,
-    'from': data['from'],
-    'to': data['to'],
+    'tripId': activeTripId ?? '',
+    'from': _getStringValue(data['from']),
+    'to': _getStringValue(data['to']),
     'quantity': quantity,
     'userId': userId,
-    'totalFare': data['totalFare'] ?? data['amount'] ?? data['fare'],
-    'route': data['route'],
-    'direction': data['direction'],
-  });
+    'totalFare': _getStringValue(
+        data['totalFare'] ?? data['amount'] ?? data['fare'] ?? '0.00'),
+    'amount': _getStringValue(
+        data['amount'] ?? data['totalFare'] ?? data['fare'] ?? '0.00'),
+    'route': _getStringValue(data['route']),
+    'direction': _getStringValue(data['direction']),
+    'fromKm': _getNumValue(data['fromKm']),
+    'toKm': _getNumValue(data['toKm']),
+    'fare': _getNumValue(data['fare']),
+    'discountAmount': _getStringValue(data['discountAmount'] ?? '0.00'),
+    'discountBreakdown': _getListValue(data['discountBreakdown']),
+    'passengerFares': _getListValue(data['passengerFares']),
+    'fareTypes': _getListValue(data['fareTypes']),
+    'ticketType': 'preTicket',
+    'type': 'preTicket',
+  };
+
+  await FirebaseFirestore.instance
+      .collection('conductors')
+      .doc(conductorDocId)
+      .collection('preTickets')
+      .doc(pendingPreTicket.id)
+      .set(conductorPreTicketData);
 
   print('✅ Saved pre-ticket with userId: $userId');
 
+  // Save to remittance
   try {
     final ticketNumber =
         await _getNextTicketNumber(conductorDocId, formattedDate);
@@ -1495,28 +1557,29 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
 
     final remittanceData = {
       'active': true,
-      'discountAmount': '0.00',
-      'discountBreakdown': data['discountBreakdown'] ?? [],
+      'discountAmount': _getStringValue(data['discountAmount'] ?? '0.00'),
+      'discountBreakdown': _getListValue(data['discountBreakdown']),
       'documentId': pendingPreTicket.id,
       'documentType': 'preTicket',
-      'endKm': data['toKm'] ?? 0,
-      'farePerPassenger': data['passengerFares'] ?? [data['fare']],
-      'from': data['from'],
+      'endKm': _getNumValue(data['toKm']),
+      'farePerPassenger': _getListValue(data['passengerFares']).isEmpty
+          ? [_getNumValue(data['fare'])]
+          : _getListValue(data['passengerFares']),
+      'from': _getStringValue(data['from']),
       'quantity': quantity,
       'scannedBy': user.uid,
-      'startKm': data['fromKm'] ?? 0,
+      'startKm': _getNumValue(data['fromKm']),
       'status': 'boarded',
       'ticketType': 'preTicket',
       'timestamp': FieldValue.serverTimestamp(),
-      'to': data['to'],
-      'totalFare':
-          (data['totalFare'] ?? data['amount'] ?? data['fare'] ?? '0.00')
-              .toString(),
-      'totalKm': (data['toKm'] ?? 0) - (data['fromKm'] ?? 0),
-      'route': data['route'],
-      'direction': data['direction'],
+      'to': _getStringValue(data['to']),
+      'totalFare': _getStringValue(
+          data['totalFare'] ?? data['amount'] ?? data['fare'] ?? '0.00'),
+      'totalKm': _getNumValue(data['toKm']) - _getNumValue(data['fromKm']),
+      'route': _getStringValue(data['route']),
+      'direction': _getStringValue(data['direction']),
       'conductorId': conductorDocId,
-      'tripId': activeTripId,
+      'tripId': activeTripId ?? '',
       'createdAt': FieldValue.serverTimestamp(),
       'scannedAt': FieldValue.serverTimestamp(),
       'boardedAt': FieldValue.serverTimestamp(),
@@ -1548,6 +1611,7 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
     print('❌ Error saving pre-ticket to remittance: $e');
   }
 
+  // Save to dailyTrips
   try {
     final dailyTripDoc = await FirebaseFirestore.instance
         .collection('conductors')
@@ -1571,18 +1635,19 @@ Future<void> _processPreTicket(Map<String, dynamic> data, User user,
           .collection('preTickets')
           .doc(pendingPreTicket.id)
           .set({
-        'from': data['from'],
-        'to': data['to'],
+        'from': _getStringValue(data['from']),
+        'to': _getStringValue(data['to']),
         'quantity': quantity,
-        'totalFare': data['totalFare'] ?? data['amount'] ?? data['fare'],
+        'totalFare': _getStringValue(
+            data['totalFare'] ?? data['amount'] ?? data['fare'] ?? '0.00'),
         'status': 'boarded',
         'scannedAt': FieldValue.serverTimestamp(),
         'scannedBy': user.uid,
-        'tripId': activeTripId,
+        'tripId': activeTripId ?? '',
         'qrData': qrDataString,
         'userId': userId,
-        'route': data['route'],
-        'direction': data['direction'],
+        'route': _getStringValue(data['route']),
+        'direction': _getStringValue(data['direction']),
         'ticketType': 'preTicket',
       });
 

@@ -110,225 +110,245 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
       body: Column(
         children: [
-          // Top Blue Section with Balance and Tabs
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Color(0xFF2C5EED),
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Birthday Promo Banner
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.cake, color: Colors.white, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        'Surprise Birthday',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+          // Scrollable content area
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Top Blue Section with Balance and Tabs
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Color(0xFF2C5EED),
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(24),
+                        bottomRight: Radius.circular(24),
                       ),
-                      SizedBox(width: 4),
-                      Text(
-                        'SHAKE AWAY',
-                        style: GoogleFonts.outfit(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Tabs
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      _buildTab('Wallet', true),
-                      _buildTab('Save', false),
-                      _buildTab('Borrow', false),
-                      _buildTab('Grow', false),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16),
-                
-                // Balance Card
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 16),
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF4169F5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                    ),
+                    child: Column(
+                      children: [
+                        // Birthday Promo Banner
+                        Container(
+                          margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              Icon(Icons.cake, color: Colors.white, size: 16),
+                              SizedBox(width: 8),
                               Text(
-                                'AVAILABLE BALANCE',
+                                'Surprise Birthday',
                                 style: GoogleFonts.outfit(
-                                  color: Colors.white70,
+                                  color: Colors.white,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.5,
                                 ),
                               ),
-                              SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _balanceVisible = !_balanceVisible;
-                                  });
-                                },
-                                child: Icon(
-                                  _balanceVisible
-                                      ? Icons.visibility
-                                      : Icons.visibility_off,
-                                  color: Colors.white70,
-                                  size: 16,
+                              SizedBox(width: 4),
+                              Text(
+                                'SHAKE AWAY',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
                           ),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '+ Cash In',
-                              style: GoogleFonts.outfit(
-                                color: Color(0xFF2C5EED),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                        ),
+                        
+                        // Tabs
+                        Container(
+                          margin: EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              _buildTab('Wallet', true),
+                              _buildTab('Save', false),
+                              _buildTab('Borrow', false),
+                              _buildTab('Grow', false),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        
+                        // Balance Card - Made more compact
+                        Container(
+                          margin: EdgeInsets.symmetric(horizontal: 16),
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF4169F5),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        'AVAILABLE BALANCE',
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.white70,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      SizedBox(width: 6),
+                                      GestureDetector(
+                                        onTap: () {
+                                          setState(() {
+                                            _balanceVisible = !_balanceVisible;
+                                          });
+                                        },
+                                        child: Icon(
+                                          _balanceVisible
+                                              ? Icons.visibility
+                                              : Icons.visibility_off,
+                                          color: Colors.white70,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '+ Cash In',
+                                      style: GoogleFonts.outfit(
+                                        color: Color(0xFF2C5EED),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
+                              SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Text(
+                                    '₱',
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    _balanceVisible
+                                        ? _availableBalance.toStringAsFixed(2)
+                                        : '****.**',
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Text(
-                            '₱',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            _balanceVisible
-                                ? _availableBalance.toStringAsFixed(2)
-                                : '****.**',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white,
-                              fontSize: 40,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        SizedBox(height: 16),
+                      ],
+                    ),
                   ),
-                ),
-                SizedBox(height: 20),
-              ],
+                  
+                  // Action Buttons Grid - Made more compact
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildActionButton(
+                              icon: Icons.send,
+                              label: 'Send',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.phone_android,
+                              label: 'Load',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.account_balance,
+                              label: 'Transfer',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.receipt,
+                              label: 'Bills',
+                              color: Color(0xFF2C5EED),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildActionButton(
+                              icon: Icons.savings,
+                              label: 'GInvest',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.credit_card,
+                              label: 'Cards',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.star,
+                              label: 'A+ Rewards',
+                              color: Color(0xFF2C5EED),
+                            ),
+                            _buildActionButton(
+                              icon: Icons.directions_bus,
+                              label: 'Commute',
+                              color: Colors.red,
+                              highlighted: true,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Add some bottom padding to ensure content doesn't get cut off
+                  SizedBox(height: 80),
+                ],
+              ),
             ),
           ),
           
-          // Action Buttons Grid
-          Container(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildActionButton(
-                      icon: Icons.send,
-                      label: 'Send',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.phone_android,
-                      label: 'Load',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.account_balance,
-                      label: 'Transfer',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.receipt,
-                      label: 'Bills',
-                      color: Color(0xFF2C5EED),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildActionButton(
-                      icon: Icons.savings,
-                      label: 'GInvest',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.credit_card,
-                      label: 'Cards',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.star,
-                      label: 'A+ Rewards',
-                      color: Color(0xFF2C5EED),
-                    ),
-                    _buildActionButton(
-                      icon: Icons.directions_bus,
-                      label: 'Commute',
-                      color: Colors.red,
-                      highlighted: true,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          
-          Spacer(),
-          
-          // Pay Now Button
+          // Pay Now Button - Fixed at bottom
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: Offset(0, -2),
+                ),
+              ],
+            ),
             child: ElevatedButton(
               onPressed: () {
                 // Check if balance is sufficient
@@ -363,10 +383,11 @@ class _PaymentPageState extends State<PaymentPage> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFF0091AD),
-                padding: EdgeInsets.symmetric(vertical: 16),
+                padding: EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                elevation: 0,
               ),
               child: Text(
                 'Pay Now',
@@ -385,25 +406,27 @@ class _PaymentPageState extends State<PaymentPage> {
         selectedItemColor: Color(0xFF2C5EED),
         unselectedItemColor: Colors.grey,
         currentIndex: 0,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
         items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            icon: Icon(Icons.home, size: 22),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.mail),
+            icon: Icon(Icons.mail, size: 22),
             label: 'Inbox',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.qr_code_scanner),
+            icon: Icon(Icons.qr_code_scanner, size: 22),
             label: 'QR',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.receipt_long),
+            icon: Icon(Icons.receipt_long, size: 22),
             label: 'Transactions',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: Icon(Icons.person, size: 22),
             label: 'Profile',
           ),
         ],
@@ -414,7 +437,7 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget _buildTab(String label, bool isSelected) {
     return Expanded(
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 12),
+        padding: EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -424,7 +447,7 @@ class _PaymentPageState extends State<PaymentPage> {
             label,
             style: GoogleFonts.outfit(
               color: isSelected ? Color(0xFF2C5EED) : Colors.white,
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -440,10 +463,11 @@ class _PaymentPageState extends State<PaymentPage> {
     bool highlighted = false,
   }) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 56,
-          height: 56,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
             color: highlighted ? Colors.red.withOpacity(0.1) : Colors.grey[100],
             borderRadius: BorderRadius.circular(12),
@@ -454,14 +478,14 @@ class _PaymentPageState extends State<PaymentPage> {
           child: Icon(
             icon,
             color: color,
-            size: 28,
+            size: 26,
           ),
         ),
-        SizedBox(height: 8),
+        SizedBox(height: 6),
         Text(
           label,
           style: GoogleFonts.outfit(
-            fontSize: 12,
+            fontSize: 11,
             color: Colors.black87,
           ),
         ),

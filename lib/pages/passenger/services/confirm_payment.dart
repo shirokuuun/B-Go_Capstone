@@ -119,7 +119,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                           ),
                         ),
                         SizedBox(height: 24),
-                        
+
                         // PAY WITH Section
                         Container(
                           padding: EdgeInsets.all(16),
@@ -140,10 +140,12 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                               ),
                               SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'GCash',
@@ -189,17 +191,17 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                             ],
                           ),
                         ),
-                        
+
                         SizedBox(height: 24),
-                        
+
                         // Divider
                         Container(
                           height: 1,
                           color: Colors.grey[200],
                         ),
-                        
+
                         SizedBox(height: 24),
-                        
+
                         // YOU ARE ABOUT TO PAY Section
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -213,16 +215,17 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                               ),
                             ),
                             SizedBox(height: 16),
-                            
+
                             // Booking Details
                             _buildDetailRow('Route', widget.route),
                             _buildDetailRow('Direction', widget.directionLabel),
                             _buildDetailRow('From', widget.fromPlace['name']),
                             _buildDetailRow('To', widget.toPlace['name']),
-                            _buildDetailRow('Passengers', widget.quantity.toString()),
-                            
+                            _buildDetailRow(
+                                'Passengers', widget.quantity.toString()),
+
                             SizedBox(height: 16),
-                            
+
                             // Amount
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -247,17 +250,17 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                             ),
                           ],
                         ),
-                        
+
                         SizedBox(height: 24),
-                        
+
                         // Divider
                         Container(
                           height: 1,
                           color: Colors.grey[200],
                         ),
-                        
+
                         SizedBox(height: 24),
-                        
+
                         // Fare Breakdown
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,16 +274,17 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
                               ),
                             ),
                             SizedBox(height: 12),
-                            ...widget.discountBreakdown.map((breakdown) => Padding(
-                              padding: EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                breakdown,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 13,
-                                  color: Colors.grey[700],
-                                ),
-                              ),
-                            )),
+                            ...widget.discountBreakdown
+                                .map((breakdown) => Padding(
+                                      padding: EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        breakdown,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 13,
+                                          color: Colors.grey[700],
+                                        ),
+                                      ),
+                                    )),
                           ],
                         ),
                       ],
@@ -290,7 +294,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
               ),
             ),
           ),
-          
+
           // Pay Button at Bottom
           Container(
             padding: EdgeInsets.all(16),
@@ -367,7 +371,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
     );
   }
 
-  /// Process payment - Same logic as in pre_book_payment.dart
+  /// ✅ FIXED: Process payment with proper document creation
   Future<void> _processPayment() async {
     setState(() {
       _isProcessing = true;
@@ -376,7 +380,8 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        _showCustomSnackBar('User not authenticated. Please try again.', 'error');
+        _showCustomSnackBar(
+            'User not authenticated. Please try again.', 'error');
         setState(() {
           _isProcessing = false;
         });
@@ -391,7 +396,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
       final formattedDate =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-      // Get the booking data
+      // Get the booking data from user's collection
       final bookingDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -418,6 +423,11 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         return;
       }
 
+      print(
+          '💳 Payment: Starting payment process for booking ${widget.bookingId}');
+      print('👤 Payment: User ID: ${user.uid}');
+      print('🚌 Payment: Conductor ID: $conductorId');
+
       // Update user's booking status
       await FirebaseFirestore.instance
           .collection('users')
@@ -431,28 +441,48 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         'testMode': true,
       });
 
-      // Update conductor's booking status
+      print('✅ Payment: Updated user booking status to paid');
+
+      // ✅ FIXED: Create/update conductor's booking with FULL data using .set()
       await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
           .collection('preBookings')
           .doc(widget.bookingId)
-          .update({
+          .set({
+        // Copy ALL booking data
+        ...bookingData,
+        // ✅ CRITICAL: Ensure totalFare is properly set for dashboard display
+        'totalFare': widget.totalAmount.toString(),
+        'amount': widget.totalAmount,
+        'fare': widget.baseFare,
+        'quantity': widget.quantity,
+        'fareTypes': widget.fareTypes,
+        'passengerFares': widget.passengerFares,
+        'discountBreakdown': widget.discountBreakdown,
+        // Update payment status
         'status': 'paid',
         'paidAt': FieldValue.serverTimestamp(),
         'paymentMethod': 'simulated',
         'testMode': true,
-      });
+        // Ensure userId is set for security rules
+        'userId': user.uid,
+        'preBookingId': widget.bookingId,
+      }, SetOptions(merge: true));
+
+      print('✅ Payment: Created/updated conductor booking status to paid');
 
       // Update status in dailyTrips collection
-      await _updateDailyTripsStatus(conductorId, formattedDate, 'paid');
+      await _updateDailyTripsStatus(
+          conductorId, formattedDate, 'paid', bookingData);
 
       // Update status in remittance collection
-      await _updateRemittanceStatus(conductorId, formattedDate, 'paid');
+      await _updateRemittanceStatus(
+          conductorId, formattedDate, 'paid', bookingData);
 
       // Show success message
       _showCustomSnackBar(
-        'Payment successful! Your reservation is confirmed.',
+        '✅ Payment successful! Your reservation is confirmed.',
         'success',
       );
 
@@ -467,7 +497,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         );
       }
     } catch (e) {
-      print('❌ Error processing payment: $e');
+      print('❌ Payment: Error processing payment: $e');
       _showCustomSnackBar(
         '❌ Payment failed. Please try again.',
         'error',
@@ -482,8 +512,8 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
   }
 
   /// Helper method to update status in dailyTrips collection
-  Future<void> _updateDailyTripsStatus(
-      String conductorId, String formattedDate, String status) async {
+  Future<void> _updateDailyTripsStatus(String conductorId, String formattedDate,
+      String status, Map<String, dynamic> bookingData) async {
     try {
       final dailyTripDoc = await FirebaseFirestore.instance
           .collection('conductors')
@@ -497,6 +527,7 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         final currentTrip = dailyTripData?['currentTrip'] ?? 1;
         final tripCollection = 'trip$currentTrip';
 
+        // ✅ Use .set() with merge to create/update
         await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorId)
@@ -506,40 +537,32 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
             .doc('preBookings')
             .collection('preBookings')
             .doc(widget.bookingId)
-            .update({
+            .set({
+          // Copy booking data
+          ...bookingData,
           'status': status,
           'paidAt': FieldValue.serverTimestamp(),
           'paymentMethod': 'simulated',
-        });
+          'testMode': true,
+          'active': true,
+          'preBookingId': widget.bookingId,
+        }, SetOptions(merge: true));
 
-        print('✅ PreBook: Updated dailyTrips status to $status');
+        print('✅ Payment: Updated dailyTrips status to $status');
       }
     } catch (e) {
-      print('❌ PreBook: Error updating dailyTrips status: $e');
+      print('❌ Payment: Error updating dailyTrips status: $e');
     }
   }
 
   /// ✅ IMPROVED: Helper method to save paid pre-booking to remittance/tickets collection
   /// This ensures paid pre-bookings appear EVERYWHERE (trip pages AND trip summary)
-  Future<void> _updateRemittanceStatus(
-      String conductorId, String formattedDate, String status) async {
+  Future<void> _updateRemittanceStatus(String conductorId, String formattedDate,
+      String status, Map<String, dynamic> bookingData) async {
     try {
-      // Get the booking data to save to remittance
-      final bookingDoc = await FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('preBookings')
-          .doc(widget.bookingId)
-          .get();
+      print('📦 Payment: Saving to remittance/tickets collection...');
 
-      if (!bookingDoc.exists) {
-        print('❌ PreBook: Booking not found in conductor preBookings');
-        return;
-      }
-
-      final bookingData = bookingDoc.data()!;
-
-      // ✅ IMPROVED: Explicitly set all required fields to ensure compatibility
+      // ✅ Use .set() instead of relying on existing document
       await FirebaseFirestore.instance
           .collection('conductors')
           .doc(conductorId)
@@ -551,29 +574,33 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         // Required fields for Trip Page
         'from': bookingData['from'] ?? '',
         'to': bookingData['to'] ?? '',
-        'totalFare': bookingData['totalFare']?.toString() ?? '0.00',
-        'quantity': bookingData['quantity'] ?? 1,
+        'totalFare': bookingData['totalFare']?.toString() ??
+            widget.totalAmount.toString(),
+        'quantity': bookingData['quantity'] ?? widget.quantity,
         'timestamp': bookingData['timestamp'] ?? FieldValue.serverTimestamp(),
-        
+
         // Additional fields
         'startKm': bookingData['fromKm'] ?? 0,
         'endKm': bookingData['toKm'] ?? 0,
         'totalKm': (bookingData['toKm'] ?? 0) - (bookingData['fromKm'] ?? 0),
-        'farePerPassenger': bookingData['farePerPassenger'] ?? [bookingData['totalFare'] ?? 37],
+        'farePerPassenger':
+            bookingData['farePerPassenger'] ?? widget.passengerFares,
         'discountAmount': bookingData['discountAmount'] ?? '0.00',
-        'discountBreakdown': bookingData['discountBreakdown'] ?? [],
-        'route': bookingData['route'] ?? '',
-        'direction': bookingData['direction'] ?? '',
+        'discountBreakdown':
+            bookingData['discountBreakdown'] ?? widget.discountBreakdown,
+        'route': bookingData['route'] ?? widget.route,
+        'direction': bookingData['direction'] ?? widget.directionLabel,
         'placeCollection': bookingData['placeCollection'] ?? 'Place',
-        
+
         // Status and type fields
         'status': status,
         'paidAt': FieldValue.serverTimestamp(),
         'paymentMethod': 'simulated',
+        'testMode': true,
         'documentType': 'preBooking',
         'ticketType': 'preBooking',
         'active': true,
-        
+
         // Booking metadata
         'userId': bookingData['userId'],
         'conductorId': conductorId,
@@ -582,26 +609,30 @@ class _ConfirmationPaymentState extends State<ConfirmationPayment> {
         'tripId': bookingData['tripId'],
         'preBookingId': widget.bookingId,
         'qrData': bookingData['qrData'],
-        
+
         // Passenger info (optional)
         'passengerLatitude': bookingData['passengerLatitude'],
         'passengerLongitude': bookingData['passengerLongitude'],
-        
+
         // Boarding status
         'boardingStatus': bookingData['boardingStatus'] ?? 'pending',
       }, SetOptions(merge: true));
 
-      print('✅ PreBook: Saved to remittance/tickets collection with status $status');
-      print('✅ PreBook: Ticket ID: ${widget.bookingId}');
-      print('✅ PreBook: From: ${bookingData['from']} → To: ${bookingData['to']}');
+      print(
+          '✅ Payment: Saved to remittance/tickets collection with status $status');
+      print(
+          '   📍 Path: conductors/$conductorId/remittance/$formattedDate/tickets/${widget.bookingId}');
+      print('   📊 From: ${bookingData['from']} → To: ${bookingData['to']}');
+      print('   💰 Amount: ${widget.totalAmount}');
     } catch (e) {
-      print('❌ PreBook: Error updating remittance status: $e');
+      print('❌ Payment: Error updating remittance status: $e');
+      print('   Stack trace: ${StackTrace.current}');
     }
   }
 
   void _showCustomSnackBar(String message, String type) {
     if (!mounted) return;
-    
+
     Color backgroundColor;
     IconData icon;
     Color iconColor;

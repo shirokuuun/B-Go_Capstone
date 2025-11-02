@@ -556,12 +556,16 @@ class _ConductorDashboardState extends State<ConductorDashboard> {
               final notCompleted = data['tripCompleted'] != true;
 
               // Only show pre-bookings that are paid but NOT scanned yet
+              final isPaid = data['status'] == 'paid';
+              final notBoarded = data['boardingStatus'] != 'boarded';
+              final notScanned = data['scannedBy'] == null;
+
               return data['route'] == widget.route &&
-                  data['status'] == 'paid' &&
-                  data['boardingStatus'] != 'boarded' &&
-                  data['scannedBy'] == null &&
+                  isPaid &&
+                  notBoarded &&
+                  notScanned &&
                   isForCurrentTrip &&
-                  notCompleted; // ✅ NEW: Don't show completed trips
+                  notCompleted;
             }).toList();
 
             if (preBookings.isEmpty) {

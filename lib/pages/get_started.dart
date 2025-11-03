@@ -113,7 +113,7 @@ class _GetStartedPageState extends State<GetStartedPage> {
                     children: [
                       // Title
                       Text(
-                        'B-Go',
+                        'BusGo',
                         style: GoogleFonts.outfit(
                           fontSize: titleFontSize,
                           fontWeight: FontWeight.bold,

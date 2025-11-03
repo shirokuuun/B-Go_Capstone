@@ -915,33 +915,78 @@ class _ConductorMapsState extends State<ConductorMaps>
       if (conductorQuery.docs.isEmpty || _isDisposed) return;
 
       final conductorId = conductorQuery.docs.first.id;
+      final conductorData =
+          conductorQuery.docs.first.data(); // ✅ ADDED: Get conductor data
+
       final today = DateTime.now();
       final formattedDate =
           '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
+      // ✅ ADDED: Get active trip ID
+      final activeTripId = conductorData['activeTrip']?['tripId'];
+
       _manualTicketsSubscription?.cancel();
-      _manualTicketsSubscription = FirebaseFirestore.instance
-          .collection('conductors')
-          .doc(conductorId)
-          .collection('remittance')
-          .doc(formattedDate)
-          .collection('tickets')
-          .where('ticketType', isEqualTo: 'manual')
-          .where('status', isEqualTo: 'boarded')
-          .snapshots()
-          .listen((snapshot) {
+
+      // ✅ ADDED: Conditional query based on active trip
+      final manualTicketsQuery = activeTripId != null
+          ? FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('remittance')
+              .doc(formattedDate)
+              .collection('tickets')
+              .where('ticketType', isEqualTo: 'Manual')
+              .where('tripId', isEqualTo: activeTripId)
+              .snapshots()
+          : FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorId)
+              .collection('remittance')
+              .doc(formattedDate)
+              .collection('tickets')
+              .where('ticketType', isEqualTo: 'Manual')
+              .snapshots();
+
+      _manualTicketsSubscription = manualTicketsQuery.listen((snapshot) {
         if (_isDisposed || !mounted || !_isAppActive) return;
 
         try {
-          final manualTickets = snapshot.docs.map((doc) {
+          List<Map<String, dynamic>> manualTickets =
+              []; // ✅ CHANGED: Clearer variable name
+
+          print('📊 Processing ${snapshot.docs.length} manual tickets...');
+
+          for (var doc in snapshot.docs) {
             final data = doc.data();
+            final docTripId = data['tripId'];
+            final status = data['status'] ?? 'paid';
+
+            print(
+                '  📋 Manual ticket ${doc.id}: status="$status", tripId="$docTripId"');
+
+            final isActive = status == 'paid' || status == 'boarded';
+
+            final isForCurrentTrip = activeTripId == null ||
+                docTripId == activeTripId ||
+                docTripId == null;
+
+            if (!isActive) {
+              print('  ⏭️ SKIPPING - not active (status="$status")');
+              continue;
+            }
+
+            if (!isForCurrentTrip) {
+              print(
+                  '  ⏭️ SKIPPING - not for current trip (expected: $activeTripId, got: $docTripId)');
+              continue;
+            }
 
             Map<String, double>? toCoords;
             if (data['toLatitude'] == null || data['toLongitude'] == null) {
               toCoords = _getCoordinatesForPlace(data['to'] ?? '');
             }
 
-            return {
+            manualTickets.add({
               'id': doc.id,
               'from': data['from'] ?? '',
               'to': data['to'] ?? '',
@@ -952,19 +997,22 @@ class _ConductorMapsState extends State<ConductorMaps>
                   toCoords?['latitude'] ?? _convertToDouble(data['toLatitude']),
               'toLongitude': toCoords?['longitude'] ??
                   _convertToDouble(data['toLongitude']),
-              'ticketType': 'manual',
+              'ticketType': 'Manual',
               'conductorId': conductorId,
               'date': formattedDate,
-              'status': data['status'] ?? 'boarded',
-            };
-          }).toList();
+              'status': status,
+              'tripId': docTripId,
+            });
+
+            print('  ✅ ACTIVE - added to list (status: $status)');
+          }
 
           if (mounted && !_isDisposed) {
             setState(() {
               _activeManualTickets = manualTickets;
             });
             print(
-                'Loaded ${_activeManualTickets.length} active manual tickets for geofencing');
+                'Loaded ${_activeManualTickets.length} active manual tickets for current trip');
           }
         } catch (e) {
           print('Error processing manual tickets: $e');
@@ -1836,6 +1884,21 @@ class _ConductorMapsState extends State<ConductorMaps>
   }
 
   Widget _buildInfoOverlay() {
+    // Count boarded pre-bookings (status == 'boarded')
+    final boardedPreBookings =
+        _activeBookings.where((b) => b['status'] == 'boarded').length;
+
+    // Count boarded manual tickets (status == 'boarded')
+    final boardedManualTickets =
+        _activeManualTickets.where((m) => m['status'] == 'boarded').length;
+
+    // Pre-tickets are always boarded when active
+    final boardedPreTickets = _activePreTickets.length;
+
+    // Total boarded count
+    final totalBoarded =
+        boardedPreBookings + boardedManualTickets + boardedPreTickets;
+
     return Positioned(
       top: 16,
       left: 16,
@@ -1871,7 +1934,7 @@ class _ConductorMapsState extends State<ConductorMaps>
                     border: Border.all(color: Colors.red[200]!, width: 1),
                   ),
                   child: Text(
-                      '${_activeBookings.where((b) => b['status'] == 'paid' && b['isRealTime'] == true).length} waiting (real-time)',
+                      '${_activeBookings.where((b) => b['status'] == 'paid' && b['isRealTime'] == true).length} waiting',
                       style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
@@ -1880,16 +1943,15 @@ class _ConductorMapsState extends State<ConductorMaps>
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.green[50],
+                    color: Colors.blue[50],
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green[200]!, width: 1),
+                    border: Border.all(color: Colors.blue[200]!, width: 1),
                   ),
-                  child: Text(
-                      '${_activeBookings.where((b) => b['status'] == 'boarded').length} boarded',
+                  child: Text('$boardedPreBookings pre-bookings',
                       style: GoogleFonts.outfit(
                           fontSize: 9,
                           fontWeight: FontWeight.w500,
-                          color: Colors.green[700])),
+                          color: Colors.blue[700])),
                 ),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),

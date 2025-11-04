@@ -39,6 +39,7 @@ class AuthServices {
         'email': email,
         'authMethod': 'google',
         'isEmailVerified': true, // Google emails are always verified
+        'isPhoneVerified': false,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -71,6 +72,7 @@ class AuthServices {
         'email': user.email,
         'authMethod': 'email',
         'isEmailVerified': true, // Update verification status
+        'isPhoneVerified': false,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     }
@@ -121,6 +123,7 @@ class AuthServices {
           'email': email.trim(),
           'authMethod': 'email',
           'isEmailVerified': false, // Initially false until they verify email
+          'isPhoneVerified': false,
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
@@ -225,7 +228,7 @@ class AuthServices {
     return await _auth.signInWithCredential(credential);
   }
 
-  // Save phone user to Firestore
+  // ✅ UPDATED: Save phone user to Firestore with isPhoneVerified flag
   Future<void> savePhoneUserToFirestore({
     required String uid,
     required String phoneNumber,
@@ -236,6 +239,7 @@ class AuthServices {
       'name': name ?? phoneNumber, // Use phone number as name if no name provided
       'authMethod': 'phone',
       'isEmailVerified': false, // Phone users don't have email verification
+      'isPhoneVerified': true, // ✅ Phone is verified after OTP
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

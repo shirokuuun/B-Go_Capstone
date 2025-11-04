@@ -12,18 +12,18 @@ class FAQPage extends StatefulWidget {
 class _FAQPageState extends State<FAQPage> {
   final List<Map<String, String>> _faqs = [
     {
-      'question': 'What is the B-Go app?',
+      'question': 'What is the BusGo app?',
       'answer':
-          'B-Go is a mobile application designed to help you track, reserve, and pay for bus rides in Batangas.'
+          'BusGo is a mobile application designed to help you track, reserve, and pay for bus rides in Batangas.'
     },
     {
-      'question': 'Is B-Go available on Android and iPhone?',
-      'answer': 'Yes, B-Go is available for Android. We\'re working on releasing an iOS version soon.'
+      'question': 'Is BusGo available on Android and iPhone?',
+      'answer': 'Yes, BusGo is available for Android. We\'re working on releasing an iOS version soon.'
     },
     {
       'question': 'How do I know when the next bus will arrive at my location?',
       'answer':
-          'You can view real-time bus arrival information within the app on the main dashboard or route page.'
+          'You can view real-time bus arrival information within the app on the main dashboard.'
     },
     {
       'question': 'How do I check if the bus is full?',
@@ -38,7 +38,7 @@ class _FAQPageState extends State<FAQPage> {
     {
       'question': 'How does the app track the bus?',
       'answer':
-          'B-Go uses GPS technology to track the location of buses in real time.'
+          'BusGo uses GPS technology to track the location of buses in real time.'
     },
     {
       'question': 'What if my bus is delayed?',
@@ -47,17 +47,17 @@ class _FAQPageState extends State<FAQPage> {
     },
     {
       'question': 'Can I pay for my ticket using the app?',
-      'answer': 'Yes, B-Go supports in-app payments for your convenience.'
+      'answer': 'Yes, BusGo supports in-app payments for your convenience.'
     },
     {
-      'question': 'Is B-Go free to use?',
+      'question': 'Is BusGo free to use?',
       'answer':
-          'Yes, downloading and using the B-Go app is free. You only pay for your bus tickets.'
+          'Yes, downloading and using the BusGo app is free. You only pay for your bus tickets.'
     },
     {
       'question': 'Who do I contact if I encounter problems with the app?',
       'answer':
-          'You can contact our support team through our email support@bgo-batangas.com.'
+          'You can contact our support team through our email batrascoservices@gmail.com.'
     },
     {
       'question': 'Will the app work without internet?',
@@ -65,9 +65,9 @@ class _FAQPageState extends State<FAQPage> {
           'You need an internet connection to access live data like bus tracking and seat availability. Offline use is limited.'
     },
     {
-      'question': 'Can I use B-Go for buses outside Batangas?',
+      'question': 'Can I use BusGo for buses outside Batangas?',
       'answer':
-          'Currently, B-Go is focused on Batangas routes. Please check the app for updates on expanded coverage.'
+          'Currently, BusGo is focused on Batangas routes. Please check the app for updates on expanded coverage.'
     },
   ];
 

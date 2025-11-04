@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 class ThermalPrinterService {
   static const platform = MethodChannel('com.bgo.printer/print');
-  
+
   bool get isConnected => true;
 
   Future<bool> connectPrinter(String ip, int port) async {
@@ -36,7 +36,8 @@ class ThermalPrinterService {
     required List<String>? discountBreakdown,
   }) async {
     try {
-      final now = DateTime.now().add(const Duration(hours: 8));
+      // ✅ FIXED: Use local device time without adding 8 hours
+      final now = DateTime.now();
       final formattedDate = DateFormat('yyyy-MM-dd').format(now);
       final formattedTime = DateFormat('HH:mm:ss').format(now);
 
@@ -114,7 +115,7 @@ class ThermalPrinterService {
     required String formattedTime,
   }) {
     StringBuffer receipt = StringBuffer();
-    
+
     // Logo will be printed separately by native code
     // Text content starts here
     receipt.writeln('Route: $route');
@@ -129,7 +130,7 @@ class ThermalPrinterService {
     receipt.writeln('Base Fare: $baseFare PHP');
     receipt.writeln('Quantity: $quantity');
     receipt.writeln('');
-    
+
     if (discountBreakdown != null && discountBreakdown.isNotEmpty) {
       receipt.writeln('Discounts:');
       for (var discount in discountBreakdown) {
@@ -140,7 +141,7 @@ class ThermalPrinterService {
       }
       receipt.writeln('');
     }
-    
+
     receipt.writeln('================================');
     receipt.writeln('      TOTAL AMOUNT');
     receipt.writeln('      $totalFare PHP');
@@ -149,7 +150,7 @@ class ThermalPrinterService {
     receipt.writeln('Thank you for riding with us!');
     receipt.writeln('Safe travels!');
     receipt.writeln('');
-    
+
     return receipt.toString();
   }
 }

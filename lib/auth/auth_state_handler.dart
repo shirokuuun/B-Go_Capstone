@@ -17,18 +17,17 @@ class AuthStateHandler extends StatefulWidget {
 }
 
 class _AuthStateHandlerState extends State<AuthStateHandler> {
-  // OPTIMIZED: Direct document lookup instead of .where() query
   Future<Map<String, dynamic>?> _getUserData(String uid) async {
     try {
       print('🔍 Fetching user data for UID: $uid');
 
-      final query = await FirebaseFirestore.instance
+      final querySnapshot = await FirebaseFirestore.instance
           .collection('conductors')
           .where('uid', isEqualTo: uid)
           .limit(1)
           .get()
           .timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 10),
         onTimeout: () {
           print('⏱️ TIMEOUT: User data fetch took too long');
           throw TimeoutException('User data timeout');
@@ -36,17 +35,17 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
       );
 
       print('✅ Firestore query completed');
-      print('📊 Documents found: ${query.docs.length}');
+      print('📊 Documents found: ${querySnapshot.docs.length}');
 
-      if (query.docs.isNotEmpty) {
-        final data = query.docs.first.data() as Map<String, dynamic>;
+      if (querySnapshot.docs.isNotEmpty) {
+        final data = querySnapshot.docs.first.data();
         final userRole = data['userRole'] ?? '';
         print('✅ User document found');
         print('👤 User role: $userRole');
         print('📄 User data: $data');
         return data;
       } else {
-        print('❌ No user document found');
+        print('❌ No user document found for uid: $uid');
         return null;
       }
     } on FirebaseException catch (e) {

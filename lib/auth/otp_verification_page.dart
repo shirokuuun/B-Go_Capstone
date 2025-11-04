@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:b_go/pages/terms_and_conditions_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:b_go/auth/auth_services.dart';
+import 'package:b_go/auth/custom_phone_auth.dart';
 
 class OTPVerificationPage extends StatefulWidget {
   final String phoneNumber;
@@ -49,12 +52,14 @@ class OTPTextInputFormatter extends TextInputFormatter {
         selection: TextSelection.collapsed(offset: 1),
       );
     }
-    
+
     return newValue;
   }
 }
 
 class _OTPVerificationPageState extends State<OTPVerificationPage> {
+  final AuthServices _authServices = AuthServices();
+  final CustomPhoneAuth _customPhoneAuth = CustomPhoneAuth();
 
   String _getOTP() {
     return otpControllers.map((controller) => controller.text).join();
@@ -71,8 +76,14 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
   bool _isVerifying = false;
   String? _errorMessage;
-  int _resendCountdown = 60;
+
+  // ✅ Updated: Changed to 30 seconds and using Timer for better control
+  int _resendCountdown = 30;
   bool _canResend = false;
+  Timer? _countdownTimer;
+
+  // ✅ Store the current verification ID (can be updated when resending)
+  String _currentVerificationId = '';
 
   // Custom TextInputFormatter for OTP fields
   late List<OTPTextInputFormatter> otpFormatters;
@@ -80,8 +91,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   @override
   void initState() {
     super.initState();
+    _currentVerificationId = widget.verificationId;
     _startResendCountdown();
-    
+
     // Initialize OTP formatters
     otpFormatters = List.generate(
       6,
@@ -91,7 +103,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
         focusNodes: focusNodes,
       ),
     );
-    
+
     // Add listeners to move focus to next field only
     for (int i = 0; i < 6; i++) {
       otpControllers[i].addListener(() {
@@ -100,12 +112,11 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
         }
       });
     }
-    
-
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     for (var controller in otpControllers) {
       controller.dispose();
     }
@@ -117,10 +128,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
   // Custom snackbar widget
   void _showCustomSnackBar(String message, String type) {
+    if (!mounted) return;
+
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -189,33 +202,212 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     );
   }
 
-
-
+  // ✅ Updated: Use Timer.periodic for more reliable countdown
   void _startResendCountdown() {
     setState(() {
       _canResend = false;
       _resendCountdown = 30;
     });
-    
-    Future.delayed(Duration(seconds: 1), () {
-      if (mounted) {
+
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
         if (_resendCountdown > 0) {
-          setState(() {
-            _resendCountdown--;
-          });
-          _startResendCountdown();
+          _resendCountdown--;
         } else {
-          setState(() {
-            _canResend = true;
+          _canResend = true;
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  // ✅ Get user-friendly error messages
+  String _getErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-phone-number':
+        return 'Invalid phone number format';
+      case 'too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'quota-exceeded':
+        return 'SMS quota exceeded. Please try again later.';
+      case 'app-not-authorized':
+        return 'App not authorized. Please try again.';
+      case 'captcha-check-failed':
+        return 'Verification failed. Please try again.';
+      case 'platform-error':
+        return 'Platform error. Please try again.';
+      case 'unknown-error':
+        return 'Failed to send OTP. Please try again.';
+      default:
+        return e.message ?? 'Verification failed';
+    }
+  }
+
+  // ✅ Handle auto verification (when SMS is auto-retrieved)
+  Future<void> _handleAutoVerification(PhoneAuthCredential credential) async {
+    try {
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        print('✅ User auto-signed in: ${user.uid}');
+
+        if (widget.isRegistration) {
+          // Save user to Firestore for registration
+          await _authServices.savePhoneUserToFirestore(
+            uid: user.uid,
+            phoneNumber: widget.phoneNumber,
+          );
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({
+            'isPhoneVerified': true,
+            'updatedAt': FieldValue.serverTimestamp(),
           });
+
+          await FirebaseAuth.instance.signOut();
+          print('✅ User signed out - redirecting to login page');
+        }
+
+        if (!mounted) return;
+        setState(() => _isVerifying = false);
+
+        if (widget.onVerificationSuccess != null) {
+          widget.onVerificationSuccess!();
         }
       }
+    } catch (e) {
+      print('❌ Auto verification error: $e');
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _errorMessage = 'Verification failed. Please try again.';
+      });
+    }
+  }
+
+  // ✅ NEW: Resend OTP function
+  Future<void> _resendOTP() async {
+    if (!_canResend || _isVerifying) return;
+
+    setState(() {
+      _isVerifying = true;
+      _errorMessage = null;
     });
+
+    try {
+      print('📱 Resending OTP to ${widget.phoneNumber}');
+
+      if (widget.isRegistration) {
+        // For registration - use custom phone auth without captcha
+        await _customPhoneAuth.sendOTPWithoutCaptcha(
+          phoneNumber: widget.phoneNumber,
+          onVerificationCompleted: (PhoneAuthCredential credential) async {
+            if (!mounted) return;
+            print('✅ Auto verification completed on resend');
+            await _handleAutoVerification(credential);
+          },
+          onVerificationFailed: (FirebaseAuthException e) {
+            if (!mounted) return;
+            print('❌ Resend verification failed: ${e.code} - ${e.message}');
+            setState(() {
+              _isVerifying = false;
+              _errorMessage = _getErrorMessage(e);
+            });
+            _showCustomSnackBar(_getErrorMessage(e), 'error');
+          },
+          onCodeSent: (String verificationId, int? resendToken) {
+            if (!mounted) return;
+            print('✅ OTP resent successfully');
+            setState(() {
+              _currentVerificationId = verificationId;
+              _isVerifying = false;
+              _errorMessage = null;
+            });
+
+            // Clear all OTP fields
+            for (var controller in otpControllers) {
+              controller.clear();
+            }
+            focusNodes[0].requestFocus();
+
+            _showCustomSnackBar(
+                'OTP has been resent to ${widget.phoneNumber}', 'success');
+            _startResendCountdown();
+          },
+          onCodeAutoRetrievalTimeout: (String verificationId) {
+            if (mounted) {
+              print('⏱️ OTP auto-retrieval timed out on resend');
+            }
+          },
+        );
+      } else {
+        // For login - use regular Firebase Auth
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: widget.phoneNumber,
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            if (!mounted) return;
+            print('✅ Auto verification completed on resend');
+            await _handleAutoVerification(credential);
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            if (!mounted) return;
+            print('❌ Resend verification failed: ${e.code} - ${e.message}');
+            setState(() {
+              _isVerifying = false;
+              _errorMessage = _getErrorMessage(e);
+            });
+            _showCustomSnackBar(_getErrorMessage(e), 'error');
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            if (!mounted) return;
+            print('✅ OTP resent successfully');
+            setState(() {
+              _currentVerificationId = verificationId;
+              _isVerifying = false;
+              _errorMessage = null;
+            });
+
+            // Clear all OTP fields
+            for (var controller in otpControllers) {
+              controller.clear();
+            }
+            focusNodes[0].requestFocus();
+
+            _showCustomSnackBar(
+                'OTP has been resent to ${widget.phoneNumber}', 'success');
+            _startResendCountdown();
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {
+            if (mounted) {
+              print('⏱️ OTP auto-retrieval timed out on resend');
+            }
+          },
+        );
+      }
+    } catch (e) {
+      print('❌ Error resending OTP: $e');
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _errorMessage = 'Failed to resend OTP. Please try again.';
+      });
+      _showCustomSnackBar('Failed to resend OTP. Please try again.', 'error');
+    }
   }
 
   Future<void> _verifyOTP() async {
     String otp = otpControllers.map((controller) => controller.text).join();
-    
+
     if (otp.length != 6) {
       setState(() {
         _errorMessage = "Please enter the complete 6-digit code";
@@ -229,34 +421,36 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     });
 
     try {
+      // ✅ Use the current verification ID (which may have been updated by resend)
       final credential = PhoneAuthProvider.credential(
-        verificationId: widget.verificationId,
+        verificationId: _currentVerificationId,
         smsCode: otp,
       );
 
       if (widget.isRegistration) {
         // For registration, verify the credential and create user document
         print('Starting registration flow for phone: ${widget.phoneNumber}');
-        
-        final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+
+        final userCredential =
+            await FirebaseAuth.instance.signInWithCredential(credential);
         final user = userCredential.user;
-        
+
         print('User authenticated with UID: ${user?.uid}');
-        
+
         if (user != null) {
           try {
             print('Creating user document in Firestore...');
-            
+
             // Check if user already exists
             final existingUser = await FirebaseFirestore.instance
                 .collection('users')
                 .doc(user.uid)
                 .get();
-            
+
             print('Checking if user exists in Firestore...');
             print('User UID: ${user.uid}');
             print('User exists: ${existingUser.exists}');
-            
+
             if (!existingUser.exists) {
               // Only create if user doesn't exist
               print('Creating new user document...');
@@ -270,57 +464,65 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                 'updatedAt': FieldValue.serverTimestamp(),
               };
               print('User data to save: $userData');
-              
-              await FirebaseFirestore.instance.collection('users').doc(user.uid).set(
-                userData,
-                SetOptions(merge: true)
-              );
+
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .set(userData, SetOptions(merge: true));
               print('New user document created successfully');
             } else {
-              print('User document already exists, updating phone verification status');
+              print(
+                  'User document already exists, updating phone verification status');
               // Update existing user's phone verification status
-              await FirebaseFirestore.instance.collection('users').doc(user.uid).update({
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({
                 'phone': widget.phoneNumber,
                 'isPhoneVerified': true,
                 'updatedAt': FieldValue.serverTimestamp(),
               });
               print('User document updated successfully');
             }
-            
+
             // If there's a callback, call it after successful user creation
             if (widget.onVerificationSuccess != null) {
               print('Calling verification success callback');
               setState(() {
                 _isVerifying = false;
               });
-              
+
               // Sign out before calling callback since callback handles navigation
               await FirebaseAuth.instance.signOut();
               print('User signed out before calling callback');
-              
+
               // Call the callback to handle navigation
               try {
                 widget.onVerificationSuccess!();
               } catch (e) {
                 print('Error in verification success callback: $e');
                 // If callback fails, fall back to default navigation
-                Navigator.pushReplacementNamed(context, '/phone_login');
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/phone_login');
+                }
               }
               return;
             }
-            
+
             // Otherwise, handle navigation here
             // Sign out after successfully creating/updating user document
             await FirebaseAuth.instance.signOut();
             print('User signed out after registration');
-            
+
             setState(() {
               _isVerifying = false;
             });
-            
+
             // Navigate to login page for registration flow
             print('Navigating to login page...');
-            Navigator.pushReplacementNamed(context, '/login');
+            if (mounted) {
+              Navigator.pushReplacementNamed(context, '/login');
+            }
             return;
           } catch (firestoreError) {
             print('Firestore error: $firestoreError');
@@ -334,28 +536,31 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       } else {
         // For login, sign in with the credential
         print('Starting login flow for phone: ${widget.phoneNumber}');
-        
+
         await FirebaseAuth.instance.signInWithCredential(credential);
         print('User logged in successfully');
-        
+
         setState(() {
           _isVerifying = false;
         });
-        
+
         // Navigate to user selection for login flow
         print('Navigating to user selection page...');
-        Navigator.pushReplacementNamed(context, '/user_selection');
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/user_selection');
+        }
         return;
       }
     } catch (e) {
       print('OTP verification error: $e');
+      if (!mounted) return;
       setState(() {
         _isVerifying = false;
-        _errorMessage = e.toString().contains('Failed to create user account') 
+        _errorMessage = e.toString().contains('Failed to create user account')
             ? e.toString().replaceAll('Exception: ', '')
             : "Incorrect code. Please try again";
       });
-      
+
       // Clear all OTP fields on error
       for (var controller in otpControllers) {
         controller.clear();
@@ -364,58 +569,16 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     }
   }
 
-  Future<void> _resendOTP() async {
-    if (!_canResend) return;
-
-    setState(() {
-      // Start resending process
-    });
-
-    try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: widget.phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) async {
-          // Auto-verification completed
-          if (widget.onVerificationSuccess != null) {
-            widget.onVerificationSuccess!();
-          }
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          setState(() {
-            _errorMessage = "Failed to resend OTP. Please try again.";
-          });
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          setState(() {
-            _errorMessage = null;
-          });
-          _startResendCountdown();
-          _showCustomSnackBar('OTP resent to ${widget.phoneNumber}', 'success');
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {
-          setState(() {
-            // Auto retrieval timeout
-          });
-        },
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = "Failed to resend OTP. Please try again.";
-      });
-    }
-  }
-
-
   @override
   Widget build(BuildContext context) {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     // Calculate responsive dimensions
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    
+
     // Responsive sizing
     final logoWidth = isMobile ? 120.0 : (isTablet ? 150.0 : 180.0);
     final titleFontSize = isMobile ? 20.0 : (isTablet ? 24.0 : 28.0);
@@ -423,7 +586,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
     final otpFieldSize = isMobile ? 40.0 : (isTablet ? 50.0 : 60.0);
     final otpFieldMargin = isMobile ? 4.0 : (isTablet ? 8.0 : 12.0);
     final buttonHeight = isMobile ? 50.0 : (isTablet ? 60.0 : 70.0);
-    
+
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
       body: SafeArea(
@@ -468,9 +631,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                       SizedBox(width: 48), // Balance the back button
                     ],
                   ),
-                  
+
                   SizedBox(height: 20),
-                  
+
                   // Instruction text
                   Center(
                     child: Text(
@@ -482,35 +645,38 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  
+
                   SizedBox(height: 30),
-                  
+
                   // OTP input fields - Made responsive to prevent overflow
                   Center(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         // Calculate available width for OTP fields
                         final availableWidth = constraints.maxWidth;
-                        final totalFieldWidth = (otpFieldSize * 6) + (otpFieldMargin * 10); // 6 fields + margins
-                        
+                        final totalFieldWidth = (otpFieldSize * 6) +
+                            (otpFieldMargin * 10); // 6 fields + margins
+
                         // If total width exceeds available width, reduce field size and margins
                         double finalFieldSize = otpFieldSize;
                         double finalMargin = otpFieldMargin;
-                        
+
                         if (totalFieldWidth > availableWidth) {
-                          finalMargin = math.max(2.0, (availableWidth - (otpFieldSize * 6)) / 10);
+                          finalMargin = math.max(
+                              2.0, (availableWidth - (otpFieldSize * 6)) / 10);
                           if (finalMargin < 2.0) {
                             finalFieldSize = (availableWidth - (2.0 * 10)) / 6;
                             finalMargin = 2.0;
                           }
                         }
-                        
+
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(6, (index) {
                             return Container(
-                              margin: EdgeInsets.symmetric(horizontal: finalMargin),
+                              margin:
+                                  EdgeInsets.symmetric(horizontal: finalMargin),
                               width: finalFieldSize,
                               height: finalFieldSize,
                               child: TextField(
@@ -530,10 +696,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide(
-                                      color: _errorMessage != null 
-                                          ? Colors.red 
-                                          : (otpControllers[index].text.isNotEmpty 
-                                              ? Color(0xFF0091AD) 
+                                      color: _errorMessage != null
+                                          ? Colors.red
+                                          : (otpControllers[index]
+                                                  .text
+                                                  .isNotEmpty
+                                              ? Color(0xFF0091AD)
                                               : Colors.grey.shade300),
                                       width: 2,
                                     ),
@@ -541,8 +709,8 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide(
-                                      color: _errorMessage != null 
-                                          ? Colors.red 
+                                      color: _errorMessage != null
+                                          ? Colors.red
                                           : Colors.grey.shade300,
                                       width: 2,
                                     ),
@@ -562,12 +730,14 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                                   setState(() {
                                     _errorMessage = null;
                                   });
-                                  
+
                                   // If field becomes empty and it's not the first field, move to previous
                                   if (value.isEmpty && index > 0) {
                                     // Small delay to ensure backspace completes
-                                    Future.delayed(Duration(milliseconds: 10), () {
-                                      if (mounted && otpControllers[index].text.isEmpty) {
+                                    Future.delayed(Duration(milliseconds: 10),
+                                        () {
+                                      if (mounted &&
+                                          otpControllers[index].text.isEmpty) {
                                         focusNodes[index - 1].requestFocus();
                                       }
                                     });
@@ -600,9 +770,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                       },
                     ),
                   ),
-                  
+
                   SizedBox(height: 20),
-                  
+
                   // Error message or verification status
                   if (_errorMessage != null)
                     Center(
@@ -626,28 +796,32 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  
+
                   SizedBox(height: 20),
-                  
-                  // Resend code option
+
+                  // ✅ Updated: Resend code option with 30-second countdown
                   Center(
                     child: GestureDetector(
-                      onTap: _canResend ? _resendOTP : null,
+                      onTap: _canResend && !_isVerifying ? _resendOTP : null,
                       child: Text(
-                        _canResend 
-                            ? "Resend code" 
+                        _canResend
+                            ? "Resend code"
                             : "Resend code in $_resendCountdown seconds",
                         style: GoogleFonts.outfit(
-                          color: _canResend ? Color(0xFF0091AD) : Colors.grey,
+                          color: _canResend && !_isVerifying
+                              ? Color(0xFF0091AD)
+                              : Colors.grey,
                           fontSize: isMobile ? 12.0 : 14.0,
                           decoration: TextDecoration.underline,
+                          fontWeight:
+                              _canResend ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                     ),
                   ),
-                  
+
                   SizedBox(height: 40),
-                  
+
                   // Continue button
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -661,14 +835,19 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: _isVerifying || _getOTP().isEmpty || _getOTP().length != 6 ? null : _verifyOTP,
+                      onPressed: _isVerifying ||
+                              _getOTP().isEmpty ||
+                              _getOTP().length != 6
+                          ? null
+                          : _verifyOTP,
                       child: _isVerifying
                           ? SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
                           : Text(
@@ -681,9 +860,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                             ),
                     ),
                   ),
-                  
+
                   SizedBox(height: 20),
-                  
+
                   // Terms and privacy policy
                   Center(
                     child: GestureDetector(
@@ -707,7 +886,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                             fontSize: isMobile ? 10.0 : 12.0,
                           ),
                           children: [
-                            TextSpan(text: 'By entering your number you agree to our '),
+                            TextSpan(
+                                text:
+                                    'By entering your number you agree to our '),
                             TextSpan(
                               text: 'Terms & Privacy Policy',
                               style: GoogleFonts.outfit(
@@ -721,7 +902,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                       ),
                     ),
                   ),
-                  
+
                   // Add bottom padding
                   SizedBox(height: isMobile ? 30.0 : 40.0),
                 ],

@@ -79,7 +79,7 @@ class AboutPage extends StatelessWidget {
                     ),
                   SizedBox(height: 8),
                   Text(
-                    'Welcome to B-Go — Your Smart Bus Companion in Batangas!',
+                    'Welcome to BusGo — Your Smart Bus Companion in Batangas!',
                     style: GoogleFonts.outfit(
                       fontWeight: FontWeight.w500,
                       fontSize: sectionFontSize,
@@ -92,12 +92,12 @@ class AboutPage extends StatelessWidget {
             ),
             SizedBox(height: 20),
             Text(
-              "B-Go is a mobile app created to improve the daily commuting experience for passengers of the Batangas Transport Cooperative (BATRASCO). Whether you're heading to school, work, or home, B-Go makes riding BATRASCO buses easier, more predictable, and more convenient.",
+              "BusGo is a mobile app created to improve the daily commuting experience for passengers of the Batangas Transport Cooperative (BATRASCO). Whether you're heading to school, work, or home, BusGo makes riding BATRASCO buses easier, more predictable, and more convenient.",
               style: GoogleFonts.outfit(fontSize: bodyFontSize),
               textAlign: TextAlign.justify,
             ),
             SizedBox(height: 24),
-            _sectionTitle('What B-Go Offers:', sectionFontSize),
+            _sectionTitle('What BusGo Offers:', sectionFontSize),
             _featureRow(Icons.location_on, 'Live Bus Tracking', 'Know exactly where your bus is and when it will arrive using real-time GPS updates.', iconSize, cyan, bodyFontSize),
             _featureRow(Icons.event_seat, 'Seat Availability Monitoring', 'Check how many seats are available before boarding so you can plan your trip more comfortably.', iconSize, cyan, bodyFontSize),
             _featureRow(Icons.confirmation_num, 'Ticket Management', 'The conductor issues and updates tickets through their interface, and you see accurate trip data in real-time.', iconSize, cyan, bodyFontSize),
@@ -117,7 +117,7 @@ class AboutPage extends StatelessWidget {
             SizedBox(height: 24),
             _sectionTitle('Powered By:', sectionFontSize),
             Text(
-              'The B-Go app is proudly developed in partnership with local developers and the BATRASCO cooperative, aiming to promote innovation in provincial transportation.',
+              'The BusGo app is proudly developed in partnership with local developers and the BATRASCO cooperative, aiming to promote innovation in provincial transportation.',
               style: GoogleFonts.outfit(fontSize: bodyFontSize),
               textAlign: TextAlign.justify,
             ),
@@ -126,7 +126,7 @@ class AboutPage extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    'Download the B-Go app and ride smarter with BATRASCO!',
+                    'Download the BusGo app and ride smarter with BATRASCO!',
                     style: GoogleFonts.outfit(
                       fontWeight: FontWeight.w500,
                       fontSize: bodyFontSize,
@@ -136,7 +136,7 @@ class AboutPage extends StatelessWidget {
                   ),
                   SizedBox(height: 8),
                   Text(
-                    'For feedback or support: support@bgo-batangas.com',
+                    'For feedback or support: batrascoservices@gmail.com',
                     style: GoogleFonts.outfit(fontSize: bodyFontSize, color: Colors.black54),
                     textAlign: TextAlign.center,
                   ),

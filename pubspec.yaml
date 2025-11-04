@@ -33,8 +33,8 @@ dependencies:
   http: ^1.5.0
   shared_preferences: ^2.5.3
   flutter_background_service: ^5.1.0
-  flutter_local_notifications: ^19.4.2
-  esc_pos_utils: ^1.1.0 # ✅ Use original package
+  flutter_local_notifications: ^19.5.0
+  esc_pos_utils: ^1.1.0
   esc_pos_printer: ^4.1.0
   image: ^3.0.2
 
@@ -47,7 +47,7 @@ dev_dependencies:
 flutter_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon.jpg"
+  image_path: "assets/busgo_logo.png"
 
 flutter:
   uses-material-design: true
@@ -78,3 +78,4 @@ flutter:
     - assets/phone-call.png
     - assets/batrasco_bus.jpg
     - assets/payment-qr.jpg
+    - assets/bus_portrait.jpg

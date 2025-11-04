@@ -1417,6 +1417,9 @@ class QRCodeFullScreenPage extends StatelessWidget {
     print('🔍 savePreTicket - User ID: ${user.uid}');
     print('🔍 savePreTicket - QR Data: $qrData');
 
+    // Decode QR data to extract all necessary fields
+    final qrDataMap = jsonDecode(qrData);
+
     // Calculate total fare from discount breakdown
     double totalFare = 0.0;
     if (discountBreakdown != null) {
@@ -1429,24 +1432,70 @@ class QRCodeFullScreenPage extends StatelessWidget {
       }
     }
 
+    // Convert passenger fares to proper format
+    List<double> passengerFaresList = [];
+    if (qrDataMap['passengerFares'] != null) {
+      for (var fare in qrDataMap['passengerFares']) {
+        if (fare is num) {
+          passengerFaresList.add(fare.toDouble());
+        } else if (fare is String) {
+          passengerFaresList.add(double.tryParse(fare) ?? 0.0);
+        }
+      }
+    }
+
     final data = {
-      'from': from,
-      'to': to,
-      'km': km,
-      'fare': fare,
+      // Basic trip info
+      'from': from.toString(),
+      'to': to.toString(),
+      'km': km.toString(),
+      'fromKm': (qrDataMap['fromKm'] is num)
+          ? qrDataMap['fromKm']
+          : (int.tryParse(qrDataMap['fromKm'].toString()) ?? 0),
+      'toKm': (qrDataMap['toKm'] is num)
+          ? qrDataMap['toKm']
+          : (int.tryParse(qrDataMap['toKm'].toString()) ?? 0),
+
+      // Fare information
+      'fare': (qrDataMap['fare'] is num)
+          ? qrDataMap['fare']
+          : (double.tryParse(qrDataMap['fare'].toString()) ?? 0.0),
       'totalFare': totalFare.toStringAsFixed(2),
+      'amount': totalFare.toStringAsFixed(2),
+      'discountAmount': '0.00',
+
+      // Passenger details
       'quantity': quantity,
+      'fareTypes': List<String>.from(qrDataMap['fareTypes'] ?? []),
+      'passengerFares': passengerFaresList,
+      'discountBreakdown': List<String>.from(discountBreakdown ?? []),
+
+      // QR and ticket info
       'qrData': qrData,
-      'discountBreakdown': discountBreakdown,
       'status': 'pending',
       'ticketType': 'preTicket',
+      'type': 'preTicket',
+
+      // Route information
+      'route': route.toString(),
+      'direction': qrDataMap['direction']?.toString() ?? '',
+      'placeCollection': qrDataMap['placeCollection']?.toString() ?? '',
+
+      // User and timestamps
+      'userId': user.uid,
       'createdAt': FieldValue.serverTimestamp(),
-      'route': route,
-      'direction': jsonDecode(qrData)['direction'],
-      'placeCollection': jsonDecode(qrData)['placeCollection'],
+
+      // Date and time
+      'date': qrDataMap['date']?.toString() ?? '',
+      'time': qrDataMap['time']?.toString() ?? '',
     };
 
     print('🔍 savePreTicket - Data to save: $data');
+    print('🔍 savePreTicket - Data types:');
+    print('  fromKm: ${data['fromKm'].runtimeType}');
+    print('  toKm: ${data['toKm'].runtimeType}');
+    print('  fare: ${data['fare'].runtimeType}');
+    print('  passengerFares: ${data['passengerFares'].runtimeType}');
 
     try {
       final docRef = await FirebaseFirestore.instance
@@ -1457,6 +1506,7 @@ class QRCodeFullScreenPage extends StatelessWidget {
       print('✅ savePreTicket - Successfully saved with ID: ${docRef.id}');
     } catch (e) {
       print('❌ savePreTicket - Error saving: $e');
+      print('❌ savePreTicket - Error details: ${e.toString()}');
       rethrow;
     }
   }

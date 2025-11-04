@@ -538,12 +538,55 @@ class _TripsPageState extends State<TripsPage> {
                           child: IconButton(
                             icon: Icon(Icons.logout, color: Colors.white),
                             onPressed: () async {
-                              final authServices = AuthServices();
-                              await authServices.signOut();
-                              // UPDATED: Navigate to auth_check
-                              if (context.mounted) {
-                                Navigator.pushNamedAndRemoveUntil(
-                                    context, '/auth_check', (route) => false);
+                              // Show confirmation dialog
+                              final shouldLogout = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: Text(
+                                    'Log Out',
+                                    style: GoogleFonts.outfit(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                  content: Text(
+                                    'Are you sure you want to log out?',
+                                    style: GoogleFonts.outfit(fontSize: 16),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(false),
+                                      child: Text(
+                                        'Cancel',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () => Navigator.of(context).pop(true),
+                                      child: Text(
+                                        'Log Out',
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+
+                              if (shouldLogout == true) {
+                                final authServices = AuthServices();
+                                await authServices.signOut();
+                                // UPDATED: Navigate to auth_check
+                                if (context.mounted) {
+                                  Navigator.pushNamedAndRemoveUntil(
+                                      context, '/auth_check', (route) => false);
+                                }
                               }
                             },
                           ),

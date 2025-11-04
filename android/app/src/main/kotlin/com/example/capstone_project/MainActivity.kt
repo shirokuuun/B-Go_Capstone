@@ -1,13 +1,22 @@
 package com.example.capstone_project
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.util.Base64
+import androidx.core.app.NotificationCompat
+import androidx.core.app.ActivityCompat
+import android.Manifest
+import android.content.pm.PackageManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,12 +25,24 @@ import java.io.FileOutputStream
 import java.io.ByteArrayOutputStream
 
 class MainActivity: FlutterActivity() {
-    private val CHANNEL = "com.bgo.printer/print"
+    // Channel for printer functionality
+    private val PRINTER_CHANNEL = "com.bgo.printer/print"
+    
+    // Channel for foreground service (geofencing)
+    private val GEOFENCING_CHANNEL = "com.example.capstone_project/foreground_service"
+    
+    // Notification configuration for foreground service
+    private val NOTIFICATION_CHANNEL_ID = "geofencing_service_channel"
+    private val NOTIFICATION_ID = 1
+    private val REQUEST_LOCATION_PERMISSION = 1
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        // ==========================================
+        // PRINTER CHANNEL (Your existing functionality)
+        // ==========================================
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PRINTER_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "isPrinterAvailable" -> {
                     result.success(true)
@@ -42,8 +63,32 @@ class MainActivity: FlutterActivity() {
                 }
             }
         }
+        
+        // ==========================================
+        // GEOFENCING CHANNEL (New functionality)
+        // ==========================================
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, GEOFENCING_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startForegroundService" -> {
+                    startForegroundService()
+                    result.success(true)
+                }
+                "stopForegroundService" -> {
+                    stopForegroundService()
+                    result.success(true)
+                }
+                "requestBackgroundLocationPermission" -> {
+                    requestBackgroundLocationPermission()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
+    // ==========================================
+    // PRINTER FUNCTIONALITY (Your existing code)
+    // ==========================================
     private fun printToBuiltInPrinter(content: String, logoBytes: ByteArray?): Boolean {
         return try {
             // Method 1: Try direct print intent
@@ -218,5 +263,80 @@ class MainActivity: FlutterActivity() {
         }
         
         return bytes.toByteArray()
+    }
+
+    // ==========================================
+    // GEOFENCING FUNCTIONALITY (New code)
+    // ==========================================
+    
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Geofencing Service"
+            val descriptionText = "Tracking your location for passenger drop-off detection"
+            val importance = NotificationManager.IMPORTANCE_LOW
+            val channel = NotificationChannel(NOTIFICATION_CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+            
+            val notificationManager: NotificationManager =
+                getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun startForegroundService() {
+        createNotificationChannel()
+
+        val notificationIntent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            notificationIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notification = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("B-Go Conductor Active")
+            .setContentText("Tracking location for passenger drop-off detection")
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val serviceIntent = Intent(this, ForegroundLocationService::class.java)
+            startForegroundService(serviceIntent)
+        }
+
+        // Show notification
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun stopForegroundService() {
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val serviceIntent = Intent(this, ForegroundLocationService::class.java)
+            stopService(serviceIntent)
+        }
+    }
+
+    private fun requestBackgroundLocationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION),
+                    REQUEST_LOCATION_PERMISSION
+                )
+            }
+        }
     }
 }

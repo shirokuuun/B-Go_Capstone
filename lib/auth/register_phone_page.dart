@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:b_go/pages/terms_and_conditions_page.dart';
@@ -44,7 +45,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -115,7 +116,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
   Future<void> _sendOTP() async {
     if (!agreedToTerms) {
-      _showCustomSnackBar('You must agree to the Terms and Conditions to sign up.', 'warning');
+      _showCustomSnackBar(
+          'You must agree to the Terms and Conditions to sign up.', 'warning');
       return;
     }
 
@@ -129,43 +131,88 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     if (phone.startsWith('0')) phone = phone.substring(1);
     String fullPhone = selectedCountryCode + phone;
 
-    // Check if phone number already exists
-    bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
-    if (isRegistered) {
-      _showCustomSnackBar('This phone number is already registered. Please login instead.', 'error');
-      return;
-    }
-
     setState(() => _isLoading = true);
 
+    // ✅ FIX: Wrap in try-catch to handle permission errors gracefully
     try {
-      // Use the custom phone auth service that bypasses reCAPTCHA
+      print('📱 Checking if phone number is registered: $fullPhone');
+
+      // Check if phone number already exists
+      bool isRegistered =
+          await _authServices.isPhoneNumberRegistered(fullPhone);
+
+      if (isRegistered) {
+        setState(() => _isLoading = false);
+        _showCustomSnackBar(
+            'This phone number is already registered. Please login instead.',
+            'error');
+        return;
+      }
+
+      // Phone number is NOT registered, proceed with registration
       await _customPhoneAuth.sendOTPWithoutCaptcha(
         phoneNumber: fullPhone,
         onVerificationCompleted: (PhoneAuthCredential credential) async {
           // This will be called if verification completes automatically
           // Usually happens on Android when SMS is auto-retrieved
+          print('✅ Auto verification completed');
           try {
-            UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+            UserCredential userCredential =
+                await FirebaseAuth.instance.signInWithCredential(credential);
             final user = userCredential.user;
+
             if (user != null) {
-              // Save user to Firestore
+              print('✅ User auto-signed in: ${user.uid}');
+
+              // Save user to Firestore with isPhoneVerified flag
               await _authServices.savePhoneUserToFirestore(
                 uid: user.uid,
                 phoneNumber: fullPhone,
               );
+
+              // Ensure isPhoneVerified is set
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .update({
+                'isPhoneVerified': true,
+                'updatedAt': FieldValue.serverTimestamp(),
+              });
+
+              print('✅ User data saved to Firestore');
+
+              // ✅ SIGN OUT after registration to force re-login
+              await FirebaseAuth.instance.signOut();
+              print('✅ User signed out - redirecting to login page');
+
+              if (!mounted) return;
+
               setState(() => _isLoading = false);
-              Navigator.pushReplacementNamed(context, '/user_selection');
+
+              _showCustomSnackBar(
+                  'Registration successful! Please log in to continue.',
+                  'success');
+
+              // Small delay to show snackbar
+              await Future.delayed(const Duration(milliseconds: 800));
+
+              if (!mounted) return;
+
+              // ✅ Redirect to login page
+              Navigator.pushReplacementNamed(context, '/phone_login');
             }
           } catch (e) {
+            print('❌ Auto verification error: $e');
             setState(() => _isLoading = false);
-            _showCustomSnackBar('Registration failed. Please try again.', 'error');
+            _showCustomSnackBar(
+                'Registration failed. Please try again.', 'error');
           }
         },
         onVerificationFailed: (FirebaseAuthException e) {
+          print('❌ Verification failed: ${e.code} - ${e.message}');
           setState(() => _isLoading = false);
           String errorMessage = 'Verification failed';
-          
+
           // Handle specific error cases
           switch (e.code) {
             case 'invalid-phone-number':
@@ -192,17 +239,18 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             default:
               errorMessage = e.message ?? 'Verification failed';
           }
-          
+
           _showCustomSnackBar(errorMessage, 'error');
         },
         onCodeSent: (String verificationId, int? resendToken) {
+          print('✅ OTP sent successfully');
           setState(() {
             _isLoading = false;
           });
-          
+
           // Show success message
           _showCustomSnackBar('OTP sent successfully to $fullPhone', 'success');
-          
+
           // Navigate to OTP verification page
           Navigator.push(
             context,
@@ -212,66 +260,332 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                 verificationId: verificationId,
                 isRegistration: true,
                 onVerificationSuccess: () async {
-                  // After successful OTP verification and user creation, navigate to user selection
-                  print('OTP verification successful, navigating to user selection');
-                  Navigator.pushReplacementNamed(context, '/user_selection');
+                  // ✅ MODIFIED: After successful OTP verification during registration
+                  print('✅ OTP verification successful during registration');
+
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    // Ensure isPhoneVerified is set
+                    await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .update({
+                      'isPhoneVerified': true,
+                      'updatedAt': FieldValue.serverTimestamp(),
+                    });
+
+                    // ✅ SIGN OUT after registration to force re-login
+                    await FirebaseAuth.instance.signOut();
+                    print(
+                        '✅ User signed out after registration - redirecting to login');
+                  }
+
+                  if (!mounted) return;
+
+                  _showCustomSnackBar(
+                      'Registration successful! Please log in to continue.',
+                      'success');
+
+                  // Small delay to show snackbar
+                  await Future.delayed(const Duration(milliseconds: 800));
+
+                  if (!mounted) return;
+
+                  // ✅ Redirect to login page instead of user selection
+                  Navigator.pushNamedAndRemoveUntil(
+                    context,
+                    '/phone_login',
+                    (route) => false,
+                  );
                 },
               ),
             ),
           );
         },
         onCodeAutoRetrievalTimeout: (String verificationId) {
-          // Show timeout message
-          _showCustomSnackBar('OTP auto-retrieval timed out. Please enter the code manually.', 'warning');
+          print('⏱️ OTP auto-retrieval timed out');
+
+          // ✅ Check if widget is still mounted before showing snackbar
+          if (mounted) {
+            _showCustomSnackBar(
+                'OTP auto-retrieval timed out. Please enter the code manually.',
+                'warning');
+          }
         },
       );
+    } on FirebaseException catch (e) {
+      print('❌ Firestore error: ${e.code} - ${e.message}');
+
+      if (e.code == 'permission-denied') {
+        // If permission denied, skip the check and proceed with registration
+        print('⚠️ Permission denied, proceeding with registration anyway');
+        _showCustomSnackBar('Proceeding with registration...', 'warning');
+
+        try {
+          await _customPhoneAuth.sendOTPWithoutCaptcha(
+            phoneNumber: fullPhone,
+            onVerificationCompleted: (PhoneAuthCredential credential) async {
+              print('✅ Auto verification completed');
+              try {
+                UserCredential userCredential = await FirebaseAuth.instance
+                    .signInWithCredential(credential);
+                final user = userCredential.user;
+
+                if (user != null) {
+                  print('✅ User auto-signed in: ${user.uid}');
+
+                  await _authServices.savePhoneUserToFirestore(
+                    uid: user.uid,
+                    phoneNumber: fullPhone,
+                  );
+
+                  await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(user.uid)
+                      .update({
+                    'isPhoneVerified': true,
+                    'updatedAt': FieldValue.serverTimestamp(),
+                  });
+
+                  print('✅ User data saved to Firestore');
+
+                  await FirebaseAuth.instance.signOut();
+                  print('✅ User signed out - redirecting to login page');
+
+                  if (!mounted) return;
+
+                  setState(() => _isLoading = false);
+
+                  _showCustomSnackBar(
+                      'Registration successful! Please log in to continue.',
+                      'success');
+
+                  await Future.delayed(const Duration(milliseconds: 800));
+
+                  if (!mounted) return;
+
+                  Navigator.pushReplacementNamed(context, '/phone_login');
+                }
+              } catch (e) {
+                print('❌ Auto verification error: $e');
+                setState(() => _isLoading = false);
+                _showCustomSnackBar(
+                    'Registration failed. Please try again.', 'error');
+              }
+            },
+            onVerificationFailed: (FirebaseAuthException e) {
+              print('❌ Verification failed: ${e.code} - ${e.message}');
+              setState(() => _isLoading = false);
+              String errorMessage = 'Verification failed';
+
+              switch (e.code) {
+                case 'invalid-phone-number':
+                  errorMessage = 'Invalid phone number format';
+                  break;
+                case 'too-many-requests':
+                  errorMessage = 'Too many attempts. Please try again later.';
+                  break;
+                case 'quota-exceeded':
+                  errorMessage = 'SMS quota exceeded. Please try again later.';
+                  break;
+                case 'app-not-authorized':
+                  errorMessage = 'App not authorized. Please try again.';
+                  break;
+                case 'captcha-check-failed':
+                  errorMessage = 'Verification failed. Please try again.';
+                  break;
+                case 'platform-error':
+                  errorMessage = 'Platform error. Please try again.';
+                  break;
+                case 'unknown-error':
+                  errorMessage = 'Failed to send OTP. Please try again.';
+                  break;
+                default:
+                  errorMessage = e.message ?? 'Verification failed';
+              }
+
+              _showCustomSnackBar(errorMessage, 'error');
+            },
+            onCodeSent: (String verificationId, int? resendToken) {
+              print('✅ OTP sent successfully');
+              setState(() {
+                _isLoading = false;
+              });
+
+              _showCustomSnackBar(
+                  'OTP sent successfully to $fullPhone', 'success');
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => OTPVerificationPage(
+                    phoneNumber: fullPhone,
+                    verificationId: verificationId,
+                    isRegistration: true,
+                    onVerificationSuccess: () async {
+                      print(
+                          '✅ OTP verification successful during registration');
+
+                      final user = FirebaseAuth.instance.currentUser;
+                      if (user != null) {
+                        await FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(user.uid)
+                            .update({
+                          'isPhoneVerified': true,
+                          'updatedAt': FieldValue.serverTimestamp(),
+                        });
+
+                        await FirebaseAuth.instance.signOut();
+                        print(
+                            '✅ User signed out after registration - redirecting to login');
+                      }
+
+                      if (!mounted) return;
+
+                      _showCustomSnackBar(
+                          'Registration successful! Please log in to continue.',
+                          'success');
+
+                      await Future.delayed(const Duration(milliseconds: 800));
+
+                      if (!mounted) return;
+
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/phone_login',
+                        (route) => false,
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+            onCodeAutoRetrievalTimeout: (String verificationId) {
+              print('⏱️ OTP auto-retrieval timed out');
+
+              // ✅ Check if widget is still mounted before showing snackbar
+              if (mounted) {
+                _showCustomSnackBar(
+                    'OTP auto-retrieval timed out. Please enter the code manually.',
+                    'warning');
+              }
+            },
+          );
+        } catch (e) {
+          print('❌ Error sending OTP: $e');
+          setState(() => _isLoading = false);
+          _showCustomSnackBar('Failed to send OTP. Please try again.', 'error');
+        }
+      } else {
+        setState(() => _isLoading = false);
+        _showCustomSnackBar('An error occurred. Please try again.', 'error');
+      }
     } catch (e) {
+      print('❌ Unexpected error: $e');
       setState(() => _isLoading = false);
-      _showCustomSnackBar('Failed to send OTP. Please try again.', 'error');
+      _showCustomSnackBar(
+          'An unexpected error occurred. Please try again.', 'error');
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     // Responsive sizing
-    final logoSize = isMobile ? 120.0 : isTablet ? 140.0 : 150.0;
-    final titleFontSize = isMobile ? 35.0 : isTablet ? 40.0 : 45.0;
-    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final buttonFontSize = isMobile ? 18.0 : isTablet ? 19.0 : 20.0;
-    final textFieldFontSize = isMobile ? 14.0 : isTablet ? 15.0 : 16.0;
-    final hintFontSize = isMobile ? 12.0 : isTablet ? 13.0 : 14.0;
-    final registerFontSize = isMobile ? 13.0 : isTablet ? 13.0 : 14.0;
-    
+    final logoSize = isMobile
+        ? 120.0
+        : isTablet
+            ? 140.0
+            : 150.0;
+    final titleFontSize = isMobile
+        ? 35.0
+        : isTablet
+            ? 40.0
+            : 45.0;
+    final subtitleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final buttonFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 19.0
+            : 20.0;
+    final textFieldFontSize = isMobile
+        ? 14.0
+        : isTablet
+            ? 15.0
+            : 16.0;
+    final hintFontSize = isMobile
+        ? 12.0
+        : isTablet
+            ? 13.0
+            : 14.0;
+    final registerFontSize = isMobile
+        ? 13.0
+        : isTablet
+            ? 13.0
+            : 14.0;
+
     // Responsive padding and spacing
-    final horizontalPadding = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
-    final fieldSpacing = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
-    final containerPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
-    
+    final horizontalPadding = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final fieldSpacing = isMobile
+        ? 20.0
+        : isTablet
+            ? 25.0
+            : 30.0;
+    final containerPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final buttonHeight = isMobile
+        ? 50.0
+        : isTablet
+            ? 55.0
+            : 60.0;
+
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
-              vertical: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
+              vertical: isMobile
+                  ? 20.0
+                  : isTablet
+                      ? 25.0
+                      : 30.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Logo section - now scrollable
-              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+              SizedBox(
+                  height: isMobile
+                      ? 40.0
+                      : isTablet
+                          ? 50.0
+                          : 60.0),
               Image.asset(
                 'assets/batrasco-logo.png',
                 width: logoSize,
                 fit: BoxFit.contain,
               ),
-              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
+              SizedBox(
+                  height: isMobile
+                      ? 40.0
+                      : isTablet
+                          ? 50.0
+                          : 60.0),
 
               // Registration form content
               Column(
@@ -300,10 +614,11 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                     ),
                   ),
                   SizedBox(height: fieldSpacing),
-                  
+
                   // Phone number field
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding * 0.9),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Color(0xFFE5E9F0),
@@ -317,7 +632,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                         children: [
                           Padding(
                             padding: EdgeInsets.only(
-                                left: containerPadding * 0.8, right: containerPadding * 0.2),
+                                left: containerPadding * 0.8,
+                                right: containerPadding * 0.2),
                             child: DropdownButtonHideUnderline(
                               child: DropdownButton<String>(
                                 value: selectedCountryCode,
@@ -366,7 +682,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
                   // Terms and conditions checkbox
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding * 0.9),
                     child: Row(
                       children: [
                         Checkbox(
@@ -381,8 +698,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           child: RichText(
                             text: TextSpan(
                               style: GoogleFonts.outfit(
-                                  color: Colors.black,
-                                  fontSize: hintFontSize),
+                                  color: Colors.black, fontSize: hintFontSize),
                               children: [
                                 TextSpan(
                                   text: 'I agree to the ',
@@ -393,7 +709,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                                       Navigator.push(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => TermsAndConditionsPage(showRegisterPage: () {}),
+                                          builder: (context) =>
+                                              TermsAndConditionsPage(
+                                                  showRegisterPage: () {}),
                                         ),
                                       );
                                     },
@@ -415,17 +733,19 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                     ),
                   ),
                   SizedBox(height: fieldSpacing),
-                  
+
                   // Send OTP button
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding * 0.9),
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: phoneController.text.trim().isNotEmpty 
-                                  ? Color(0xFF0091AD) 
-                                  : Colors.grey,
+                              backgroundColor:
+                                  phoneController.text.trim().isNotEmpty
+                                      ? Color(0xFF0091AD)
+                                      : Colors.grey,
                               minimumSize: Size(double.infinity, buttonHeight),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -442,9 +762,14 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                             ),
                           ),
                   ),
-                  
-                  SizedBox(height: isMobile ? 50.0 : isTablet ? 60.0 : 70.0),
-                  
+
+                  SizedBox(
+                      height: isMobile
+                          ? 50.0
+                          : isTablet
+                              ? 60.0
+                              : 70.0),
+
                   // Login link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -458,7 +783,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          Navigator.pushReplacementNamed(context, '/login');
+                          Navigator.pushReplacementNamed(
+                              context, '/phone_login');
                         },
                         child: Text(
                           ' Login',
@@ -471,7 +797,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       )
                     ],
                   ),
-                  
+
                   // Add bottom padding
                   SizedBox(height: isMobile ? 30.0 : 40.0),
                 ],

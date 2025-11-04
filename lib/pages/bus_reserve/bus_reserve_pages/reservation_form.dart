@@ -205,7 +205,7 @@ class _ReservationFormState extends State<ReservationForm> {
 
     if (!_isValidPassengerCount(passengerCount)) {
       _showCustomSnackBar(
-          'Please enter a valid number of passengers (1-50)', 'warning');
+          'Please enter a valid number of passengers (1-22)', 'warning');
       return;
     }
 
@@ -335,7 +335,9 @@ class _ReservationFormState extends State<ReservationForm> {
   bool _isValidPassengerCount(String count) {
     if (count.isEmpty) return false;
     final number = int.tryParse(count);
-    return number != null && number > 0 && number <= 50;
+    return number != null &&
+        number > 0 &&
+        number <= 22; 
   }
 
   Future<void> _selectDepartureDate() async {

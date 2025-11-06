@@ -438,6 +438,27 @@ class _TripsPageState extends State<TripsPage> {
     }
   }
 
+  // ✅ NEW: Helper method to format fare with 2 decimal places
+  String _formatFare(dynamic fare) {
+    if (fare == null) return '0.00';
+    
+    // If it's already a string, try to parse it
+    if (fare is String) {
+      final parsed = double.tryParse(fare);
+      if (parsed != null) {
+        return parsed.toStringAsFixed(2);
+      }
+      return fare; // Return as-is if can't parse
+    }
+    
+    // If it's a number, format it
+    if (fare is num) {
+      return fare.toStringAsFixed(2);
+    }
+    
+    return fare.toString();
+  }
+
   String getRouteLabel(String placeCollection) {
     final route = widget.route;
 
@@ -486,6 +507,20 @@ class _TripsPageState extends State<TripsPage> {
     }
 
     return 'Unknown Route';
+  }
+
+  // ✅ Helper method to get display name for filter button
+  String _getFilterDisplayName(String filterValue) {
+    switch (filterValue) {
+      case 'preTicket':
+        return 'Pre-tickets';
+      case 'preBooking':
+        return 'Pre-bookings';
+      case 'Manual':
+        return 'Manual';
+      default:
+        return 'All';
+    }
   }
 
   @override
@@ -868,7 +903,7 @@ class _TripsPageState extends State<TripsPage> {
                                               GoogleFonts.outfit(fontSize: 14),
                                         ),
                                         Text(
-                                          'Total Amount: $totalFare PHP',
+                                          'Total Amount: ${_formatFare(totalFare)} PHP',
                                           style: GoogleFonts.outfit(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w600,
@@ -1005,7 +1040,7 @@ class _TripsPageState extends State<TripsPage> {
                                       ),
                                       SizedBox(width: 8),
                                       Text(
-                                        '${ticket['totalFare']} pesos',
+                                        '${_formatFare(ticket['totalFare'])} pesos',
                                         style: GoogleFonts.outfit(
                                           fontWeight: FontWeight.bold,
                                           color: Color(0xFF0091AD),
@@ -1095,19 +1130,5 @@ class _TripsPageState extends State<TripsPage> {
         ],
       ),
     );
-  }
-
-  // ✅ Helper method to get display name for filter button
-  String _getFilterDisplayName(String filterValue) {
-    switch (filterValue) {
-      case 'preTicket':
-        return 'Pre-tickets';
-      case 'preBooking':
-        return 'Pre-bookings';
-      case 'Manual':
-        return 'Manual';
-      default:
-        return 'All';
-    }
   }
 }

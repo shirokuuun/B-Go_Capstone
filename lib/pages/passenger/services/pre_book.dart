@@ -103,52 +103,11 @@ class PreBook extends StatefulWidget {
           print(
               '✅ PreBook: Booking is ACCOMPLISHED - preserving and copying to remittance');
 
-          // Copy to remittance so it shows in trip pages
-          try {
-            print('📦 PreBook: Copying accomplished booking to remittance...');
-
-            await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorId)
-                .collection('remittance')
-                .doc(date)
-                .collection('tickets')
-                .doc(preBookingId)
-                .set({
-              'from': preBookingData['from'],
-              'to': preBookingData['to'],
-              'totalFare': preBookingData['totalFare'],
-              'quantity': preBookingData['quantity'],
-              'discountAmount': preBookingData['discountAmount'] ?? 0,
-              'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
-              'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
-              'startKm': preBookingData['fromKm'] ?? 0,
-              'endKm': preBookingData['toKm'] ?? 0,
-              'timestamp': preBookingData['timestamp'],
-              'status': 'accomplished',
-              'ticketType': 'preBooking',
-              'boardedAt': preBookingData['boardedAt'],
-              'scannedBy': preBookingData['scannedBy'],
-              'boardingStatus': preBookingData['boardingStatus'],
-              'dropOffTimestamp': preBookingData['dropOffTimestamp'],
-              'dropOffLocation': preBookingData['dropOffLocation'],
-              'geofenceStatus': preBookingData['geofenceStatus'],
-              'preBookingId': preBookingId,
-              'userId': originalUserId,
-              'tripId': preBookingData['tripId'],
-              'paidAt': preBookingData['paidAt'],
-              'route': preBookingData['route'],
-              'direction': preBookingData['direction'],
-            });
-
-            print(
-                '✅ PreBook: Successfully copied accomplished booking to remittance');
-            print(
-                '   Path: conductors/$conductorId/remittance/$date/tickets/$preBookingId');
-          } catch (e) {
-            print(
-                '❌ PreBook: Error copying accomplished booking to remittance: $e');
-          }
+          // ✅ Skip remittance copy - already saved during payment
+          print(
+              '⏭️ PreBook: Booking already in remittance (from payment), skipping copy');
+          print(
+              '   Path: conductors/$conductorId/remittance/$date/tickets/$preBookingId');
 
           accomplishedCount++;
           continue;
@@ -214,47 +173,9 @@ class PreBook extends StatefulWidget {
             print('   Booking ID: $preBookingId');
           }
 
-          // Copy to remittance so it shows in trip pages
-          try {
-            print('📦 PreBook: Copying accomplished booking to remittance...');
-
-            await FirebaseFirestore.instance
-                .collection('conductors')
-                .doc(conductorId)
-                .collection('remittance')
-                .doc(date)
-                .collection('tickets')
-                .doc(preBookingId)
-                .set({
-              'from': preBookingData['from'],
-              'to': preBookingData['to'],
-              'totalFare': preBookingData['totalFare'],
-              'quantity': preBookingData['quantity'],
-              'discountAmount': preBookingData['discountAmount'] ?? 0,
-              'discountBreakdown': preBookingData['discountBreakdown'] ?? [],
-              'farePerPassenger': preBookingData['farePerPassenger'] ?? [],
-              'startKm': preBookingData['fromKm'] ?? 0,
-              'endKm': preBookingData['toKm'] ?? 0,
-              'timestamp': preBookingData['timestamp'],
-              'status': 'accomplished',
-              'ticketType': 'preBooking',
-              'boardedAt': preBookingData['boardedAt'],
-              'scannedBy': preBookingData['scannedBy'],
-              'boardingStatus': 'accomplished',
-              'preBookingId': preBookingId,
-              'userId': originalUserId,
-              'tripId': preBookingData['tripId'],
-              'paidAt': preBookingData['paidAt'],
-              'route': preBookingData['route'],
-              'direction': preBookingData['direction'],
-            }, SetOptions(merge: true));
-
-            print(
-                '✅ PreBook: Successfully copied accomplished booking to remittance');
-          } catch (e) {
-            print(
-                '❌ PreBook: Error copying accomplished booking to remittance: $e');
-          }
+          // ✅ Skip remittance copy - already saved during payment
+          print(
+              '⏭️ PreBook: Booking already in remittance (from payment), skipping copy');
 
           accomplishedCount++;
         }
@@ -2063,10 +1984,12 @@ class _ReceiptModalState extends State<_ReceiptModal> {
     Position? passengerLocation = widget.currentLocation;
 
     if (passengerLocation == null) {
-      print('⚠️ PreBook: No location found in modal, trying to get location again...');
+      print(
+          '⚠️ PreBook: No location found in modal, trying to get location again...');
       try {
         final locationService = PassengerLocationService();
-        passengerLocation = await locationService.getCurrentLocation(context: context);
+        passengerLocation =
+            await locationService.getCurrentLocation(context: context);
         if (passengerLocation != null) {
           print('✅ PreBook: Successfully captured location on retry');
         } else {
@@ -2077,10 +2000,15 @@ class _ReceiptModalState extends State<_ReceiptModal> {
       }
     }
 
-    print('💾 PreBook: Saving booking with passenger location: ${passengerLocation?.latitude}, ${passengerLocation?.longitude}');
+    print(
+        '💾 PreBook: Saving booking with passenger location: ${passengerLocation?.latitude}, ${passengerLocation?.longitude}');
 
-    final actualDirection = widget.selectedConductor?['activeTrip']?['direction'] ?? widget.directionLabel;
-    final actualPlaceCollection = widget.selectedConductor?['activeTrip']?['placeCollection'] ?? widget.selectedPlaceCollection;
+    final actualDirection = widget.selectedConductor?['activeTrip']
+            ?['direction'] ??
+        widget.directionLabel;
+    final actualPlaceCollection = widget.selectedConductor?['activeTrip']
+            ?['placeCollection'] ??
+        widget.selectedPlaceCollection;
 
     final qrData = {
       'type': 'preBooking',
@@ -2126,7 +2054,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
       'toLongitude': widget.toPlace['longitude'] ?? 0.0,
       'passengerLatitude': passengerLocation?.latitude ?? 0.0,
       'passengerLongitude': passengerLocation?.longitude ?? 0.0,
-      'passengerLocationTimestamp': passengerLocation != null ? FieldValue.serverTimestamp() : null,
+      'passengerLocationTimestamp':
+          passengerLocation != null ? FieldValue.serverTimestamp() : null,
       'fare': baseFare,
       'quantity': widget.quantity,
       'amount': totalAmount,
@@ -2155,7 +2084,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
           .collection('preBookings')
           .add(data);
 
-      print('✅ PreBook: Booking saved to user collection with ID: ${docRef.id}');
+      print(
+          '✅ PreBook: Booking saved to user collection with ID: ${docRef.id}');
 
       // Update qrData to include the booking ID
       qrData['bookingId'] = docRef.id;
@@ -2167,7 +2097,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
       });
 
       print('✅ PreBook: Updated QR data with booking ID: ${docRef.id}');
-      print('✅ PreBook: Booking will be saved to conductor collections AFTER payment is confirmed');
+      print(
+          '✅ PreBook: Booking will be saved to conductor collections AFTER payment is confirmed');
 
       // ❌ DO NOT save to conductor collections here!
       // This will be done in confirm_payment.dart after payment succeeds
@@ -2182,22 +2113,32 @@ class _ReceiptModalState extends State<_ReceiptModal> {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
-    final formattedDate = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final formattedTime = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    final actualDirection = widget.selectedConductor?['activeTrip']?['direction'] ?? widget.directionLabel;
-    final startKm = widget.fromPlace['km'] is num ? widget.fromPlace['km'] : num.tryParse(widget.fromPlace['km'].toString()) ?? 0;
-    final endKm = widget.toPlace['km'] is num ? widget.toPlace['km'] : num.tryParse(widget.toPlace['km'].toString()) ?? 0;
+    final formattedDate =
+        "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final formattedTime =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final actualDirection = widget.selectedConductor?['activeTrip']
+            ?['direction'] ??
+        widget.directionLabel;
+    final startKm = widget.fromPlace['km'] is num
+        ? widget.fromPlace['km']
+        : num.tryParse(widget.fromPlace['km'].toString()) ?? 0;
+    final endKm = widget.toPlace['km'] is num
+        ? widget.toPlace['km']
+        : num.tryParse(widget.toPlace['km'].toString()) ?? 0;
     final baseFare = computeFullTripFare(widget.route);
-    
+
     List<String> discountBreakdown = [];
     List<double> passengerFares = [];
     double totalAmount = 0.0;
-    
+
     for (int i = 0; i < widget.fareTypes.length; i++) {
       final type = widget.fareTypes[i];
       double passengerFare;
       bool isDiscounted = false;
-      if (type.toLowerCase() == 'pwd' || type.toLowerCase() == 'senior' || type.toLowerCase() == 'student') {
+      if (type.toLowerCase() == 'pwd' ||
+          type.toLowerCase() == 'senior' ||
+          type.toLowerCase() == 'student') {
         passengerFare = baseFare * 0.8;
         isDiscounted = true;
       } else {
@@ -2216,7 +2157,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
         return !_isSaving;
       },
       child: AlertDialog(
-        title: Text('Receipt', style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
+        title: Text('Receipt',
+            style: GoogleFonts.outfit(fontSize: 20, color: Colors.black)),
         content: ConstrainedBox(
           constraints: BoxConstraints(
             maxWidth: MediaQuery.of(context).size.width * 0.9,
@@ -2227,21 +2169,40 @@ class _ReceiptModalState extends State<_ReceiptModal> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Route: ${widget.route}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Direction: $actualDirection', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Date: $formattedDate', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Time: $formattedTime', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('From: ${widget.fromPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('To: ${widget.toPlace['name']}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('From KM: ${(widget.fromPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('To KM: ${(widget.toPlace['km'] as num).toInt()}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Selected Distance: ${(endKm - startKm).toStringAsFixed(1)} km', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Full Trip Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('Quantity: ${widget.quantity}', style: GoogleFonts.outfit(fontSize: 14)),
-                Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP', style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600)),
+                Text('Route: ${widget.route}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('Direction: $actualDirection',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('Date: $formattedDate',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('Time: $formattedTime',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('From: ${widget.fromPlace['name']}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('To: ${widget.toPlace['name']}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('From KM: ${(widget.fromPlace['km'] as num).toInt()}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('To KM: ${(widget.toPlace['km'] as num).toInt()}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text(
+                    'Selected Distance: ${(endKm - startKm).toStringAsFixed(1)} km',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text(
+                    'Full Trip Fare (Regular): ${baseFare.toStringAsFixed(2)} PHP',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
+                Text('Quantity: ${widget.quantity}',
+                    style: GoogleFonts.outfit(fontSize: 14)),
+                Text('Total Amount: ${totalAmount.toStringAsFixed(2)} PHP',
+                    style: GoogleFonts.outfit(
+                        fontSize: 14, fontWeight: FontWeight.w600)),
                 SizedBox(height: 16),
-                Text('Discounts:', style: GoogleFonts.outfit(fontWeight: FontWeight.w500, fontSize: 14)),
-                ...discountBreakdown.map((e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
+                Text('Discounts:',
+                    style: GoogleFonts.outfit(
+                        fontWeight: FontWeight.w500, fontSize: 14)),
+                ...discountBreakdown.map(
+                    (e) => Text(e, style: GoogleFonts.outfit(fontSize: 14))),
                 SizedBox(height: 16),
                 Container(
                   padding: EdgeInsets.all(8),
@@ -2252,7 +2213,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
                   ),
                   child: Text(
                     'Note: You pay the full trip fare for guaranteed seats',
-                    style: GoogleFonts.outfit(fontSize: 12, color: Colors.blue[700]),
+                    style: GoogleFonts.outfit(
+                        fontSize: 12, color: Colors.blue[700]),
                   ),
                 ),
               ],
@@ -2269,7 +2231,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
                 : () async {
                     // ✅ CRITICAL: Check if already saving to prevent duplicates
                     if (_isSaving) {
-                      print('⚠️ PreBook: Save already in progress, ignoring click');
+                      print(
+                          '⚠️ PreBook: Save already in progress, ignoring click');
                       return;
                     }
 
@@ -2277,7 +2240,8 @@ class _ReceiptModalState extends State<_ReceiptModal> {
                     if (widget.currentLocation == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('⚠️ Location not captured! Please go back and enable location access.'),
+                          content: Text(
+                              '⚠️ Location not captured! Please go back and enable location access.'),
                           backgroundColor: Colors.red,
                           duration: Duration(seconds: 3),
                         ),
@@ -2295,23 +2259,19 @@ class _ReceiptModalState extends State<_ReceiptModal> {
 
                     try {
                       print('💾 PreBook: Starting booking save process...');
-                      final bookingId = await savePreBooking(
-                        context, 
-                        baseFare, 
-                        totalAmount, 
-                        discountBreakdown, 
-                        passengerFares
-                      );
+                      final bookingId = await savePreBooking(context, baseFare,
+                          totalAmount, discountBreakdown, passengerFares);
 
                       print('💾 PreBook: Booking save result - ID: $bookingId');
 
                       if (bookingId != null && bookingId.isNotEmpty) {
-                        print('✅ PreBook: Booking saved successfully, navigating to payment page');
-                        
+                        print(
+                            '✅ PreBook: Booking saved successfully, navigating to payment page');
+
                         if (mounted) {
                           // Close the receipt modal
                           Navigator.of(context).pop();
-                          
+
                           // Navigate to payment page
                           Navigator.of(context).push(
                             MaterialPageRoute(
@@ -2332,14 +2292,16 @@ class _ReceiptModalState extends State<_ReceiptModal> {
                           );
                         }
                       } else {
-                        print('❌ PreBook: Booking save failed - bookingId is null or empty');
+                        print(
+                            '❌ PreBook: Booking save failed - bookingId is null or empty');
                         if (mounted) {
                           setState(() {
                             _isSaving = false;
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('❌ Failed to save booking. Please try again.'),
+                              content: Text(
+                                  '❌ Failed to save booking. Please try again.'),
                               backgroundColor: Colors.red,
                               duration: Duration(seconds: 5),
                             ),
@@ -2372,18 +2334,26 @@ class _ReceiptModalState extends State<_ReceiptModal> {
                         height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       ),
                       SizedBox(width: 8),
-                      Text('Saving...', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+                      Text('Saving...',
+                          style: GoogleFonts.outfit(
+                              fontSize: 14, color: Colors.white)),
                     ],
                   )
-                : Text('Confirm & Save', style: GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
+                : Text('Confirm & Save',
+                    style:
+                        GoogleFonts.outfit(fontSize: 14, color: Colors.white)),
           ),
           TextButton(
             onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-            child: Text('Close', style: GoogleFonts.outfit(fontSize: 14, color: _isSaving ? Colors.grey[400] : Colors.grey[600])),
+            child: Text('Close',
+                style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    color: _isSaving ? Colors.grey[400] : Colors.grey[600])),
           ),
         ],
       ),

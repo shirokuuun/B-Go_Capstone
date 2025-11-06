@@ -490,7 +490,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      Navigator.of(context).pop(); // Close loading dialog
+      Navigator.of(context).pop();
       setState(() {
         _isEndingTrip = false;
       });
@@ -520,8 +520,22 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
       final endingTripId = activeTrip['tripId'];
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-      // Move tickets to remittance
+      // ✅ STEP 1: Copy ALL data to remittance FIRST (before any deletion)
+      print('📋 Step 1: Copying data to remittance...');
       try {
+        // Create remittance document if it doesn't exist
+        await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('remittance')
+            .doc(today)
+            .set({
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastUpdated': FieldValue.serverTimestamp(),
+          'date': today,
+        }, SetOptions(merge: true));
+
+        // Copy manual tickets from trips collection
         final ticketsSnapshot = await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorDocId)
@@ -530,6 +544,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             .collection('tickets')
             .get();
 
+        print('📋 Found ${ticketsSnapshot.docs.length} manual tickets');
         for (var ticket in ticketsSnapshot.docs) {
           final ticketData = ticket.data();
           await FirebaseFirestore.instance
@@ -539,16 +554,148 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               .doc(today)
               .collection('tickets')
               .doc(ticket.id)
-              .set(ticketData);
+              .set({
+            ...ticketData,
+            'remittanceDate': today,
+            'movedToRemittanceAt': FieldValue.serverTimestamp(),
+            'ticketType': ticketData['ticketType'] ?? 'Manual',
+          }, SetOptions(merge: true));
         }
 
+// Copy scannedQRCodes (pre-tickets and pre-bookings)
+        final scannedQRs = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('scannedQRCodes')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        print('📋 Found ${scannedQRs.docs.length} scanned QR codes');
+        for (var qrDoc in scannedQRs.docs) {
+          final qrData = qrDoc.data();
+
+          // Determine ticket type
+          String ticketType = 'preTicket';
+          if (qrData['type'] == 'preBooking') {
+            ticketType = 'preBooking';
+          }
+
+          // ✅ FIX: For pre-bookings, skip if already in remittance (from payment)
+          if (ticketType == 'preBooking') {
+            final bookingId = qrData['bookingId'] ?? qrData['id'];
+
+            if (bookingId != null) {
+              // Check if this booking already exists in remittance
+              final existingDoc = await FirebaseFirestore.instance
+                  .collection('conductors')
+                  .doc(conductorDocId)
+                  .collection('remittance')
+                  .doc(today)
+                  .collection('tickets')
+                  .doc(bookingId)
+                  .get();
+
+              if (existingDoc.exists) {
+                print(
+                    '⏭️ PreBooking $bookingId already in remittance (from payment), skipping');
+                continue; // Skip copying this pre-booking
+              }
+            }
+          }
+
+          // Only copy if not skipped above
+          await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('remittance')
+              .doc(today)
+              .collection('tickets')
+              .doc(qrDoc.id)
+              .set({
+            ...qrData,
+            'remittanceDate': today,
+            'movedToRemittanceAt': FieldValue.serverTimestamp(),
+            'ticketType': ticketType,
+            'originalTripId': endingTripId,
+            'timestamp': qrData['scannedAt'] ??
+                qrData['boardedAt'] ??
+                FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+
+          print('✅ Copied $ticketType to remittance: ${qrDoc.id}');
+        }
+
+// Copy preBookings collection as well (backup)
+        final preBookings = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('preBookings')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        print('📋 Found ${preBookings.docs.length} pre-bookings');
+        for (var bookingDoc in preBookings.docs) {
+          final bookingData = bookingDoc.data();
+
+          // ✅ FIXED: Get the booking ID to check for duplicates
+          final preBookingId = bookingData['preBookingId'] ??
+              bookingData['bookingId'] ??
+              bookingData['id'] ??
+              bookingDoc.id;
+
+          // ✅ FIXED: Query by preBookingId instead of document ID
+          final existingTickets = await FirebaseFirestore.instance
+              .collection('conductors')
+              .doc(conductorDocId)
+              .collection('remittance')
+              .doc(today)
+              .collection('tickets')
+              .where('preBookingId', isEqualTo: preBookingId)
+              .limit(1)
+              .get();
+
+          // Only copy if this booking doesn't already exist in remittance
+          if (existingTickets.docs.isEmpty) {
+            print('✅ Copying preBooking $preBookingId to remittance');
+            await FirebaseFirestore.instance
+                .collection('conductors')
+                .doc(conductorDocId)
+                .collection('remittance')
+                .doc(today)
+                .collection('tickets')
+                .doc(bookingDoc.id)
+                .set({
+              ...bookingData,
+              'remittanceDate': today,
+              'movedToRemittanceAt': FieldValue.serverTimestamp(),
+              'ticketType': 'preBooking',
+              'originalTripId': endingTripId,
+              'preBookingId': preBookingId, // Ensure this field is set
+              'timestamp': bookingData['scannedAt'] ??
+                  bookingData['boardedAt'] ??
+                  FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+          } else {
+            print(
+                '⏭️ PreBooking $preBookingId already exists in remittance, skipping');
+          }
+        }
+
+        // This preserves timestamps and data for the Trips Page
         await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorDocId)
             .collection('trips')
             .doc(today)
-            .delete();
+            .set({
+          'tripCompleted': true,
+          'completedAt': FieldValue.serverTimestamp(),
+          'completedTripId': endingTripId,
+        }, SetOptions(merge: true));
 
+        print('✅ All tickets copied to remittance successfully');
+
+        // Calculate remittance summary
         try {
           final remittanceSummary =
               await RemittanceService.calculateDailyRemittance(
@@ -557,13 +704,15 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               conductorDocId, today, remittanceSummary);
           print('✅ Remittance summary calculated and saved for $today');
         } catch (e) {
-          print('Error calculating remittance summary: $e');
+          print('⚠️ Error calculating remittance summary: $e');
         }
       } catch (e) {
-        print('Error moving tickets to remittance: $e');
+        print('❌ Error copying tickets to remittance: $e');
+        throw Exception('Failed to save trip data: $e');
       }
 
-      // Mark scannedQRCodes as completed, but DON'T update if already accomplished
+      // ✅ STEP 2: Mark records as completed (but DON'T delete accomplished ones)
+      print('📋 Step 2: Marking records as completed...');
       try {
         final scannedQRs = await FirebaseFirestore.instance
             .collection('conductors')
@@ -576,6 +725,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           final data = doc.data();
           final currentStatus = data['status'] ?? '';
 
+          // Only update if not already accomplished
           if (currentStatus != 'accomplished' &&
               data['tripCompleted'] != true) {
             await doc.reference.update({
@@ -586,14 +736,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           }
         }
 
-        print(
-            '✅ Marked scannedQRCodes as completed (preserved accomplished status)');
-      } catch (e) {
-        print('⚠️ Error marking QR codes as completed: $e');
-      }
-
-      // Mark preBookings as completed, but DON'T overwrite accomplished status
-      try {
         final preBookings = await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorDocId)
@@ -614,13 +756,13 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           }
         }
 
-        print(
-            '✅ Marked preBookings as completed (preserved accomplished status)');
+        print('✅ Marked records as completed');
       } catch (e) {
-        print('⚠️ Error marking pre-bookings as completed: $e');
+        print('⚠️ Error marking records as completed: $e');
       }
 
-      // Only delete scannedQRCodes that were NOT accomplished
+      // ✅ STEP 3: Delete ONLY non-accomplished records (cleanup)
+      print('📋 Step 3: Cleaning up non-accomplished records...');
       try {
         final scannedQRsToDelete = await FirebaseFirestore.instance
             .collection('conductors')
@@ -629,17 +771,60 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             .where('tripId', isEqualTo: endingTripId)
             .get();
 
+        int deletedCount = 0;
+        int preservedCount = 0;
+
         for (var doc in scannedQRsToDelete.docs) {
-          await doc.reference.delete();
+          final data = doc.data();
+          final status = data['status'] ?? '';
+
+          // DON'T delete accomplished records
+          if (status.toLowerCase() == 'accomplished' ||
+              data['accomplishedAt'] != null ||
+              data['dropOffTimestamp'] != null) {
+            preservedCount++;
+            print('✅ Preserving accomplished record: ${doc.id}');
+          } else {
+            await doc.reference.delete();
+            deletedCount++;
+          }
         }
 
-        print(
-            '✅ Deleted ${scannedQRsToDelete.docs.length} scanned QR codes from trip $endingTripId');
+        print('✅ Deleted $deletedCount non-accomplished scanned QR codes');
+        print('✅ Preserved $preservedCount accomplished records');
+
+        // Do the same for preBookings
+        final preBookingsToDelete = await FirebaseFirestore.instance
+            .collection('conductors')
+            .doc(conductorDocId)
+            .collection('preBookings')
+            .where('tripId', isEqualTo: endingTripId)
+            .get();
+
+        deletedCount = 0;
+        preservedCount = 0;
+
+        for (var doc in preBookingsToDelete.docs) {
+          final data = doc.data();
+          final status = data['status'] ?? '';
+
+          if (status.toLowerCase() == 'accomplished' ||
+              data['accomplishedAt'] != null ||
+              data['dropOffTimestamp'] != null) {
+            preservedCount++;
+          } else {
+            await doc.reference.delete();
+            deletedCount++;
+          }
+        }
+
+        print('✅ Deleted $deletedCount non-accomplished pre-bookings');
+        print('✅ Preserved $preservedCount accomplished pre-bookings');
       } catch (e) {
-        print('⚠️ Error deleting scanned QR codes: $e');
+        print('⚠️ Error deleting non-accomplished records: $e');
       }
 
-      // Process trip end with respect to accomplished pre-bookings
+      // ✅ STEP 4: Process trip end for passenger pre-bookings
       try {
         await PreBook.processTripEndForPreBookings(
             conductorDocId, today, endingTripId);
@@ -648,7 +833,8 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
         print('❌ Error processing pre-bookings for trip end: $e');
       }
 
-      // Rest of the trip ending logic
+      // ✅ STEP 5: Update trip status and handle return trip
+      print('📋 Step 5: Updating trip status...');
       try {
         final dailyTripDoc = await FirebaseFirestore.instance
             .collection('conductors')
@@ -662,6 +848,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           final currentTrip = dailyTripData?['currentTrip'] ?? 1;
 
           if (currentTrip % 2 == 1) {
+            // First trip - start return trip
             await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
@@ -709,7 +896,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               'passengerCount': 0,
             });
 
-            // ✅ CLEAR GEOFENCING CACHE WHEN STARTING RETURN TRIP
             GeofencingService().clearProcessedTickets();
             print('✅ Cleared geofencing cache for return trip $nextTripId');
 
@@ -721,13 +907,13 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               currentTripId = nextTripId;
             });
 
-            Navigator.of(context).pop(); // Close loading dialog
-
+            Navigator.of(context).pop();
             _showCustomSnackBar(
               'Trip $currentTrip completed. Starting Trip ${currentTrip + 1} (return direction).',
               'info',
             );
           } else if (currentTrip % 2 == 0) {
+            // Second trip - complete round trip
             await FirebaseFirestore.instance
                 .collection('conductors')
                 .doc(conductorDocId)
@@ -748,7 +934,6 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               'passengerCount': 0,
             });
 
-            // ✅ CLEAR GEOFENCING CACHE WHEN ROUND TRIP COMPLETES
             GeofencingService().clearProcessedTickets();
             print('✅ Cleared geofencing cache after round trip completion');
 
@@ -760,14 +945,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
               selectedPlaceCollection = 'Place';
             });
 
-            Navigator.of(context).pop(); // Close loading dialog
-
+            Navigator.of(context).pop();
             _showCustomSnackBar(
               'Round trip completed successfully! You can now start a new trip.',
               'success',
             );
           }
         } else {
+          // Fallback if dailyTrips document doesn't exist
           await FirebaseFirestore.instance
               .collection('conductors')
               .doc(conductorDocId)
@@ -776,9 +961,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             'passengerCount': 0,
           });
 
-          // ✅ CLEAR GEOFENCING CACHE
           GeofencingService().clearProcessedTickets();
-          print('✅ Cleared geofencing cache after trip completion');
 
           setState(() {
             isTripActive = false;
@@ -788,15 +971,15 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
             selectedPlaceCollection = 'Place';
           });
 
-          Navigator.of(context).pop(); // Close loading dialog
-
+          Navigator.of(context).pop();
           _showCustomSnackBar(
             'Trip completed successfully!',
             'success',
           );
         }
       } catch (e) {
-        print('Error checking trip direction: $e');
+        print('❌ Error updating trip status: $e');
+        // Gracefully handle error
         await FirebaseFirestore.instance
             .collection('conductors')
             .doc(conductorDocId)
@@ -805,9 +988,7 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           'passengerCount': 0,
         });
 
-        // ✅ CLEAR GEOFENCING CACHE EVEN ON ERROR
         GeofencingService().clearProcessedTickets();
-        print('✅ Cleared geofencing cache after error');
 
         setState(() {
           isTripActive = false;
@@ -817,16 +998,14 @@ class _ConductorDepartureState extends State<ConductorDeparture> {
           selectedPlaceCollection = 'Place';
         });
 
-        Navigator.of(context).pop(); // Close loading dialog
-
+        Navigator.of(context).pop();
         _showCustomSnackBar(
           'Trip completed successfully!',
           'success',
         );
       }
     } catch (e) {
-      Navigator.of(context).pop(); // Close loading dialog
-
+      Navigator.of(context).pop();
       _showCustomSnackBar(
         'Error ending trip: ${e.toString()}',
         'error',

@@ -87,6 +87,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               '• Pre-booking is available for select routes and schedules\n'
               '• Reservations are subject to seat availability\n'
               '• Payment must be completed to confirm bookings\n'
+              '• Bookings are cancellable and not refundable\n'
               '• No-shows may result in booking restrictions',
               fontSizeBody,
             ),
@@ -97,7 +98,7 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
               '• Fares are calculated based on distance and passenger type\n'
               '• Discounts apply to verified Student, Senior Citizen, and PWD IDs\n'
               '• Fare prices are subject to change without prior notice\n'
-              '• Tickets are non-transferable and non-refundable unless cancelled\n'
+              '• Tickets are non-transferable and non-refundable\n'
               '• Multiple passengers can be booked in a single transaction',
               fontSizeBody,
             ),
@@ -139,10 +140,9 @@ class _TermsAndConditionsPageState extends State<TermsAndConditionsPage> {
             _buildSection(
               '10. Payment Terms',
               '• All payments are processed securely through our payment partners\n'
-              '• Accepted payment methods include cash, mobile payments, and digital wallets\n'
+              '• Accepted payment methods include cash and online payments\n'
               '• Receipts are provided electronically for all transactions\n'
-              '• Disputed charges must be reported within 7 days\n'
-              '• Refunds are processed according to our cancellation policy',
+              '• Disputed charges must be reported within 7 days',
               fontSizeBody,
             ),
             

@@ -28,8 +28,10 @@ class ConductorTicket extends StatefulWidget {
 class _ConductorTicketState extends State<ConductorTicket> {
   final ThermalPrinterService _printerService = ThermalPrinterService();
   bool _isPrinting = false;
-  bool _hasAttemptedAutoPrint =
-      false; // ✅ Flag to prevent multiple auto-print attempts
+  bool _hasAttemptedAutoPrint = false;
+  String? _serialNumber;
+  String? _busNumber;
+  String? _plateNumber;
 
   String getRouteLabel(String placeCollection) {
     final route = widget.route;
@@ -81,6 +83,53 @@ class _ConductorTicketState extends State<ConductorTicket> {
     return 'Unknown Route';
   }
 
+  Future<String> _generateUniqueSerialNumber() async {
+    try {
+      // Get current conductor's data to fetch bus number
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final conductorQuery = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('uid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+
+        if (conductorQuery.docs.isNotEmpty) {
+          final conductorData = conductorQuery.docs.first.data();
+          
+          // Get bus number from activeTrip or directly from conductor document
+          String busNum = 'XX';
+          if (conductorData['activeTrip'] != null && 
+              conductorData['activeTrip']['busNumber'] != null) {
+            busNum = conductorData['activeTrip']['busNumber'].toString().padLeft(2, '0');
+          } else if (conductorData['busNumber'] != null) {
+            busNum = conductorData['busNumber'].toString().padLeft(2, '0');
+          }
+
+          // Create a unique document in Firestore to get a unique ID
+          final serialDoc = await FirebaseFirestore.instance
+              .collection('ticket_serials')
+              .add({
+            'busNumber': busNum,
+            'timestamp': FieldValue.serverTimestamp(),
+            'conductorUid': user.uid,
+          });
+
+          // Use the last 6 characters of the document ID + bus number
+          final uniqueId = serialDoc.id.substring(serialDoc.id.length - 6).toUpperCase();
+          return '#$busNum$uniqueId';
+        }
+      }
+    } catch (e) {
+      print('❌ Error generating serial number: $e');
+    }
+
+    // Fallback: use timestamp + random
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final uniquePart = timestamp.toString().substring(timestamp.toString().length - 8);
+    return '#$uniquePart';
+  }
+
   Map<String, dynamic>? latestTrip;
   bool isLoading = true;
   String? errorMessage;
@@ -88,6 +137,13 @@ class _ConductorTicketState extends State<ConductorTicket> {
   @override
   void initState() {
     super.initState();
+    _initializeTicket();
+  }
+
+  Future<void> _initializeTicket() async {
+    // Generate serial number first
+    _serialNumber = await _generateUniqueSerialNumber();
+    // Then fetch trip data
     fetchLatestTrip();
   }
 
@@ -130,6 +186,9 @@ class _ConductorTicketState extends State<ConductorTicket> {
         tripData = await fetchFromConductorRemittance();
       }
 
+      // ✅ Fetch conductor data to get bus number and plate number
+      await _fetchConductorData();
+
       setState(() {
         latestTrip = tripData;
         isLoading = false;
@@ -140,10 +199,8 @@ class _ConductorTicketState extends State<ConductorTicket> {
           errorMessage = 'No trip data found. This might be a QR scan ticket.';
         });
       } else {
-        // ✅ AUTO-PRINT: Trigger automatic printing after data loads
         if (!_hasAttemptedAutoPrint) {
           _hasAttemptedAutoPrint = true;
-          // Add a small delay to ensure UI is ready
           await Future.delayed(const Duration(milliseconds: 500));
           _printReceipt();
         }
@@ -154,6 +211,43 @@ class _ConductorTicketState extends State<ConductorTicket> {
         isLoading = false;
         errorMessage = 'Error loading ticket data: ${e.toString()}';
       });
+    }
+  }
+
+  Future<void> _fetchConductorData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final conductorQuery = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorQuery.docs.isNotEmpty) {
+        final conductorData = conductorQuery.docs.first.data();
+        
+        // Get data from activeTrip if available
+        if (conductorData['activeTrip'] != null) {
+          final activeTrip = conductorData['activeTrip'];
+          
+          _busNumber = activeTrip['busNumber']?.toString() ?? 
+                       conductorData['busNumber']?.toString();
+          
+          _plateNumber = activeTrip['plateNumber']?.toString() ?? 
+                        conductorData['plateNumber']?.toString();
+        } else {
+          // Fallback to conductor document fields
+          _busNumber = conductorData['busNumber']?.toString();
+          _plateNumber = conductorData['plateNumber']?.toString();
+        }
+
+        print('✅ Bus Number: $_busNumber');
+        print('✅ Plate Number: $_plateNumber');
+      }
+    } catch (e) {
+      print('❌ Error fetching conductor data: $e');
     }
   }
 
@@ -249,7 +343,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
     });
 
     try {
-      // If not connected to printer, show connection dialog
       if (!_printerService.isConnected) {
         await ThermalPrinterService.showPrinterConnectionDialog(
           context,
@@ -270,12 +363,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
               return;
             }
 
-            // Now print after successful connection
             await _performPrint();
           },
         );
       } else {
-        // Already connected, just print
         await _performPrint();
       }
     } catch (e) {
@@ -296,7 +387,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
 
   Future<void> _performPrint() async {
     try {
-      // Extract receipt data
       final from = latestTrip?['from']?.toString() ?? 'N/A';
       final to = latestTrip?['to']?.toString() ?? 'N/A';
       final startKm = latestTrip?['startKm']?.toString() ?? '0';
@@ -326,7 +416,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
                 .map((e) => e.toString()));
       }
 
-      // Print receipt
       final success = await _printerService.printManualTicket(
         route: getRouteLabel(widget.placeCollection),
         from: from,
@@ -338,6 +427,9 @@ class _ConductorTicketState extends State<ConductorTicket> {
         totalFare: totalFare,
         discountAmount: discountAmount,
         discountBreakdown: discountBreakdown,
+        serialNumber: _serialNumber ?? 'N/A',
+        plateNumber: _plateNumber ?? 'N/A',
+        busNumber: _busNumber ?? 'N/A',
       );
 
       if (mounted) {
@@ -588,10 +680,9 @@ class _ConductorTicketState extends State<ConductorTicket> {
       try {
         DateTime dateTime;
         if (timestamp is Timestamp) {
-          dateTime = timestamp
-              .toDate(); // ✅ FIXED: Use local time without adding hours
+          dateTime = timestamp.toDate();
         } else if (timestamp is DateTime) {
-          dateTime = timestamp; // ✅ FIXED: Use local time without adding hours
+          dateTime = timestamp;
         } else {
           dateTime = DateTime.now();
         }
@@ -651,7 +742,6 @@ class _ConductorTicketState extends State<ConductorTicket> {
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF0091AD))),
-                // ✅ Show printing status indicator
                 if (_isPrinting)
                   Row(
                     children: [
@@ -678,6 +768,10 @@ class _ConductorTicketState extends State<ConductorTicket> {
               ],
             ),
             const SizedBox(height: 16),
+            _buildReceiptRow('Serial#:', _serialNumber ?? 'N/A'),
+            _buildReceiptRow('Plate Number:', _plateNumber ?? 'N/A'),
+            _buildReceiptRow('Bus Number:', _busNumber ?? 'N/A'),
+            const Divider(height: 24, thickness: 1),
             _buildReceiptRow('Route:', getRouteLabel(widget.placeCollection)),
             _buildReceiptRow('Date:', formattedDate),
             _buildReceiptRow('Time:', formattedTime),

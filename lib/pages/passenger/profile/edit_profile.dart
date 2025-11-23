@@ -23,6 +23,7 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
 
   File? _selectedImage;
@@ -36,20 +37,30 @@ class _EditProfileState extends State<EditProfile> {
       _nameController.text = user.displayName ?? '';
       _emailController.text = user.email ?? '';
       _currentProfileImageUrl = user.photoURL;
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get()
-          .then((doc) {
-        if (doc.exists) {
-          _phoneController.text = doc['phone'] ?? '';
-        }
-      });
+
+      // Load user data from Firestore
+      _loadUserData(user.uid);
     }
 
     _emailController.addListener(() {
       setState(() {});
     });
+  }
+
+  Future<void> _loadUserData(String uid) async {
+    try {
+      final doc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+
+      if (doc.exists && mounted) {
+        setState(() {
+          _phoneController.text = doc.data()?['phone'] ?? '';
+          _addressController.text = doc.data()?['address'] ?? '';
+        });
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+    }
   }
 
   @override
@@ -58,6 +69,7 @@ class _EditProfileState extends State<EditProfile> {
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -65,7 +77,7 @@ class _EditProfileState extends State<EditProfile> {
     Color backgroundColor;
     IconData icon;
     Color iconColor;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -241,7 +253,9 @@ class _EditProfileState extends State<EditProfile> {
       await FirebaseAuth.instance.currentUser!
           .linkWithCredential(emailCredential);
 
-      _showCustomSnackBar('Email successfully linked to your account! You can now log in using either phone or email.', 'success');
+      _showCustomSnackBar(
+          'Email successfully linked to your account! You can now log in using either phone or email.',
+          'success');
     } catch (e) {
       _showCustomSnackBar('Failed to link email: $e', 'error');
     }
@@ -262,20 +276,56 @@ class _EditProfileState extends State<EditProfile> {
   @override
   Widget build(BuildContext context) {
     final primaryTeal = const Color(0xFF0091AD);
-    
+
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
-    final sectionFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
-    final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
-    final trailingIconSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
-    final avatarRadius = isMobile ? 60.0 : isTablet ? 70.0 : 80.0;
-    final cameraIconSize = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
-    
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
-    final profileSpacing = isMobile ? 24.0 : isTablet ? 32.0 : 40.0;
+
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final sectionFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final titleFontSize = isMobile
+        ? 15.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final trailingIconSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final avatarRadius = isMobile
+        ? 60.0
+        : isTablet
+            ? 70.0
+            : 80.0;
+    final cameraIconSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 32.0;
+    final profileSpacing = isMobile
+        ? 24.0
+        : isTablet
+            ? 32.0
+            : 40.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -298,69 +348,74 @@ class _EditProfileState extends State<EditProfile> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-            child: Column(
-              children: [
+          child: Column(
+            children: [
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(profileSpacing),
                 child: Column(
                   children: [
-                Stack(
-                  alignment: Alignment.bottomRight,
-                  children: [
-                    CircleAvatar(
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
                           radius: avatarRadius,
-                      backgroundImage: _selectedImage != null
-                          ? FileImage(_selectedImage!)
-                          : (_currentProfileImageUrl != null
-                              ? NetworkImage(_currentProfileImageUrl!)
-                              : null) as ImageProvider?,
-                      backgroundColor: Colors.grey[300],
-                      child: _selectedImage == null &&
-                              _currentProfileImageUrl == null
-                          ? Icon(Icons.person,
+                          backgroundImage: _selectedImage != null
+                              ? FileImage(_selectedImage!)
+                              : (_currentProfileImageUrl != null
+                                  ? NetworkImage(_currentProfileImageUrl!)
+                                  : null) as ImageProvider?,
+                          backgroundColor: Colors.grey[300],
+                          child: _selectedImage == null &&
+                                  _currentProfileImageUrl == null
+                              ? Icon(Icons.person,
                                   size: avatarRadius, color: Colors.grey[600])
-                          : null,
-                    ),
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: _pickImage,
-                        child: CircleAvatar(
-                              radius: isMobile ? 20.0 : isTablet ? 24.0 : 28.0,
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: _pickImage,
+                            child: CircleAvatar(
+                              radius: isMobile
+                                  ? 20.0
+                                  : isTablet
+                                      ? 24.0
+                                      : 28.0,
                               backgroundColor: primaryTeal,
-                          child: Icon(Icons.camera_alt,
+                              child: Icon(Icons.camera_alt,
                                   color: Colors.white, size: cameraIconSize),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    if (_selectedImage != null) ...[
+                      SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _uploadProfileImage,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryTeal,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                        ),
+                        child: Text(
+                          'Upload Profile Picture',
+                          style: GoogleFonts.outfit(
+                              fontSize: titleFontSize,
+                              fontWeight: FontWeight.w500),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                    SizedBox(height: 12),
-                if (_selectedImage != null) ...[
-                  SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _uploadProfileImage,
-                    style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryTeal,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    ),
-                    child: Text(
-                      'Upload Profile Picture',
-                      style: GoogleFonts.outfit(
-                              fontSize: titleFontSize, fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
+                    ],
                   ],
                 ),
               ),
-              
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -376,14 +431,16 @@ class _EditProfileState extends State<EditProfile> {
                       ),
                     ),
                     SizedBox(height: 16),
-                Form(
-                  key: _formKey,
-                  child: Column(
-                    children: [
+                    Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
                           _ProfileField(
                             label: 'Name',
-                            value: _nameController.text.isNotEmpty ? _nameController.text : 'Enter your name',
-                        icon: Icons.person,
+                            value: _nameController.text.isNotEmpty
+                                ? _nameController.text
+                                : 'Enter your name',
+                            icon: Icons.person,
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -404,8 +461,10 @@ class _EditProfileState extends State<EditProfile> {
                             primaryTeal: primaryTeal,
                           ),
                           _ProfileField(
-                        label: 'E-Mail',
-                            value: _emailController.text.isNotEmpty ? _emailController.text : 'Enter your email',
+                            label: 'E-Mail',
+                            value: _emailController.text.isNotEmpty
+                                ? _emailController.text
+                                : 'Enter your email',
                             icon: Icons.email,
                             onTap: () => Navigator.push(
                               context,
@@ -413,8 +472,8 @@ class _EditProfileState extends State<EditProfile> {
                                 builder: (context) => _EditFieldPage(
                                   title: 'Edit Email',
                                   initialValue: _emailController.text,
-                        icon: Icons.email,
-                        keyboardType: TextInputType.emailAddress,
+                                  icon: Icons.email,
+                                  keyboardType: TextInputType.emailAddress,
                                   onSave: (value) {
                                     _emailController.text = value;
                                     setState(() {});
@@ -429,7 +488,9 @@ class _EditProfileState extends State<EditProfile> {
                           ),
                           _ProfileField(
                             label: 'Phone No.',
-                            value: _phoneController.text.isNotEmpty ? _phoneController.text : 'Enter your phone number',
+                            value: _phoneController.text.isNotEmpty
+                                ? _phoneController.text
+                                : 'Enter your phone number',
                             icon: Icons.phone,
                             onTap: () async {
                               // Navigate to phone editing with OTP
@@ -441,6 +502,32 @@ class _EditProfileState extends State<EditProfile> {
                                     onSave: (value) {
                                       _phoneController.text = value;
                                       setState(() {});
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            iconSize: iconSize,
+                            titleFontSize: titleFontSize,
+                            trailingIconSize: trailingIconSize,
+                            primaryTeal: primaryTeal,
+                          ),
+                          _ProfileField(
+                            label: 'Address',
+                            value: _addressController.text.isNotEmpty
+                                ? _addressController.text
+                                : 'Enter your address',
+                            icon: Icons.location_on,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => _EditAddressPage(
+                                    initialValue: _addressController.text,
+                                    onSave: (value) {
+                                      setState(() {
+                                        _addressController.text = value;
+                                      });
                                     },
                                   ),
                                 ),
@@ -474,321 +561,383 @@ class _EditProfileState extends State<EditProfile> {
                         ],
                       ),
                     ),
-                    
-                      if (_emailController.text.isNotEmpty &&
-                          FirebaseAuth.instance.currentUser?.email != null &&
-                        FirebaseAuth.instance.currentUser?.email!.isNotEmpty == true) ...[
+                    if (_emailController.text.isNotEmpty &&
+                        FirebaseAuth.instance.currentUser?.email != null &&
+                        FirebaseAuth.instance.currentUser?.email!.isNotEmpty ==
+                            true) ...[
                       SizedBox(height: 16),
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                          color: FirebaseAuth.instance.currentUser?.emailVerified == true
-                                ? Colors.green.shade50
-                                : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                            color: FirebaseAuth.instance.currentUser?.emailVerified == true
-                                  ? Colors.green.shade200
-                                  : Colors.orange.shade200,
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: FirebaseAuth
+                                      .instance.currentUser?.emailVerified ==
+                                  true
+                              ? Colors.green.shade50
+                              : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: FirebaseAuth
+                                        .instance.currentUser?.emailVerified ==
+                                    true
+                                ? Colors.green.shade200
+                                : Colors.orange.shade200,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              FirebaseAuth.instance.currentUser
+                                          ?.emailVerified ==
+                                      true
+                                  ? Icons.verified
+                                  : Icons.warning,
+                              color: FirebaseAuth.instance.currentUser
+                                          ?.emailVerified ==
+                                      true
+                                  ? Colors.green.shade700
+                                  : Colors.orange.shade700,
+                              size: 20,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                              FirebaseAuth.instance.currentUser?.emailVerified == true
-                                    ? Icons.verified
-                                    : Icons.warning,
-                              color: FirebaseAuth.instance.currentUser?.emailVerified == true
-                                    ? Colors.green.shade700
-                                    : Colors.orange.shade700,
-                                size: 20,
-                              ),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                FirebaseAuth.instance.currentUser?.emailVerified == true
-                                      ? 'Email verified. You can login using email'
-                                      : 'Email not verified. Please check your inbox and verify your email',
-                                  style: GoogleFonts.outfit(
-                                  color: FirebaseAuth.instance.currentUser?.emailVerified == true
-                                        ? Colors.green.shade700
-                                        : Colors.orange.shade700,
-                                    fontSize: 14,
-                                  ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                FirebaseAuth.instance.currentUser
+                                            ?.emailVerified ==
+                                        true
+                                    ? 'Email verified. You can login using email'
+                                    : 'Email not verified. Please check your inbox and verify your email',
+                                style: GoogleFonts.outfit(
+                                  color: FirebaseAuth.instance.currentUser
+                                              ?.emailVerified ==
+                                          true
+                                      ? Colors.green.shade700
+                                      : Colors.orange.shade700,
+                                  fontSize: 14,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
-                    
-                      if (_emailController.text.isNotEmpty &&
-                          (FirebaseAuth.instance.currentUser?.email == null ||
-                            FirebaseAuth.instance.currentUser?.email!.isEmpty == true)) ...[
-                      SizedBox(height: 16),
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.shade200),
-                          ),
-                          child: Row(
-                            children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Adding email requires a password for login functionality.',
-                                  style: GoogleFonts.outfit(
-                                    color: Colors.blue.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      ),
                     ],
-                    
-                SizedBox(height: 32),
-                    
+                    if (_emailController.text.isNotEmpty &&
+                        (FirebaseAuth.instance.currentUser?.email == null ||
+                            FirebaseAuth.instance.currentUser?.email!.isEmpty ==
+                                true)) ...[
+                      SizedBox(height: 16),
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline,
+                                color: Colors.blue.shade700, size: 20),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Adding email requires a password for login functionality.',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.blue.shade700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    SizedBox(height: 32),
                     Center(
                       child: Column(
                         children: [
-                ElevatedButton(
-                  onPressed: () async {
-                    if (_formKey.currentState!.validate()) {
-                      String? validationError = _validateEmailAndPassword();
-                      if (validationError != null) {
-                        _showCustomSnackBar(validationError, 'warning');
-                        return;
-                      }
+                          ElevatedButton(
+                            onPressed: () async {
+                              if (_formKey.currentState!.validate()) {
+                                String? validationError =
+                                    _validateEmailAndPassword();
+                                if (validationError != null) {
+                                  _showCustomSnackBar(
+                                      validationError, 'warning');
+                                  return;
+                                }
 
-                      final user = FirebaseAuth.instance.currentUser;
-                      if (user != null) {
-                        try {
-                          String newEmail = _emailController.text.trim();
+                                final user = FirebaseAuth.instance.currentUser;
+                                if (user != null) {
+                                  try {
+                                    String newEmail =
+                                        _emailController.text.trim();
 
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (BuildContext context) {
-                              return Center(
-                                child: CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(primaryTeal),
-                                ),
-                              );
-                            },
-                          );
-
-                          await user.updateDisplayName(_nameController.text);
-
-                              bool isPhoneUser = user.email == null || user.email!.isEmpty;
-
-                          if (isPhoneUser && newEmail.isNotEmpty) {
-                            try {
-                                  final emailCredential = EmailAuthProvider.credential(
-                                email: newEmail,
-                                password: _passwordController.text,
-                              );
-
-                              await user.linkWithCredential(emailCredential);
-
-                              await FirebaseFirestore.instance
-                                  .collection('users')
-                                  .doc(user.uid)
-                                  .update({
-                                'name': _nameController.text,
-                                'email': newEmail,
-                                    'authMethod': 'phone_email',
-                                'updatedAt': FieldValue.serverTimestamp(),
-                              });
-
-                              await user.sendEmailVerification();
-
-                              Navigator.of(context).pop();
-
-                              await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                      title: Text('Verify your email', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                                  content: Text(
-                                      'A verification link has been sent to $newEmail.\n\nPlease verify your email before you can login using email.\n\nYou can continue using the app with your phone number while waiting for verification.'),
-                                  actions: [
-                                    TextButton(
-                                          onPressed: () => Navigator.of(context).pop(),
-                                          child: Text('OK', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        _resendVerificationEmail();
+                                    showDialog(
+                                      context: context,
+                                      barrierDismissible: false,
+                                      builder: (BuildContext context) {
+                                        return Center(
+                                          child: CircularProgressIndicator(
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    primaryTeal),
+                                          ),
+                                        );
                                       },
-                                      child: Text('Resend Email'),
-                                    ),
-                                  ],
-                                ),
-                              );
+                                    );
 
-                              _showCustomSnackBar('Email linked successfully! Please check your email for verification.', 'success');
+                                    await user.updateDisplayName(
+                                        _nameController.text);
 
-                              if (mounted) {
-                                Navigator.pop(context);
-                              }
-                              return;
-                            } catch (e) {
-                              Navigator.of(context).pop();
-                              String message = 'Failed to link email';
-                              if (e is FirebaseAuthException) {
-                                switch (e.code) {
-                                  case 'email-already-in-use':
-                                        message = 'This email is already in use by another account';
-                                    break;
-                                  case 'invalid-email':
-                                        message = 'Please enter a valid email address';
-                                    break;
-                                  case 'weak-password':
-                                    message = 'Password is too weak';
-                                    break;
-                                  default:
-                                        message = e.message ?? 'Failed to link email';
+                                    bool isPhoneUser = user.email == null ||
+                                        user.email!.isEmpty;
+
+                                    if (isPhoneUser && newEmail.isNotEmpty) {
+                                      try {
+                                        final emailCredential =
+                                            EmailAuthProvider.credential(
+                                          email: newEmail,
+                                          password: _passwordController.text,
+                                        );
+
+                                        await user.linkWithCredential(
+                                            emailCredential);
+
+                                        await FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(user.uid)
+                                            .update({
+                                          'name': _nameController.text,
+                                          'email': newEmail,
+                                          'authMethod': 'phone_email',
+                                          'address': _addressController.text
+                                              .trim(), // NEW
+                                          'updatedAt':
+                                              FieldValue.serverTimestamp(),
+                                        });
+
+                                        await user.sendEmailVerification();
+
+                                        Navigator.of(context).pop();
+
+                                        await showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title: Text('Verify your email',
+                                                style: GoogleFonts.outfit(
+                                                    fontWeight:
+                                                        FontWeight.w600)),
+                                            content: Text(
+                                                'A verification link has been sent to $newEmail.\n\nPlease verify your email before you can login using email.\n\nYou can continue using the app with your phone number while waiting for verification.'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(context).pop(),
+                                                child: Text('OK',
+                                                    style: GoogleFonts.outfit(
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ),
+                                              TextButton(
+                                                onPressed: () {
+                                                  Navigator.of(context).pop();
+                                                  _resendVerificationEmail();
+                                                },
+                                                child: Text('Resend Email'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+
+                                        _showCustomSnackBar(
+                                            'Email linked successfully! Please check your email for verification.',
+                                            'success');
+
+                                        if (mounted) {
+                                          Navigator.pop(context);
+                                        }
+                                        return;
+                                      } catch (e) {
+                                        Navigator.of(context).pop();
+                                        String message = 'Failed to link email';
+                                        if (e is FirebaseAuthException) {
+                                          switch (e.code) {
+                                            case 'email-already-in-use':
+                                              message =
+                                                  'This email is already in use by another account';
+                                              break;
+                                            case 'invalid-email':
+                                              message =
+                                                  'Please enter a valid email address';
+                                              break;
+                                            case 'weak-password':
+                                              message = 'Password is too weak';
+                                              break;
+                                            default:
+                                              message = e.message ??
+                                                  'Failed to link email';
+                                          }
+                                        }
+                                        _showCustomSnackBar(message, 'error');
+                                        return;
+                                      }
+                                    }
+
+                                    if (newEmail != user.email &&
+                                        newEmail.isNotEmpty) {
+                                      try {
+                                        await user
+                                            .verifyBeforeUpdateEmail(newEmail);
+                                        Navigator.of(context).pop();
+                                        await showDialog(
+                                          context: context,
+                                          builder: (context) => AlertDialog(
+                                            title:
+                                                Text('Verify your new email'),
+                                            content: Text(
+                                                'A verification link has been sent to $newEmail.\n\nTo complete the change, please:\n1. Open your new email inbox.\n2. Click the verification link.\n3. After verification, you can log in using either your phone number or email address.\n\nNote: You may need to set a password for your email login to work.'),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.of(context).pop(),
+                                                child: Text('OK'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        return;
+                                      } on FirebaseAuthException catch (e) {
+                                        Navigator.of(context).pop();
+                                        if (e.code == 'requires-recent-login') {
+                                          await showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: Text(
+                                                  'Re-authentication Required'),
+                                              content: Text(
+                                                  'For security reasons, please log in again to change your email.'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(),
+                                                  child: Text('OK'),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                          final authServices = AuthServices();
+                                          await authServices.signOut();
+                                          if (mounted) {
+                                            Navigator.of(context).popUntil(
+                                                (route) => route.isFirst);
+                                          }
+                                          return;
+                                        } else {
+                                          _showCustomSnackBar(
+                                              'Failed to update email: ${e.message}',
+                                              'error');
+                                          return;
+                                        }
+                                      }
+                                    }
+
+                                    await FirebaseFirestore.instance
+                                        .collection('users')
+                                        .doc(user.uid)
+                                        .update({
+                                      'name': _nameController.text,
+                                      'email': newEmail,
+                                      'address':
+                                          _addressController.text.trim(), // NEW
+                                      'updatedAt': FieldValue.serverTimestamp(),
+                                    });
+
+                                    if (_passwordController.text.isNotEmpty) {
+                                      await user.updatePassword(
+                                          _passwordController.text);
+                                    }
+
+                                    Navigator.of(context).pop();
+                                    _showCustomSnackBar(
+                                        'Profile updated successfully!',
+                                        'success');
+
+                                    if (mounted) {
+                                      Navigator.pop(context);
+                                    }
+                                  } on FirebaseAuthException catch (e) {
+                                    Navigator.of(context).pop();
+                                    String message;
+                                    if (e.code == 'requires-recent-login') {
+                                      await showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: Text(
+                                              'Re-authentication Required'),
+                                          content: Text(
+                                              'For security reasons, please log in again to change your email.'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.of(context).pop(),
+                                              child: Text('OK'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      final authServices = AuthServices();
+                                      await authServices.signOut();
+                                      if (mounted) {
+                                        Navigator.of(context)
+                                            .popUntil((route) => route.isFirst);
+                                      }
+                                      return;
+                                    }
+                                    switch (e.code) {
+                                      case 'invalid-email':
+                                        message =
+                                            'Please enter a valid email address.';
+                                        break;
+                                      case 'email-already-in-use':
+                                        message =
+                                            'This email is already in use.';
+                                        break;
+                                      case 'weak-password':
+                                        message = 'Password is too weak.';
+                                        break;
+                                      default:
+                                        message =
+                                            'Failed to update profile. Please try again.';
+                                    }
+                                    _showCustomSnackBar(message, 'error');
+                                  } catch (e) {
+                                    Navigator.of(context).pop();
+                                    _showCustomSnackBar(
+                                        'An unexpected error occurred. Please try again.',
+                                        'error');
+                                  }
                                 }
                               }
-                              _showCustomSnackBar(message, 'error');
-                              return;
-                            }
-                          }
-
-                          if (newEmail != user.email && newEmail.isNotEmpty) {
-                            try {
-                              await user.verifyBeforeUpdateEmail(newEmail);
-                              Navigator.of(context).pop();
-                              await showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: Text('Verify your new email'),
-                                  content: Text(
-                                      'A verification link has been sent to $newEmail.\n\nTo complete the change, please:\n1. Open your new email inbox.\n2. Click the verification link.\n3. After verification, you can log in using either your phone number or email address.\n\nNote: You may need to set a password for your email login to work.'),
-                                  actions: [
-                                    TextButton(
-                                          onPressed: () => Navigator.of(context).pop(),
-                                      child: Text('OK'),
-                                    ),
-                                  ],
-                                ),
-                              );
-                              return;
-                            } on FirebaseAuthException catch (e) {
-                              Navigator.of(context).pop();
-                              if (e.code == 'requires-recent-login') {
-                                await showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text('Re-authentication Required'),
-                                        content: Text('For security reasons, please log in again to change your email.'),
-                                    actions: [
-                                      TextButton(
-                                            onPressed: () => Navigator.of(context).pop(),
-                                        child: Text('OK'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                                final authServices = AuthServices();
-                                await authServices.signOut();
-                                if (mounted) {
-                                      Navigator.of(context).popUntil((route) => route.isFirst);
-                                }
-                                return;
-                              } else {
-                                _showCustomSnackBar('Failed to update email: ${e.message}', 'error');
-                                return;
-                              }
-                            }
-                          }
-
-                          await FirebaseFirestore.instance
-                              .collection('users')
-                              .doc(user.uid)
-                              .update({
-                            'name': _nameController.text,
-                            'email': newEmail,
-                            'updatedAt': FieldValue.serverTimestamp(),
-                          });
-
-                          if (_passwordController.text.isNotEmpty) {
-                            await user.updatePassword(_passwordController.text);
-                          }
-
-                          Navigator.of(context).pop();
-                          _showCustomSnackBar('Profile updated successfully!', 'success');
-
-                          if (mounted) {
-                            Navigator.pop(context);
-                          }
-                        } on FirebaseAuthException catch (e) {
-                          Navigator.of(context).pop();
-                          String message;
-                          if (e.code == 'requires-recent-login') {
-                            await showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text('Re-authentication Required'),
-                                    content: Text('For security reasons, please log in again to change your email.'),
-                                actions: [
-                                  TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                    child: Text('OK'),
-                                  ),
-                                ],
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryTeal,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
                               ),
-                            );
-                            final authServices = AuthServices();
-                            await authServices.signOut();
-                            if (mounted) {
-                                  Navigator.of(context).popUntil((route) => route.isFirst);
-                            }
-                            return;
-                          }
-                          switch (e.code) {
-                            case 'invalid-email':
-                              message = 'Please enter a valid email address.';
-                              break;
-                            case 'email-already-in-use':
-                              message = 'This email is already in use.';
-                              break;
-                            case 'weak-password':
-                              message = 'Password is too weak.';
-                              break;
-                            default:
-                                  message = 'Failed to update profile. Please try again.';
-                          }
-                          _showCustomSnackBar(message, 'error');
-                        } catch (e) {
-                          Navigator.of(context).pop();
-                          _showCustomSnackBar('An unexpected error occurred. Please try again.', 'error');
-                        }
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryTeal,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 4,
-                    padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
-                  ),
-                  child: Text(
+                              elevation: 4,
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 48, vertical: 12),
+                            ),
+                            child: Text(
                               'Save Changes',
-                              style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500),
-                  ),
-                ),
-                SizedBox(height: 32),
-              ],
-            ),
+                              style: GoogleFonts.outfit(
+                                  fontSize: 16, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          SizedBox(height: 32),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -853,8 +1002,12 @@ class _ProfileField extends StatelessWidget {
                     value,
                     style: GoogleFonts.outfit(
                       fontSize: titleFontSize,
-                      color: value.contains('Enter') ? Colors.grey[500] : Colors.black54,
+                      color: value.contains('Enter')
+                          ? Colors.grey[500]
+                          : Colors.black54,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
@@ -871,7 +1024,175 @@ class _ProfileField extends StatelessWidget {
   }
 }
 
-// NEW: Edit Phone with OTP Page
+class _EditAddressPage extends StatefulWidget {
+  final String initialValue;
+  final Function(String) onSave;
+
+  const _EditAddressPage({
+    required this.initialValue,
+    required this.onSave,
+  });
+
+  @override
+  State<_EditAddressPage> createState() => _EditAddressPageState();
+}
+
+class _EditAddressPageState extends State<_EditAddressPage> {
+  late TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryTeal = const Color(0xFF0091AD);
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final titleFontSize = isMobile
+        ? 15.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 32.0;
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: primaryTeal,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white, size: iconSize),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          'Edit Address',
+          style: GoogleFonts.outfit(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: appBarFontSize,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(horizontalPadding),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 32),
+                Text(
+                  'Enter your complete address',
+                  style: GoogleFonts.outfit(
+                    fontSize: titleFontSize + 2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Include street, city, province, and postal code',
+                  style: GoogleFonts.outfit(
+                    fontSize: titleFontSize - 2,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                SizedBox(height: 24),
+                TextFormField(
+                  controller: _controller,
+                  maxLines: 4,
+                  keyboardType: TextInputType.streetAddress,
+                  decoration: InputDecoration(
+                    labelText: 'Address',
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(bottom: 60),
+                      child: Icon(Icons.location_on, color: primaryTeal),
+                    ),
+                    hintText: 'e.g., 123 Main, Lipa City, Batangas 4217',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: primaryTeal, width: 2),
+                    ),
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    alignLabelWithHint: true,
+                  ),
+                  style: GoogleFonts.outfit(fontSize: titleFontSize),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Address is required';
+                    }
+                    if (value.trim().length < 10) {
+                      return 'Please enter a complete address';
+                    }
+                    return null;
+                  },
+                ),
+                Spacer(),
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        widget.onSave(_controller.text.trim());
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryTeal,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 4,
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                    ),
+                    child: Text(
+                      'Save Address',
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EditPhoneWithOTPPage extends StatefulWidget {
   final String initialPhone;
   final Function(String) onSave;
@@ -891,11 +1212,12 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
   bool _isLoading = false;
   String? _verificationId;
   bool _showOTPFields = false;
-  
+
   // OTP Controllers
-  final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
+  final List<TextEditingController> otpControllers =
+      List.generate(6, (index) => TextEditingController());
   final List<FocusNode> focusNodes = List.generate(6, (index) => FocusNode());
-  
+
   int _resendCountdown = 30;
   bool _canResend = false;
   String? _errorMessage;
@@ -904,7 +1226,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
   void initState() {
     super.initState();
     _phoneController = TextEditingController(text: widget.initialPhone);
-    
+
     // Add listeners for OTP fields
     for (int i = 0; i < 6; i++) {
       otpControllers[i].addListener(() {
@@ -930,7 +1252,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
   void _showCustomSnackBar(String message, String type) {
     Color backgroundColor;
     IconData icon;
-    
+
     switch (type) {
       case 'success':
         backgroundColor = Colors.green;
@@ -952,7 +1274,9 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
             Icon(icon, color: Colors.white, size: 20),
             SizedBox(width: 12),
             Expanded(
-              child: Text(message, style: GoogleFonts.outfit(color: Colors.white, fontWeight: FontWeight.w500)),
+              child: Text(message,
+                  style: GoogleFonts.outfit(
+                      color: Colors.white, fontWeight: FontWeight.w500)),
             ),
           ],
         ),
@@ -969,7 +1293,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
       _canResend = false;
       _resendCountdown = 30;
     });
-    
+
     Future.delayed(Duration(seconds: 1), () {
       if (mounted) {
         if (_resendCountdown > 0) {
@@ -1040,7 +1364,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
 
   Future<void> _verifyOTP() async {
     String otp = otpControllers.map((controller) => controller.text).join();
-    
+
     if (otp.length != 6) {
       setState(() {
         _errorMessage = "Please enter the complete 6-digit code";
@@ -1088,7 +1412,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
       });
 
       _showCustomSnackBar('Phone number verified successfully!', 'success');
-      
+
       // Call the onSave callback and pop
       widget.onSave(phone);
       Navigator.of(context).pop();
@@ -1097,7 +1421,7 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
         _isLoading = false;
         _errorMessage = "Incorrect code. Please try again";
       });
-      
+
       for (var controller in otpControllers) {
         controller.clear();
       }
@@ -1115,13 +1439,37 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
     final primaryTeal = const Color(0xFF0091AD);
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
-    final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
-    final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
-    final otpFieldSize = isMobile ? 40.0 : isTablet ? 50.0 : 60.0;
-    final otpFieldMargin = isMobile ? 4.0 : isTablet ? 8.0 : 12.0;
+
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final titleFontSize = isMobile
+        ? 15.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 32.0;
+    final otpFieldSize = isMobile
+        ? 40.0
+        : isTablet
+            ? 50.0
+            : 60.0;
+    final otpFieldMargin = isMobile
+        ? 4.0
+        : isTablet
+            ? 8.0
+            : 12.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1182,7 +1530,8 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(color: primaryTeal),
                       ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                      contentPadding:
+                          EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     ),
                     style: GoogleFonts.outfit(fontSize: titleFontSize),
                     validator: (value) {
@@ -1212,31 +1561,34 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 32),
-                  
+
                   // OTP Fields
                   Center(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final availableWidth = constraints.maxWidth;
-                        final totalFieldWidth = (otpFieldSize * 6) + (otpFieldMargin * 10);
-                        
+                        final totalFieldWidth =
+                            (otpFieldSize * 6) + (otpFieldMargin * 10);
+
                         double finalFieldSize = otpFieldSize;
                         double finalMargin = otpFieldMargin;
-                        
+
                         if (totalFieldWidth > availableWidth) {
-                          finalMargin = math.max(2.0, (availableWidth - (otpFieldSize * 6)) / 10);
+                          finalMargin = math.max(
+                              2.0, (availableWidth - (otpFieldSize * 6)) / 10);
                           if (finalMargin < 2.0) {
                             finalFieldSize = (availableWidth - (2.0 * 10)) / 6;
                             finalMargin = 2.0;
                           }
                         }
-                        
+
                         return Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(6, (index) {
                             return Container(
-                              margin: EdgeInsets.symmetric(horizontal: finalMargin),
+                              margin:
+                                  EdgeInsets.symmetric(horizontal: finalMargin),
                               width: finalFieldSize,
                               height: finalFieldSize,
                               child: TextField(
@@ -1255,10 +1607,12 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide(
-                                      color: _errorMessage != null 
-                                          ? Colors.red 
-                                          : (otpControllers[index].text.isNotEmpty 
-                                              ? primaryTeal 
+                                      color: _errorMessage != null
+                                          ? Colors.red
+                                          : (otpControllers[index]
+                                                  .text
+                                                  .isNotEmpty
+                                              ? primaryTeal
                                               : Colors.grey.shade300),
                                       width: 2,
                                     ),
@@ -1266,8 +1620,8 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                                   enabledBorder: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8),
                                     borderSide: BorderSide(
-                                      color: _errorMessage != null 
-                                          ? Colors.red 
+                                      color: _errorMessage != null
+                                          ? Colors.red
                                           : Colors.grey.shade300,
                                       width: 2,
                                     ),
@@ -1287,10 +1641,12 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                                   setState(() {
                                     _errorMessage = null;
                                   });
-                                  
+
                                   if (value.isEmpty && index > 0) {
-                                    Future.delayed(Duration(milliseconds: 10), () {
-                                      if (mounted && otpControllers[index].text.isEmpty) {
+                                    Future.delayed(Duration(milliseconds: 10),
+                                        () {
+                                      if (mounted &&
+                                          otpControllers[index].text.isEmpty) {
                                         focusNodes[index - 1].requestFocus();
                                       }
                                     });
@@ -1307,9 +1663,9 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                       },
                     ),
                   ),
-                  
+
                   SizedBox(height: 20),
-                  
+
                   if (_errorMessage != null)
                     Center(
                       child: Text(
@@ -1321,15 +1677,15 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-                  
+
                   SizedBox(height: 20),
-                  
+
                   Center(
                     child: GestureDetector(
                       onTap: _canResend ? _resendOTP : null,
                       child: Text(
-                        _canResend 
-                            ? "Resend code" 
+                        _canResend
+                            ? "Resend code"
                             : "Resend code in $_resendCountdown seconds",
                         style: GoogleFonts.outfit(
                           color: _canResend ? primaryTeal : Colors.grey,
@@ -1340,13 +1696,11 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                     ),
                   ),
                 ],
-                
                 SizedBox(height: 40),
-                
                 Center(
                   child: ElevatedButton(
-                    onPressed: _isLoading 
-                        ? null 
+                    onPressed: _isLoading
+                        ? null
                         : (_showOTPFields ? _verifyOTP : _sendOTP),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryTeal,
@@ -1355,7 +1709,8 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 4,
-                      padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 48, vertical: 12),
                       minimumSize: Size(200, 50),
                     ),
                     child: _isLoading
@@ -1364,7 +1719,8 @@ class _EditPhoneWithOTPPageState extends State<_EditPhoneWithOTPPage> {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : Text(
@@ -1426,11 +1782,27 @@ class _EditFieldPageState extends State<_EditFieldPage> {
     final primaryTeal = const Color(0xFF0091AD);
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
-    final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
-    final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
+
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final titleFontSize = isMobile
+        ? 15.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 32.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1473,7 +1845,8 @@ class _EditFieldPageState extends State<_EditFieldPage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryTeal),
                     ),
-                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
                   style: GoogleFonts.outfit(fontSize: titleFontSize),
                   validator: (value) {
@@ -1499,11 +1872,13 @@ class _EditFieldPageState extends State<_EditFieldPage> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 4,
-                      padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 48, vertical: 12),
                     ),
                     child: Text(
                       'Save',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ),
@@ -1545,11 +1920,27 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
     final primaryTeal = const Color(0xFF0091AD);
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
-    final appBarFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 24.0;
-    final titleFontSize = isMobile ? 15.0 : isTablet ? 16.0 : 18.0;
-    final iconSize = isMobile ? 22.0 : isTablet ? 24.0 : 28.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 32.0;
+
+    final appBarFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final titleFontSize = isMobile
+        ? 15.0
+        : isTablet
+            ? 16.0
+            : 18.0;
+    final iconSize = isMobile
+        ? 22.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 32.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1587,7 +1978,9 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
                     prefixIcon: Icon(Icons.lock, color: primaryTeal),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                        _obscurePassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: primaryTeal,
                       ),
                       onPressed: () {
@@ -1603,7 +1996,8 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryTeal),
                     ),
-                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
                   style: GoogleFonts.outfit(fontSize: titleFontSize),
                   validator: (value) {
@@ -1625,7 +2019,9 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
                     prefixIcon: Icon(Icons.lock_outline, color: primaryTeal),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                        _obscureConfirmPassword
+                            ? Icons.visibility
+                            : Icons.visibility_off,
                         color: primaryTeal,
                       ),
                       onPressed: () {
@@ -1641,7 +2037,8 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: primaryTeal),
                     ),
-                    contentPadding: EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                    contentPadding:
+                        EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                   ),
                   style: GoogleFonts.outfit(fontSize: titleFontSize),
                   validator: (value) {
@@ -1670,11 +2067,13 @@ class _EditPasswordPageState extends State<_EditPasswordPage> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       elevation: 4,
-                      padding: EdgeInsets.symmetric(horizontal: 48, vertical: 12),
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 48, vertical: 12),
                     ),
                     child: Text(
                       'Save Password',
-                      style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.outfit(
+                          fontSize: 16, fontWeight: FontWeight.w500),
                     ),
                   ),
                 ),

@@ -38,6 +38,9 @@ class _ConductorFromState extends State<ConductorFrom> {
   // Thermal Printer Service
   final ThermalPrinterService _printerService = ThermalPrinterService();
 
+  String? _busNumber;
+  String? _plateNumber;
+
   final Map<String, String> _routeFirestoreNames = {
     'Batangas': 'Batangas',
     'Rosario': 'Rosario',
@@ -52,6 +55,95 @@ class _ConductorFromState extends State<ConductorFrom> {
     super.initState();
     _initializeRouteDirections();
     _checkActiveTrip();
+    _fetchConductorData();
+  }
+
+  Future<void> _fetchConductorData() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final conductorQuery = await FirebaseFirestore.instance
+          .collection('conductors')
+          .where('uid', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (conductorQuery.docs.isNotEmpty) {
+        final conductorData = conductorQuery.docs.first.data();
+
+        // Get data from activeTrip if available
+        if (conductorData['activeTrip'] != null) {
+          final activeTrip = conductorData['activeTrip'];
+
+          setState(() {
+            _busNumber = activeTrip['busNumber']?.toString() ??
+                conductorData['busNumber']?.toString();
+
+            _plateNumber = activeTrip['plateNumber']?.toString() ??
+                conductorData['plateNumber']?.toString();
+          });
+        } else {
+          // Fallback to conductor document fields
+          setState(() {
+            _busNumber = conductorData['busNumber']?.toString();
+            _plateNumber = conductorData['plateNumber']?.toString();
+          });
+        }
+
+        print('✅ Bus Number: $_busNumber');
+        print('✅ Plate Number: $_plateNumber');
+      }
+    } catch (e) {
+      print('❌ Error fetching conductor data: $e');
+    }
+  }
+
+  // ✅ ADD THIS METHOD TO GENERATE UNIQUE SERIAL NUMBER
+  Future<String> _generateUniqueSerialNumber() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final conductorQuery = await FirebaseFirestore.instance
+            .collection('conductors')
+            .where('uid', isEqualTo: user.uid)
+            .limit(1)
+            .get();
+
+        if (conductorQuery.docs.isNotEmpty) {
+          final conductorData = conductorQuery.docs.first.data();
+
+          String busNum = 'XX';
+          if (conductorData['activeTrip'] != null &&
+              conductorData['activeTrip']['busNumber'] != null) {
+            busNum = conductorData['activeTrip']['busNumber']
+                .toString()
+                .padLeft(2, '0');
+          } else if (conductorData['busNumber'] != null) {
+            busNum = conductorData['busNumber'].toString().padLeft(2, '0');
+          }
+
+          final serialDoc = await FirebaseFirestore.instance
+              .collection('ticket_serials')
+              .add({
+            'busNumber': busNum,
+            'timestamp': FieldValue.serverTimestamp(),
+            'conductorUid': user.uid,
+          });
+
+          final uniqueId =
+              serialDoc.id.substring(serialDoc.id.length - 6).toUpperCase();
+          return '#$busNum$uniqueId';
+        }
+      }
+    } catch (e) {
+      print('❌ Error generating serial number: $e');
+    }
+
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final uniquePart =
+        timestamp.toString().substring(timestamp.toString().length - 8);
+    return '#$uniquePart';
   }
 
   @override
@@ -138,9 +230,13 @@ class _ConductorFromState extends State<ConductorFrom> {
     }
   }
 
+  // ✅ UPDATE THIS METHOD TO INCLUDE NEW PARAMETERS
   Future<void> _performScannedTicketPrint(
       Map<String, dynamic> ticketData, String ticketType) async {
     try {
+      // Generate unique serial number for this scanned ticket
+      final serialNumber = await _generateUniqueSerialNumber();
+
       final from = ticketData['from']?.toString() ?? 'N/A';
       final to = ticketData['to']?.toString() ?? 'N/A';
       final fromKm = ticketData['fromKm']?.toString() ?? '0';
@@ -171,6 +267,7 @@ class _ConductorFromState extends State<ConductorFrom> {
             (ticketData['discountBreakdown'] as List).map((e) => e.toString()));
       }
 
+      // ✅ NOW INCLUDES ALL REQUIRED PARAMETERS
       final success = await _printerService.printManualTicket(
         route: getRouteLabel(selectedPlaceCollection),
         from: from,
@@ -182,6 +279,9 @@ class _ConductorFromState extends State<ConductorFrom> {
         totalFare: totalFare,
         discountAmount: discountAmount,
         discountBreakdown: discountBreakdown,
+        serialNumber: serialNumber,
+        plateNumber: _plateNumber ?? 'N/A',
+        busNumber: _busNumber ?? 'N/A',
       );
 
       if (mounted) {

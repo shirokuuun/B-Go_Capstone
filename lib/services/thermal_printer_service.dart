@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 class ThermalPrinterService {
   static const platform = MethodChannel('com.bgo.printer/print');
+  static const String companyTIN = '738-990-391-000NV'; // ✅ BATRASCO TIN
 
   bool get isConnected => true;
 
@@ -34,9 +35,11 @@ class ThermalPrinterService {
     required String totalFare,
     required String discountAmount,
     required List<String>? discountBreakdown,
+    required String serialNumber,
+    required String plateNumber,
+    required String busNumber,
   }) async {
     try {
-      // ✅ FIXED: Use local device time without adding 8 hours
       final now = DateTime.now();
       final formattedDate = DateFormat('yyyy-MM-dd').format(now);
       final formattedTime = DateFormat('HH:mm:ss').format(now);
@@ -54,6 +57,9 @@ class ThermalPrinterService {
         discountBreakdown: discountBreakdown,
         formattedDate: formattedDate,
         formattedTime: formattedTime,
+        serialNumber: serialNumber,
+        plateNumber: plateNumber,
+        busNumber: busNumber,
       );
 
       print('🖨️ Sending to built-in printer...');
@@ -95,6 +101,9 @@ class ThermalPrinterService {
         discountBreakdown: discountBreakdown,
         formattedDate: DateFormat('yyyy-MM-dd').format(DateTime.now()),
         formattedTime: DateFormat('HH:mm:ss').format(DateTime.now()),
+        serialNumber: serialNumber,
+        plateNumber: plateNumber,
+        busNumber: busNumber,
       ));
       return false;
     }
@@ -113,14 +122,27 @@ class ThermalPrinterService {
     required List<String>? discountBreakdown,
     required String formattedDate,
     required String formattedTime,
+    required String serialNumber,
+    required String plateNumber,
+    required String busNumber,
   }) {
     StringBuffer receipt = StringBuffer();
 
-    // Logo will be printed separately by native code
-    // Text content starts here
-    receipt.writeln('Route: $route');
+    // Header with company info
+    receipt.writeln('         BATRASCO');
+    receipt.writeln('   TIN: $companyTIN');
+    receipt.writeln('');
+    receipt.writeln('     OFFICIAL RECEIPT');
+    receipt.writeln('================================');
+    receipt.writeln('Serial#: $serialNumber');
+    receipt.writeln('Plate Number: $plateNumber');
+    receipt.writeln('Bus Number: $busNumber');
+    receipt.writeln('');
     receipt.writeln('Date: $formattedDate');
     receipt.writeln('Time: $formattedTime');
+    receipt.writeln('================================');
+    receipt.writeln('');
+    receipt.writeln('Route: $route');
     receipt.writeln('');
     receipt.writeln('From: $from');
     receipt.writeln('To: $to');
@@ -146,6 +168,9 @@ class ThermalPrinterService {
     receipt.writeln('      TOTAL AMOUNT');
     receipt.writeln('      $totalFare PHP');
     receipt.writeln('================================');
+    receipt.writeln('');
+    receipt.writeln('THIS SERVES AS AN OFFICIAL RECEIPT');
+    receipt.writeln('KEEP YOUR TICKET FOR INSPECTION');
     receipt.writeln('');
     receipt.writeln('Thank you for riding with us!');
     receipt.writeln('Safe travels!');

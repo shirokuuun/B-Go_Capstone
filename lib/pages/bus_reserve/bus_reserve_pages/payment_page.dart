@@ -29,13 +29,42 @@ class _PaymentPageState extends State<PaymentPage> {
   File? _receiptImage;
   final ImagePicker _picker = ImagePicker();
   bool _isUploading = false;
+  Map<String, dynamic>? _busDetails;
+  bool _isLoadingBusDetails = true;
 
   @override
   void initState() {
     super.initState();
+    _fetchBusDetails();
     // Start the expired reservation service if not already running
     if (!ExpiredReservationService.isRunning) {
       ExpiredReservationService.startService();
+    }
+  }
+
+  Future<void> _fetchBusDetails() async {
+    try {
+      // Get the conductor document using the first selected bus ID
+      final conductorDoc = await FirebaseFirestore.instance
+          .collection('conductors')
+          .doc(widget.selectedBusIds.first)
+          .get();
+
+      if (conductorDoc.exists) {
+        setState(() {
+          _busDetails = conductorDoc.data();
+          _isLoadingBusDetails = false;
+        });
+      } else {
+        setState(() {
+          _isLoadingBusDetails = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching bus details: $e');
+      setState(() {
+        _isLoadingBusDetails = false;
+      });
     }
   }
 
@@ -44,15 +73,39 @@ class _PaymentPageState extends State<PaymentPage> {
     // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     // Responsive sizing
-    final titleFontSize = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
-    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final sectionFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final qrSize = isMobile ? 200.0 : isTablet ? 250.0 : 300.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final verticalPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    
+    final titleFontSize = isMobile
+        ? 20.0
+        : isTablet
+            ? 24.0
+            : 28.0;
+    final subtitleFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final sectionFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final qrSize = isMobile
+        ? 200.0
+        : isTablet
+            ? 250.0
+            : 300.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8F8),
       body: CustomScrollView(
@@ -88,13 +141,14 @@ class _PaymentPageState extends State<PaymentPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(height: 20),
-                  
+
                   // Reservation Summary
                   Container(
                     padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Color(0xFF0091AD).withOpacity(0.1),
-                      border: Border.all(color: Color(0xFF0091AD).withOpacity(0.3)),
+                      border:
+                          Border.all(color: Color(0xFF0091AD).withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -102,7 +156,8 @@ class _PaymentPageState extends State<PaymentPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.receipt, color: Color(0xFF0091AD), size: 24),
+                            Icon(Icons.receipt,
+                                color: Color(0xFF0091AD), size: 24),
                             SizedBox(width: 8),
                             Text(
                               'Reservation Summary',
@@ -115,18 +170,134 @@ class _PaymentPageState extends State<PaymentPage> {
                           ],
                         ),
                         SizedBox(height: 12),
-                        _buildSummaryRow('From', widget.reservationDetails['from'] ?? 'N/A'),
-                        _buildSummaryRow('To', widget.reservationDetails['to'] ?? 'N/A'),
-                        _buildSummaryRow('Trip Type', widget.reservationDetails['isRoundTrip'] == true ? 'Round Trip' : 'One Way'),
-                        _buildSummaryRow('Passenger', widget.reservationDetails['fullName'] ?? 'N/A'),
-                        _buildSummaryRow('Email', widget.reservationDetails['email'] ?? 'N/A'),
-                        _buildSummaryRow('Reservation ID', widget.reservationId),
+
+                        // Bus Information Section
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          margin: EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bus Details',
+                                style: GoogleFonts.outfit(
+                                  fontSize: subtitleFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0091AD),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              _buildSummaryRow(
+                                  'Bus Number',
+                                  widget.reservationDetails['busNumber'] ??
+                                      'N/A'),
+                              _buildSummaryRow(
+                                  'Plate Number',
+                                  widget.reservationDetails['plateNumber'] ??
+                                      'N/A'),
+                              _buildSummaryRow(
+                                  'Driver',
+                                  widget.reservationDetails['driverName'] ??
+                                      'N/A'),
+                            ],
+                          ),
+                        ),
+
+                        // Trip Information Section
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          margin: EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Trip Information',
+                                style: GoogleFonts.outfit(
+                                  fontSize: subtitleFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0091AD),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              _buildSummaryRow('From',
+                                  widget.reservationDetails['from'] ?? 'N/A'),
+                              _buildSummaryRow('To',
+                                  widget.reservationDetails['to'] ?? 'N/A'),
+                              _buildSummaryRow(
+                                  'Trip Type',
+                                  widget.reservationDetails['isRoundTrip'] ==
+                                          true
+                                      ? 'Round Trip'
+                                      : 'One Way'),
+                              _buildSummaryRow(
+                                  'Departure Date',
+                                  widget.reservationDetails['departureDate'] ??
+                                      'N/A'),
+                              _buildSummaryRow(
+                                  'Departure Time',
+                                  widget.reservationDetails['departureTime'] ??
+                                      'N/A'),
+                              _buildSummaryRow(
+                                  'Passengers',
+                                  widget.reservationDetails['passengerCount'] ??
+                                      'N/A'),
+                            ],
+                          ),
+                        ),
+
+                        // Passenger Information Section
+                        Container(
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Passenger Information',
+                                style: GoogleFonts.outfit(
+                                  fontSize: subtitleFontSize,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF0091AD),
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              _buildSummaryRow(
+                                  'Name',
+                                  widget.reservationDetails['fullName'] ??
+                                      'N/A'),
+                              _buildSummaryRow('Email',
+                                  widget.reservationDetails['email'] ?? 'N/A'),
+                              _buildSummaryRow(
+                                  'Phone',
+                                  widget.reservationDetails['contactNumber'] ??
+                                      'N/A'),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 12),
+                        _buildSummaryRow(
+                            'Reservation ID', widget.reservationId),
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: 24),
-                  
+
                   // Payment Instructions
                   Container(
                     padding: EdgeInsets.all(16),
@@ -140,7 +311,8 @@ class _PaymentPageState extends State<PaymentPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 24),
+                            Icon(Icons.info_outline,
+                                color: Colors.blue.shade700, size: 24),
                             SizedBox(width: 8),
                             Text(
                               'Payment Instructions',
@@ -168,9 +340,9 @@ class _PaymentPageState extends State<PaymentPage> {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: 24),
-                  
+
                   // QR Code Section
                   Center(
                     child: Container(
@@ -232,9 +404,9 @@ class _PaymentPageState extends State<PaymentPage> {
                       ),
                     ),
                   ),
-                  
+
                   SizedBox(height: 24),
-                  
+
                   // Receipt Upload Section
                   Container(
                     padding: EdgeInsets.all(16),
@@ -331,17 +503,20 @@ class _PaymentPageState extends State<PaymentPage> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   onPressed: _uploadReceipt,
-                                  icon: _isUploading 
-                                    ? SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : Icon(Icons.upload, size: 18),
-                                  label: Text(_isUploading ? 'Uploading...' : 'Upload'),
+                                  icon: _isUploading
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
+                                          ),
+                                        )
+                                      : Icon(Icons.upload, size: 18),
+                                  label: Text(
+                                      _isUploading ? 'Uploading...' : 'Upload'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Color(0xFF0091AD),
                                     foregroundColor: Colors.white,
@@ -354,9 +529,9 @@ class _PaymentPageState extends State<PaymentPage> {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: 24),
-                  
+
                   // Status Information
                   Container(
                     padding: EdgeInsets.all(16),
@@ -367,7 +542,8 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.schedule, color: Colors.orange.shade700, size: 24),
+                        Icon(Icons.schedule,
+                            color: Colors.orange.shade700, size: 24),
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -381,7 +557,7 @@ class _PaymentPageState extends State<PaymentPage> {
                       ],
                     ),
                   ),
-                  
+
                   SizedBox(height: 30),
                 ],
               ),
@@ -395,11 +571,18 @@ class _PaymentPageState extends State<PaymentPage> {
         left: false,
         right: false,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
+          padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding, vertical: verticalPadding),
           child: ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: Color(0xFF0091AD),
-              minimumSize: Size(double.infinity, isMobile ? 45 : isTablet ? 50 : 55),
+              minimumSize: Size(
+                  double.infinity,
+                  isMobile
+                      ? 45
+                      : isTablet
+                          ? 50
+                          : 55),
             ),
             onPressed: () {
               Navigator.pushReplacement(
@@ -413,7 +596,11 @@ class _PaymentPageState extends State<PaymentPage> {
               'Back to Home',
               style: GoogleFonts.outfit(
                 color: Colors.white,
-                fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                fontSize: isMobile
+                    ? 16
+                    : isTablet
+                        ? 18
+                        : 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -426,7 +613,7 @@ class _PaymentPageState extends State<PaymentPage> {
   Widget _buildSummaryRow(String label, String value) {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-    
+
     return Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Row(
@@ -437,7 +624,11 @@ class _PaymentPageState extends State<PaymentPage> {
             child: Text(
               '$label:',
               style: GoogleFonts.outfit(
-                fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+                fontSize: isMobile
+                    ? 12
+                    : isTablet
+                        ? 14
+                        : 16,
                 fontWeight: FontWeight.w600,
                 color: Colors.grey.shade700,
               ),
@@ -447,7 +638,11 @@ class _PaymentPageState extends State<PaymentPage> {
             child: Text(
               value,
               style: GoogleFonts.outfit(
-                fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+                fontSize: isMobile
+                    ? 12
+                    : isTablet
+                        ? 14
+                        : 16,
                 color: Colors.black87,
               ),
             ),
@@ -471,7 +666,7 @@ class _PaymentPageState extends State<PaymentPage> {
         maxHeight: 1080,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _receiptImage = File(image.path);
@@ -491,11 +686,9 @@ class _PaymentPageState extends State<PaymentPage> {
 
     try {
       // Upload image to Firebase Storage
-      final storageRef = FirebaseStorage.instance
-          .ref()
-          .child('receipts')
-          .child('${widget.reservationId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      
+      final storageRef = FirebaseStorage.instance.ref().child('receipts').child(
+          '${widget.reservationId}_${DateTime.now().millisecondsSinceEpoch}.jpg');
+
       await storageRef.putFile(_receiptImage!);
       final downloadUrl = await storageRef.getDownloadURL();
 
@@ -521,13 +714,14 @@ class _PaymentPageState extends State<PaymentPage> {
         });
       }
 
-      _showCustomSnackBar('Receipt uploaded successfully! Admin will verify your payment.', 'success');
+      _showCustomSnackBar(
+          'Receipt uploaded successfully! Admin will verify your payment.',
+          'success');
 
       // Clear the image after successful upload
       setState(() {
         _receiptImage = null;
       });
-
     } catch (e) {
       _showCustomSnackBar('Error uploading receipt: $e', 'error');
     } finally {
@@ -610,5 +804,4 @@ class _PaymentPageState extends State<PaymentPage> {
       ),
     );
   }
-
 }

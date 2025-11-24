@@ -137,7 +137,7 @@ class ReservationService {
         return {
           'id': conductor['id'],
           'name': conductor['name'] ?? 'Unknown Conductor',
-          'plateNumber': plateNumber,
+          'busNumber': conductor['busNumber'],
           'codingDays': codingDays,
           'Price': 2000,
           'status': 'active',
@@ -322,6 +322,7 @@ class ReservationService {
     required String email,
     DateTime? departureDate,
     String? departureTime,
+    String? passengerCount,
   }) async {
     final firestore = FirebaseFirestore.instance;
     final reservationsRef = firestore.collection('reservations');
@@ -339,6 +340,7 @@ class ReservationService {
       'departureDate':
           departureDate != null ? Timestamp.fromDate(departureDate) : null,
       'departureTime': departureTime,
+      'passengerCount': passengerCount,
       'timestamp': FieldValue.serverTimestamp(),
       'status': 'pending',
     });

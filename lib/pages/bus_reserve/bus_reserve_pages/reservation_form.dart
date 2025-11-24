@@ -162,95 +162,103 @@ class _ReservationFormState extends State<ReservationForm> {
     return selectedCodingDays.contains(weekday);
   }
 
-  Future<void> _submitReservation() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || user.email == null) {
-      _showCustomSnackBar('Please log in to make a reservation', 'error');
-      return;
-    }
-
-    final from = _fromController.text.trim();
-    final to = _toController.text.trim();
-    final fullName = _fullNameController.text.trim();
-    final email = user.email!;
-    final contactNumber = _contactNumberController.text.trim();
-    final departureTime = _departureTimeController.text.trim();
-    final passengerCount = _passengerCountController.text.trim();
-
-    if (from.isEmpty ||
-        to.isEmpty ||
-        fullName.isEmpty ||
-        contactNumber.isEmpty ||
-        departureTime.isEmpty ||
-        passengerCount.isEmpty ||
-        _departureDate == null) {
-      _showCustomSnackBar('Please fill out all fields', 'warning');
-      return;
-    }
-
-    if (!_isDateValidForSelectedBus(_departureDate!)) {
-      final selectedCodingDays = _getSelectedBusCodingDays();
-      _showCustomSnackBar(
-        'Selected date is not available for the chosen bus. Available days: ${selectedCodingDays.join(', ')}',
-        'error',
-      );
-      return;
-    }
-
-    if (!_isValidPhoneNumber(contactNumber)) {
-      _showCustomSnackBar(
-          'Please enter a valid contact number (10-11 digits)', 'warning');
-      return;
-    }
-
-    if (!_isValidPassengerCount(passengerCount)) {
-      _showCustomSnackBar(
-          'Please enter a valid number of passengers (1-22)', 'warning');
-      return;
-    }
-
-    try {
-      final reservationId = await ReservationService.saveReservation(
-        selectedBusIds: widget.selectedBusIds,
-        from: from,
-        to: to,
-        isRoundTrip: _isRoundTrip,
-        fullName: fullName,
-        email: email,
-        departureDate: _departureDate,
-        departureTime: departureTime,
-      );
-
-      final reservationDetails = {
-        'from': from,
-        'to': to,
-        'isRoundTrip': _isRoundTrip,
-        'fullName': fullName,
-        'email': email,
-        'departureDate': _departureDate != null
-            ? DateFormat('EEE, MMM d, yyyy').format(_departureDate!)
-            : 'Not selected',
-        'departureTime': _departureTimeController.text,
-        'passengerCount': _passengerCountController.text,
-        'contactNumber': _contactNumberController.text,
-      };
-
-      _clearForm();
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentPage(
-            reservationId: reservationId,
-            selectedBusIds: widget.selectedBusIds,
-            reservationDetails: reservationDetails,
-          ),
-        ),
-      );
-    } catch (e) {
-      _showCustomSnackBar('Error: $e', 'error');
-    }
+Future<void> _submitReservation() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null || user.email == null) {
+    _showCustomSnackBar('Please log in to make a reservation', 'error');
+    return;
   }
+
+  final from = _fromController.text.trim();
+  final to = _toController.text.trim();
+  final fullName = _fullNameController.text.trim();
+  final email = user.email!;
+  final contactNumber = _contactNumberController.text.trim();
+  final departureTime = _departureTimeController.text.trim();
+  final passengerCount = _passengerCountController.text.trim();
+
+  if (from.isEmpty ||
+      to.isEmpty ||
+      fullName.isEmpty ||
+      contactNumber.isEmpty ||
+      departureTime.isEmpty ||
+      passengerCount.isEmpty ||
+      _departureDate == null) {
+    _showCustomSnackBar('Please fill out all fields', 'warning');
+    return;
+  }
+
+  if (!_isDateValidForSelectedBus(_departureDate!)) {
+    final selectedCodingDays = _getSelectedBusCodingDays();
+    _showCustomSnackBar(
+      'Selected date is not available for the chosen bus. Available days: ${selectedCodingDays.join(', ')}',
+      'error',
+    );
+    return;
+  }
+
+  if (!_isValidPhoneNumber(contactNumber)) {
+    _showCustomSnackBar(
+        'Please enter a valid contact number (10-11 digits)', 'warning');
+    return;
+  }
+
+  if (!_isValidPassengerCount(passengerCount)) {
+    _showCustomSnackBar(
+        'Please enter a valid number of passengers (1-22)', 'warning');
+    return;
+  }
+
+  try {
+    final reservationId = await ReservationService.saveReservation(
+      selectedBusIds: widget.selectedBusIds,
+      from: from,
+      to: to,
+      isRoundTrip: _isRoundTrip,
+      fullName: fullName,
+      email: email,
+      departureDate: _departureDate,
+      departureTime: departureTime,
+      passengerCount: passengerCount,
+    );
+
+    // Get conductor data from _selectedBus
+    final conductorData = _selectedBus?['conductorData'] as Map<String, dynamic>?;
+
+    final reservationDetails = {
+      'from': from,
+      'to': to,
+      'isRoundTrip': _isRoundTrip,
+      'fullName': fullName,
+      'email': email,
+      'departureDate': _departureDate != null
+          ? DateFormat('EEE, MMM d, yyyy').format(_departureDate!)
+          : 'Not selected',
+      'departureTime': departureTime,
+      'passengerCount': passengerCount,
+      'contactNumber': contactNumber,
+      // Add bus information
+      'driverName': conductorData?['driverName'] ?? 'N/A',
+      'plateNumber': conductorData?['plateNumber'] ?? _selectedBus?['plateNumber'] ?? 'N/A',
+      'busNumber': conductorData?['busNumber']?.toString() ?? _selectedBus?['busNumber']?.toString() ?? 'N/A',
+    };
+
+    _clearForm();
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PaymentPage(
+          reservationId: reservationId,
+          selectedBusIds: widget.selectedBusIds,
+          reservationDetails: reservationDetails,
+        ),
+      ),
+    );
+  } catch (e) {
+    _showCustomSnackBar('Error: $e', 'error');
+  }
+}
 
   Widget _buildFormField(
     String label,

@@ -191,6 +191,28 @@ class _BusHomeState extends State<BusHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // 1. Driver
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Driver: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              TextSpan(
+                text: conductor['driverName'] ?? 'Unknown',
+                style: GoogleFonts.outfit(
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 4),
+        // 2. Conductor
         RichText(
           text: TextSpan(
             children: [
@@ -210,6 +232,50 @@ class _BusHomeState extends State<BusHome> {
             ],
           ),
         ),
+        SizedBox(height: 4),
+        // 3. Plate Number (NEW)
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Plate Number: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              TextSpan(
+                text: conductor['plateNumber'] ?? bus['plateNumber'] ?? 'N/A',
+                style: GoogleFonts.outfit(
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 4),
+        // 4. Available (codingDays from bus object)
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Available: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              TextSpan(
+                text: List<String>.from(bus['codingDays'] ?? []).join(', '),
+                style: GoogleFonts.outfit(
+                  color: Colors.grey[800],
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 4),
+        // 5. Status
         RichText(
           text: TextSpan(
             children: [
@@ -230,31 +296,27 @@ class _BusHomeState extends State<BusHome> {
             ],
           ),
         ),
-        if (conductor['codingDay'] != null)
-          RichText(
-            text: TextSpan(
-              children: [
-                TextSpan(
-                  text: 'Coding Day: ',
-                  style: GoogleFonts.outfit(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+        SizedBox(height: 4),
+        // 6. Price
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'Price: ',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-                TextSpan(
-                  text: conductor['codingDay'] ?? 'Unknown',
-                  style: GoogleFonts.outfit(
-                    color: Colors.grey[800],
-                    fontSize: isMobile
-                        ? 11
-                        : isTablet
-                            ? 12
-                            : 13,
-                  ),
+              ),
+              TextSpan(
+                text: '₱${bus['Price']}',
+                style: GoogleFonts.outfit(
+                  color: Colors.grey[800],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -869,7 +931,7 @@ class _BusHomeState extends State<BusHome> {
                                 SizedBox(width: isMobile ? 12 : 16),
                                 Expanded(
                                   child: Text(
-                                    bus['name'] ?? '',
+                                    'Bus #${conductor?['busNumber']?.toString() ?? bus['busNumber']?.toString() ?? 'N/A'}',
                                     style: GoogleFonts.outfit(
                                       fontSize: busNameFontSize,
                                       fontWeight: FontWeight.bold,
@@ -953,56 +1015,6 @@ class _BusHomeState extends State<BusHome> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  RichText(
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: 'Available: ',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            color: isGrayedOut
-                                                ? Colors.grey.shade600
-                                                : Colors.black,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: List<String>.from(
-                                                  bus['codingDays'])
-                                              .join(', '),
-                                          style: GoogleFonts.outfit(
-                                            color: isGrayedOut
-                                                ? Colors.grey.shade500
-                                                : Colors.grey[800],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  RichText(
-                                    text: TextSpan(
-                                      children: [
-                                        TextSpan(
-                                          text: 'Price: ',
-                                          style: GoogleFonts.outfit(
-                                            fontWeight: FontWeight.bold,
-                                            color: isGrayedOut
-                                                ? Colors.grey.shade600
-                                                : Colors.black,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text: '₱${bus['Price']}',
-                                          style: GoogleFonts.outfit(
-                                            color: isGrayedOut
-                                                ? Colors.grey.shade500
-                                                : Colors.grey[800],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
                                   _buildConductorInfo(bus),
                                 ],
                               ),

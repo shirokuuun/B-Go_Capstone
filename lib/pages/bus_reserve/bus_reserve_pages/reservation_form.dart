@@ -482,17 +482,6 @@ Future<void> _submitReservation() async {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Plate: ${_selectedBus!['plateNumber']}',
-                  style: GoogleFonts.outfit(
-                    fontSize: isMobile
-                        ? 12
-                        : isTablet
-                            ? 14
-                            : 16,
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                Text(
                   'Available Days: ${List<String>.from(_selectedBus!['codingDays'] ?? []).join(', ')}',
                   style: GoogleFonts.outfit(
                     fontSize: isMobile

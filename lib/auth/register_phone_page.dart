@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -30,7 +31,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
     {'name': 'United States', 'code': '+1'},
     {'name': 'India', 'code': '+91'},
     {'name': 'United Kingdom', 'code': '+44'},
-    // Add more countries as needed
   ];
   String selectedCountryCode = '+63';
 
@@ -38,6 +38,57 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
   void dispose() {
     phoneController.dispose();
     super.dispose();
+  }
+
+  // Format phone number with parenthesis
+  // If starts with 0: (0XXX) XXXXXXX (4 digits in parenthesis)
+  // If starts with other digit: (XXX) XXXXXXX (3 digits in parenthesis)
+  String _formatPhoneNumber(String value) {
+    // Remove all non-digit characters
+    String digitsOnly = value.replaceAll(RegExp(r'[^\d]'), '');
+    
+    if (digitsOnly.isEmpty) return '';
+    
+    // Check if starts with 0
+    bool startsWithZero = digitsOnly.startsWith('0');
+    
+    if (startsWithZero) {
+      // Format with 4 digits in parenthesis: (0XXX) XXXXXXX
+      if (digitsOnly.length <= 4) {
+        return '($digitsOnly';
+      } else if (digitsOnly.length <= 11) {
+        return '(${digitsOnly.substring(0, 4)}) ${digitsOnly.substring(4)}';
+      } else {
+        // Limit to 11 digits total
+        return '(${digitsOnly.substring(0, 4)}) ${digitsOnly.substring(4, 11)}';
+      }
+    } else {
+      // Format with 3 digits in parenthesis: (XXX) XXXXXXX
+      if (digitsOnly.length <= 3) {
+        return '($digitsOnly';
+      } else if (digitsOnly.length <= 10) {
+        return '(${digitsOnly.substring(0, 3)}) ${digitsOnly.substring(3)}';
+      } else {
+        // Limit to 10 digits total
+        return '(${digitsOnly.substring(0, 3)}) ${digitsOnly.substring(3, 10)}';
+      }
+    }
+  }
+
+  // Get raw phone number (digits only, no formatting)
+  String _getRawPhoneNumber(String formatted) {
+    String digitsOnly = formatted.replaceAll(RegExp(r'[^\d]'), '');
+    // Remove leading 0 if present for sending to Firebase
+    if (digitsOnly.startsWith('0')) {
+      digitsOnly = digitsOnly.substring(1);
+    }
+    return digitsOnly;
+  }
+
+  // Validate phone number length (10-11 digits for Philippines)
+  bool _isValidPhoneLength(String phone) {
+    String digitsOnly = _getRawPhoneNumber(phone);
+    return digitsOnly.length >= 10 && digitsOnly.length <= 11;
   }
 
   // Custom snackbar widget
@@ -121,25 +172,33 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
       return;
     }
 
-    String phone = phoneController.text.trim();
+    String phone = _getRawPhoneNumber(phoneController.text);
+    
     if (phone.isEmpty) {
       _showCustomSnackBar('Please enter a phone number.', 'warning');
       return;
     }
 
-    // Remove leading 0 if present
-    if (phone.startsWith('0')) phone = phone.substring(1);
+    // Validate phone number length
+    if (!_isValidPhoneLength(phoneController.text)) {
+      _showCustomSnackBar('Phone number must be 10-11 digits.', 'warning');
+      return;
+    }
+
+    // Ensure it starts with 9 or 09 for Philippines
+    if (selectedCountryCode == '+63' && !phone.startsWith('9')) {
+      _showCustomSnackBar('Philippine phone numbers must start with 9 or 09.', 'warning');
+      return;
+    }
+
     String fullPhone = selectedCountryCode + phone;
 
     setState(() => _isLoading = true);
 
-    // ✅ FIX: Wrap in try-catch to handle permission errors gracefully
     try {
       print('📱 Checking if phone number is registered: $fullPhone');
 
-      // Check if phone number already exists
-      bool isRegistered =
-          await _authServices.isPhoneNumberRegistered(fullPhone);
+      bool isRegistered = await _authServices.isPhoneNumberRegistered(fullPhone);
 
       if (isRegistered) {
         setState(() => _isLoading = false);
@@ -149,12 +208,9 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
         return;
       }
 
-      // Phone number is NOT registered, proceed with registration
       await _customPhoneAuth.sendOTPWithoutCaptcha(
         phoneNumber: fullPhone,
         onVerificationCompleted: (PhoneAuthCredential credential) async {
-          // This will be called if verification completes automatically
-          // Usually happens on Android when SMS is auto-retrieved
           print('✅ Auto verification completed');
           try {
             UserCredential userCredential =
@@ -164,13 +220,11 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             if (user != null) {
               print('✅ User auto-signed in: ${user.uid}');
 
-              // Save user to Firestore with isPhoneVerified flag
               await _authServices.savePhoneUserToFirestore(
                 uid: user.uid,
                 phoneNumber: fullPhone,
               );
 
-              // Ensure isPhoneVerified is set
               await FirebaseFirestore.instance
                   .collection('users')
                   .doc(user.uid)
@@ -181,7 +235,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
               print('✅ User data saved to Firestore');
 
-              // ✅ SIGN OUT after registration to force re-login
               await FirebaseAuth.instance.signOut();
               print('✅ User signed out - redirecting to login page');
 
@@ -193,12 +246,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                   'Registration successful! Please log in to continue.',
                   'success');
 
-              // Small delay to show snackbar
               await Future.delayed(const Duration(milliseconds: 800));
 
               if (!mounted) return;
 
-              // ✅ Redirect to login page
               Navigator.pushReplacementNamed(context, '/phone_login');
             }
           } catch (e) {
@@ -213,7 +264,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
           setState(() => _isLoading = false);
           String errorMessage = 'Verification failed';
 
-          // Handle specific error cases
           switch (e.code) {
             case 'invalid-phone-number':
               errorMessage = 'Invalid phone number format';
@@ -248,10 +298,8 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             _isLoading = false;
           });
 
-          // Show success message
           _showCustomSnackBar('OTP sent successfully to $fullPhone', 'success');
 
-          // Navigate to OTP verification page
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -260,12 +308,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                 verificationId: verificationId,
                 isRegistration: true,
                 onVerificationSuccess: () async {
-                  // ✅ MODIFIED: After successful OTP verification during registration
                   print('✅ OTP verification successful during registration');
 
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null) {
-                    // Ensure isPhoneVerified is set
                     await FirebaseFirestore.instance
                         .collection('users')
                         .doc(user.uid)
@@ -274,7 +320,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       'updatedAt': FieldValue.serverTimestamp(),
                     });
 
-                    // ✅ SIGN OUT after registration to force re-login
                     await FirebaseAuth.instance.signOut();
                     print(
                         '✅ User signed out after registration - redirecting to login');
@@ -286,12 +331,10 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       'Registration successful! Please log in to continue.',
                       'success');
 
-                  // Small delay to show snackbar
                   await Future.delayed(const Duration(milliseconds: 800));
 
                   if (!mounted) return;
 
-                  // ✅ Redirect to login page instead of user selection
                   Navigator.pushNamedAndRemoveUntil(
                     context,
                     '/phone_login',
@@ -305,7 +348,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
         onCodeAutoRetrievalTimeout: (String verificationId) {
           print('⏱️ OTP auto-retrieval timed out');
 
-          // ✅ Check if widget is still mounted before showing snackbar
           if (mounted) {
             _showCustomSnackBar(
                 'OTP auto-retrieval timed out. Please enter the code manually.',
@@ -317,7 +359,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
       print('❌ Firestore error: ${e.code} - ${e.message}');
 
       if (e.code == 'permission-denied') {
-        // If permission denied, skip the check and proceed with registration
         print('⚠️ Permission denied, proceeding with registration anyway');
         _showCustomSnackBar('Proceeding with registration...', 'warning');
 
@@ -464,7 +505,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
             onCodeAutoRetrievalTimeout: (String verificationId) {
               print('⏱️ OTP auto-retrieval timed out');
 
-              // ✅ Check if widget is still mounted before showing snackbar
               if (mounted) {
                 _showCustomSnackBar(
                     'OTP auto-retrieval timed out. Please enter the code manually.',
@@ -491,68 +531,21 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
-    // Responsive sizing
-    final logoSize = isMobile
-        ? 120.0
-        : isTablet
-            ? 140.0
-            : 150.0;
-    final titleFontSize = isMobile
-        ? 35.0
-        : isTablet
-            ? 40.0
-            : 45.0;
-    final subtitleFontSize = isMobile
-        ? 16.0
-        : isTablet
-            ? 18.0
-            : 20.0;
-    final buttonFontSize = isMobile
-        ? 18.0
-        : isTablet
-            ? 19.0
-            : 20.0;
-    final textFieldFontSize = isMobile
-        ? 14.0
-        : isTablet
-            ? 15.0
-            : 16.0;
-    final hintFontSize = isMobile
-        ? 12.0
-        : isTablet
-            ? 13.0
-            : 14.0;
-    final registerFontSize = isMobile
-        ? 13.0
-        : isTablet
-            ? 13.0
-            : 14.0;
+    final logoSize = isMobile ? 120.0 : isTablet ? 140.0 : 150.0;
+    final titleFontSize = isMobile ? 35.0 : isTablet ? 40.0 : 45.0;
+    final subtitleFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonFontSize = isMobile ? 18.0 : isTablet ? 19.0 : 20.0;
+    final textFieldFontSize = isMobile ? 14.0 : isTablet ? 15.0 : 16.0;
+    final hintFontSize = isMobile ? 12.0 : isTablet ? 13.0 : 14.0;
+    final registerFontSize = isMobile ? 13.0 : isTablet ? 13.0 : 14.0;
 
-    // Responsive padding and spacing
-    final horizontalPadding = isMobile
-        ? 20.0
-        : isTablet
-            ? 24.0
-            : 28.0;
-    final fieldSpacing = isMobile
-        ? 20.0
-        : isTablet
-            ? 25.0
-            : 30.0;
-    final containerPadding = isMobile
-        ? 16.0
-        : isTablet
-            ? 18.0
-            : 20.0;
-    final buttonHeight = isMobile
-        ? 50.0
-        : isTablet
-            ? 55.0
-            : 60.0;
+    final horizontalPadding = isMobile ? 20.0 : isTablet ? 24.0 : 28.0;
+    final fieldSpacing = isMobile ? 20.0 : isTablet ? 25.0 : 30.0;
+    final containerPadding = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final buttonHeight = isMobile ? 50.0 : isTablet ? 55.0 : 60.0;
 
     return Scaffold(
       backgroundColor: Color(0xFFE5E9F0),
@@ -560,34 +553,18 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
               horizontal: horizontalPadding,
-              vertical: isMobile
-                  ? 20.0
-                  : isTablet
-                      ? 25.0
-                      : 30.0),
+              vertical: isMobile ? 20.0 : isTablet ? 25.0 : 30.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Logo section - now scrollable
-              SizedBox(
-                  height: isMobile
-                      ? 40.0
-                      : isTablet
-                          ? 50.0
-                          : 60.0),
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
               Image.asset(
                 'assets/batrasco-logo.png',
                 width: logoSize,
                 fit: BoxFit.contain,
               ),
-              SizedBox(
-                  height: isMobile
-                      ? 40.0
-                      : isTablet
-                          ? 50.0
-                          : 60.0),
+              SizedBox(height: isMobile ? 40.0 : isTablet ? 50.0 : 60.0),
 
-              // Registration form content
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -617,8 +594,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
                   // Phone number field
                   Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Color(0xFFE5E9F0),
@@ -659,13 +635,23 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                               controller: phoneController,
                               keyboardType: TextInputType.phone,
                               enabled: true,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(RegExp(r'[\d\(\)\s]')),
+                                TextInputFormatter.withFunction((oldValue, newValue) {
+                                  String formatted = _formatPhoneNumber(newValue.text);
+                                  return TextEditingValue(
+                                    text: formatted,
+                                    selection: TextSelection.collapsed(offset: formatted.length),
+                                  );
+                                }),
+                              ],
                               style: GoogleFonts.outfit(
                                 color: Colors.black,
                                 fontSize: textFieldFontSize,
                               ),
                               decoration: InputDecoration(
                                 border: InputBorder.none,
-                                hintText: "Phone Number",
+                                hintText: "(929) XXXXXXX or (0929) XXXXXX",
                                 hintStyle: GoogleFonts.outfit(
                                   color: Colors.black54,
                                   fontWeight: FontWeight.w700,
@@ -682,8 +668,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
                   // Terms and conditions checkbox
                   Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                     child: Row(
                       children: [
                         Checkbox(
@@ -736,22 +721,22 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
 
                   // Send OTP button
                   Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: horizontalPadding * 0.9),
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.9),
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  phoneController.text.trim().isNotEmpty
-                                      ? Color(0xFF0091AD)
-                                      : Colors.grey,
+                              backgroundColor: (_isValidPhoneLength(phoneController.text) && agreedToTerms)
+                                  ? Color(0xFF0091AD)
+                                  : Colors.grey,
                               minimumSize: Size(double.infinity, buttonHeight),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            onPressed: agreedToTerms ? _sendOTP : null,
+                            onPressed: (_isValidPhoneLength(phoneController.text) && agreedToTerms)
+                                ? _sendOTP
+                                : null,
                             child: Text(
                               'Send OTP',
                               style: GoogleFonts.outfit(
@@ -763,12 +748,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                           ),
                   ),
 
-                  SizedBox(
-                      height: isMobile
-                          ? 50.0
-                          : isTablet
-                              ? 60.0
-                              : 70.0),
+                  SizedBox(height: isMobile ? 50.0 : isTablet ? 60.0 : 70.0),
 
                   // Login link
                   Row(
@@ -783,8 +763,7 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          Navigator.pushReplacementNamed(
-                              context, '/phone_login');
+                          Navigator.pushReplacementNamed(context, '/phone_login');
                         },
                         child: Text(
                           ' Login',
@@ -798,7 +777,6 @@ class _RegisterPhonePageState extends State<RegisterPhonePage> {
                     ],
                   ),
 
-                  // Add bottom padding
                   SizedBox(height: isMobile ? 30.0 : 40.0),
                 ],
               ),

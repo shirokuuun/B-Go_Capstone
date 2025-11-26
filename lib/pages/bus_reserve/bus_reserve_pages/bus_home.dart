@@ -15,7 +15,7 @@ class BusHome extends StatefulWidget {
 
 class _BusHomeState extends State<BusHome> {
   List<Map<String, dynamic>> _availableBuses = [];
-  String? _selectedBusId; // Changed from Set to single String
+  String? _selectedBusId;
   String? _selectedWeekday;
   String _availabilityFilter = 'all';
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -60,7 +60,6 @@ class _BusHomeState extends State<BusHome> {
   List<Map<String, dynamic>> _getFilteredBuses() {
     List<Map<String, dynamic>> filtered = List.from(_availableBuses);
 
-    // Apply weekday filter first (filters by coding day availability)
     if (_selectedWeekday != null) {
       final selectedDate = _getDateFromWeekday(_selectedWeekday!);
       filtered = filtered.where((bus) {
@@ -70,7 +69,6 @@ class _BusHomeState extends State<BusHome> {
       }).toList();
     }
 
-    // Apply availability filter (filters by reservation status)
     if (_availabilityFilter != 'all') {
       filtered = filtered.where((bus) {
         final conductor = bus['conductorData'] as Map<String, dynamic>?;
@@ -85,11 +83,9 @@ class _BusHomeState extends State<BusHome> {
         if (_availabilityFilter == 'available') {
           return busAvailabilityStatus == 'available';
         } else if (_availabilityFilter == 'unavailable') {
-          // Include both 'unavailable' and 'pending' statuses
           return busAvailabilityStatus == 'unavailable' ||
               busAvailabilityStatus == 'pending';
         } else if (_availabilityFilter == 'reserved') {
-          // Only include 'reserved' status (verified receipts)
           return busAvailabilityStatus == 'reserved';
         }
 
@@ -98,6 +94,316 @@ class _BusHomeState extends State<BusHome> {
     }
 
     return filtered;
+  }
+
+  void _showBusDetails(Map<String, dynamic> bus) {
+    final isMobile = ResponsiveBreakpoints.of(context).isMobile;
+    final isTablet = ResponsiveBreakpoints.of(context).isTablet;
+    final conductor = bus['conductorData'] as Map<String, dynamic>?;
+    final busAvailabilityStatus = conductor != null
+        ? ReservationService.getBusAvailabilityStatus(conductor)
+        : 'available';
+
+    // Check if bus is available for reservation
+    final plateNumber = bus['plateNumber'] as String? ?? '';
+    bool isAvailable = busAvailabilityStatus == 'available';
+    
+    if (_selectedWeekday != null && isAvailable) {
+      final selectedDate = _getDateFromWeekday(_selectedWeekday!);
+      isAvailable = ReservationService.isBusAvailableForReservation(
+          plateNumber, selectedDate);
+    }
+
+    // Get status display
+    Color statusColor;
+    String statusText;
+
+    if (busAvailabilityStatus == 'pending') {
+      statusColor = Colors.orange;
+      statusText = 'Pending Payment';
+    } else if (busAvailabilityStatus == 'reserved') {
+      statusColor = Colors.blue;
+      statusText = 'Reserved (Verified)';
+    } else if (busAvailabilityStatus == 'unavailable') {
+      statusColor = Colors.red;
+      statusText = 'Unavailable';
+    } else {
+      statusColor = Colors.green;
+      statusText = 'Available';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Container(
+                margin: EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Header
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.directions_bus,
+                      color: Color(0xFF0091AD),
+                      size: isMobile ? 24 : 28,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'Bus Details',
+                      style: GoogleFonts.outfit(
+                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close, size: isMobile ? 24 : 28),
+                      onPressed: () => Navigator.pop(context),
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, thickness: 1),
+
+              // Content
+              Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.7,
+                ),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        // Bus Image
+                        if (conductor?['busImageUrl'] != null)
+                          Container(
+                            margin: EdgeInsets.only(bottom: 20),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                conductor!['busImageUrl'],
+                                width: double.infinity,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    height: 200,
+                                    color: Colors.grey.shade200,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.directions_bus,
+                                        size: 80,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+
+                        // Bus Information
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF0091AD).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildDetailRow(
+                                'Bus Number',
+                                'Bus #${conductor?['busNumber']?.toString() ?? bus['busNumber']?.toString() ?? 'N/A'}',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Plate Number',
+                                conductor?['plateNumber'] ?? bus['plateNumber'] ?? 'N/A',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Route',
+                                conductor?['route'] ?? bus['route'] ?? 'N/A',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Driver',
+                                conductor?['driverName'] ?? 'Unknown',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Conductor',
+                                conductor?['name'] ?? 'Unknown',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Available Days',
+                                List<String>.from(bus['codingDays'] ?? []).join(', '),
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              _buildDetailRow(
+                                'Price',
+                                '₱${bus['Price']}',
+                                isMobile,
+                                isTablet,
+                              ),
+                              SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Status',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: statusColor.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: statusColor,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      statusText,
+                                      style: GoogleFonts.outfit(
+                                        fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: statusColor,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        SizedBox(height: 20),
+
+                        // Continue Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: isMobile ? 50 : isTablet ? 55 : 60,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isAvailable
+                                  ? Color(0xFF0091AD)
+                                  : Colors.grey.shade400,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: isAvailable
+                                ? () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => ReservationForm(
+                                          selectedBusIds: [bus['id']],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                : null,
+                            child: Text(
+                              isAvailable
+                                  ? 'Continue with Selected Bus'
+                                  : 'Bus Not Available',
+                              style: GoogleFonts.outfit(
+                                color: Colors.white,
+                                fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, bool isMobile, bool isTablet) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        Expanded(
+          flex: 3,
+          child: Text(
+            value,
+            style: GoogleFonts.outfit(
+              fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+              color: Colors.grey[800],
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildFilterChip(String label, String value) {
@@ -126,11 +432,7 @@ class _BusHomeState extends State<BusHome> {
           label,
           style: GoogleFonts.outfit(
             color: isSelected ? Colors.white : Colors.black87,
-            fontSize: isMobile
-                ? 12
-                : isTablet
-                    ? 14
-                    : 16,
+            fontSize: isMobile ? 12 : isTablet ? 14 : 16,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -166,11 +468,9 @@ class _BusHomeState extends State<BusHome> {
       );
     }
 
-    // Get the ACTUAL reservation status
     final busAvailabilityStatus =
         ReservationService.getBusAvailabilityStatus(conductor);
 
-    // Determine status based on actual reservation status
     Color statusColor;
     String statusText;
 
@@ -191,7 +491,6 @@ class _BusHomeState extends State<BusHome> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. Driver
         RichText(
           text: TextSpan(
             children: [
@@ -212,19 +511,18 @@ class _BusHomeState extends State<BusHome> {
           ),
         ),
         SizedBox(height: 4),
-        // 2. Conductor
         RichText(
           text: TextSpan(
             children: [
               TextSpan(
-                text: 'Conductor: ',
+                text: 'Route: ',
                 style: GoogleFonts.outfit(
                   fontWeight: FontWeight.bold,
                   color: Colors.black,
                 ),
               ),
               TextSpan(
-                text: conductor['name'] ?? 'Unknown',
+                text: conductor['route'] ?? bus['route'] ?? 'N/A',
                 style: GoogleFonts.outfit(
                   color: Colors.grey[800],
                 ),
@@ -233,49 +531,6 @@ class _BusHomeState extends State<BusHome> {
           ),
         ),
         SizedBox(height: 4),
-        // 3. Plate Number (NEW)
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: 'Plate Number: ',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              TextSpan(
-                text: conductor['plateNumber'] ?? bus['plateNumber'] ?? 'N/A',
-                style: GoogleFonts.outfit(
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 4),
-        // 4. Available (codingDays from bus object)
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: 'Available: ',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              TextSpan(
-                text: List<String>.from(bus['codingDays'] ?? []).join(', '),
-                style: GoogleFonts.outfit(
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 4),
-        // 5. Status
         RichText(
           text: TextSpan(
             children: [
@@ -291,27 +546,6 @@ class _BusHomeState extends State<BusHome> {
                 style: GoogleFonts.outfit(
                   color: statusColor,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 4),
-        // 6. Price
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: 'Price: ',
-                style: GoogleFonts.outfit(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              TextSpan(
-                text: '₱${bus['Price']}',
-                style: GoogleFonts.outfit(
-                  color: Colors.grey[800],
                 ),
               ),
             ],
@@ -372,11 +606,7 @@ class _BusHomeState extends State<BusHome> {
                     Text(
                       'Filter by Day',
                       style: GoogleFonts.outfit(
-                        fontSize: isMobile
-                            ? 20
-                            : isTablet
-                                ? 22
-                                : 24,
+                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
@@ -453,11 +683,7 @@ class _BusHomeState extends State<BusHome> {
                               Text(
                                 'Show All Days',
                                 style: GoogleFonts.outfit(
-                                  fontSize: isMobile
-                                      ? 16
-                                      : isTablet
-                                          ? 18
-                                          : 20,
+                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
                                   fontWeight: _selectedWeekday == null
                                       ? FontWeight.w600
                                       : FontWeight.w500,
@@ -562,76 +788,17 @@ class _BusHomeState extends State<BusHome> {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
-    final drawerHeaderFontSize = isMobile
-        ? 30.0
-        : isTablet
-            ? 34.0
-            : 38.0;
-    final drawerItemFontSize = isMobile
-        ? 18.0
-        : isTablet
-            ? 20.0
-            : 22.0;
-    final titleFontSize = isMobile
-        ? 25.0
-        : isTablet
-            ? 28.0
-            : 32.0;
-    final busListingsFontSize = isMobile
-        ? 24.0
-        : isTablet
-            ? 28.0
-            : 32.0;
-    final busNameFontSize = isMobile
-        ? 16.0
-        : isTablet
-            ? 18.0
-            : 20.0;
-    final buttonFontSize = isMobile
-        ? 18.0
-        : isTablet
-            ? 20.0
-            : 22.0;
-    final iconSize = isMobile
-        ? 40.0
-        : isTablet
-            ? 48.0
-            : 56.0;
-    final expandedHeight = isMobile
-        ? 70.0
-        : isTablet
-            ? 80.0
-            : 90.0;
-    final horizontalPadding = isMobile
-        ? 16.0
-        : isTablet
-            ? 20.0
-            : 24.0;
-    final verticalPadding = isMobile
-        ? 12.0
-        : isTablet
-            ? 16.0
-            : 20.0;
-    final containerPadding = isMobile
-        ? 12.0
-        : isTablet
-            ? 16.0
-            : 20.0;
-    final marginSpacing = isMobile
-        ? 6.0
-        : isTablet
-            ? 8.0
-            : 10.0;
-    final horizontalMargin = isMobile
-        ? 10.0
-        : isTablet
-            ? 12.0
-            : 16.0;
-    final buttonHeight = isMobile
-        ? 50.0
-        : isTablet
-            ? 55.0
-            : 60.0;
+    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
+    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
+    final titleFontSize = isMobile ? 25.0 : isTablet ? 28.0 : 32.0;
+    final busListingsFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
+    final busNameFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
+    final expandedHeight = isMobile ? 70.0 : isTablet ? 80.0 : 90.0;
+    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
+    final verticalPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    final containerPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
+    final marginSpacing = isMobile ? 6.0 : isTablet ? 8.0 : 10.0;
+    final horizontalMargin = isMobile ? 10.0 : isTablet ? 12.0 : 16.0;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -823,11 +990,7 @@ class _BusHomeState extends State<BusHome> {
                         Text(
                           'Filter:',
                           style: GoogleFonts.outfit(
-                            fontSize: isMobile
-                                ? 14
-                                : isTablet
-                                    ? 16
-                                    : 18,
+                            fontSize: isMobile ? 14 : isTablet ? 16 : 18,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -872,10 +1035,8 @@ class _BusHomeState extends State<BusHome> {
                               conductor)
                           : 'available';
 
-                      // Determine if bus should be grayed out
                       bool isGrayedOut = false;
 
-                      // Gray out if reserved OR pending (both are unavailable for new reservations)
                       if (busAvailabilityStatus == 'reserved' ||
                           busAvailabilityStatus == 'pending' ||
                           busAvailabilityStatus == 'unavailable') {
@@ -889,137 +1050,67 @@ class _BusHomeState extends State<BusHome> {
                         isGrayedOut = !isAvailableOnSelectedDay;
                       }
 
-                      final isSelected = _selectedBusId == bus['id'];
-
-                      return Container(
-                        margin: EdgeInsets.symmetric(
-                            vertical: marginSpacing,
-                            horizontal: horizontalMargin),
-                        padding: EdgeInsets.all(containerPadding),
-                        decoration: BoxDecoration(
-                          color:
-                              isGrayedOut ? Colors.grey.shade100 : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                      return GestureDetector(
+                        onTap: () => _showBusDetails(bus),
+                        child: Container(
+                          margin: EdgeInsets.symmetric(
+                              vertical: marginSpacing,
+                              horizontal: horizontalMargin),
+                          padding: EdgeInsets.all(containerPadding),
+                          decoration: BoxDecoration(
+                            color: isGrayedOut
+                                ? Colors.grey.shade100
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: isGrayedOut
+                                  ? Colors.grey.shade400
+                                  : const Color(0xFF0091AD).withOpacity(0.7),
+                              width: 2,
                             ),
-                          ],
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.green
-                                : isGrayedOut
-                                    ? Colors.grey.shade400
-                                    : const Color(0xFF0091AD).withOpacity(0.7),
-                            width: 2,
                           ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.directions_bus,
-                                  size: iconSize,
-                                  color: isGrayedOut
-                                      ? Colors.grey.shade500
-                                      : Color(0xFF0091AD),
-                                ),
-                                SizedBox(width: isMobile ? 12 : 16),
-                                Expanded(
-                                  child: Text(
-                                    'Bus #${conductor?['busNumber']?.toString() ?? bus['busNumber']?.toString() ?? 'N/A'}',
-                                    style: GoogleFonts.outfit(
-                                      fontSize: busNameFontSize,
-                                      fontWeight: FontWeight.bold,
-                                      color: isGrayedOut
-                                          ? Colors.grey.shade600
-                                          : Color(0xFF0091AD),
-                                    ),
-                                    overflow: TextOverflow.visible,
-                                    maxLines: 2,
-                                  ),
-                                ),
-                                Radio<String>(
-                                  activeColor: Color(0xFF0091AD),
-                                  value: bus['id'],
-                                  groupValue: _selectedBusId,
-                                  onChanged: isGrayedOut
-                                      ? null
-                                      : (String? value) {
-                                          // Verify bus is actually available
-                                          if (busAvailabilityStatus !=
-                                              'available') {
-                                            String reason = busAvailabilityStatus ==
-                                                    'pending'
-                                                ? '(payment pending)'
-                                                : busAvailabilityStatus ==
-                                                        'reserved'
-                                                    ? '(already reserved and verified)'
-                                                    : '(not available)';
-
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                    'Bus is not available $reason'),
-                                                duration: Duration(seconds: 2),
-                                                backgroundColor:
-                                                    Colors.red.shade400,
-                                              ),
-                                            );
-                                            return;
-                                          }
-
-                                          // If weekday filter is active, check coding day
-                                          if (_selectedWeekday != null) {
-                                            final selectedDate =
-                                                _getDateFromWeekday(
-                                                    _selectedWeekday!);
-                                            final isAvailableOnDay =
-                                                ReservationService
-                                                    .isBusAvailableForReservation(
-                                                        plateNumber,
-                                                        selectedDate);
-
-                                            if (!isAvailableOnDay) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                      'Bus is not available on $_selectedWeekday'),
-                                                  duration:
-                                                      Duration(seconds: 2),
-                                                  backgroundColor:
-                                                      Colors.red.shade400,
-                                                ),
-                                              );
-                                              return;
-                                            }
-                                          }
-
-                                          setState(() {
-                                            _selectedBusId = value;
-                                          });
-                                        },
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: isMobile ? 12 : 16),
-                            Padding(
-                              padding:
-                                  EdgeInsets.only(left: isMobile ? 10 : 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  _buildConductorInfo(bus),
+                                  Expanded(
+                                    child: Text(
+                                      'Bus #${conductor?['busNumber']?.toString() ?? bus['busNumber']?.toString() ?? 'N/A'}',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: busNameFontSize,
+                                        fontWeight: FontWeight.bold,
+                                        color: isGrayedOut
+                                            ? Colors.grey.shade600
+                                            : Color(0xFF0091AD),
+                                      ),
+                                      overflow: TextOverflow.visible,
+                                      maxLines: 2,
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.chevron_right,
+                                    color: isGrayedOut
+                                        ? Colors.grey.shade500
+                                        : Color(0xFF0091AD),
+                                  ),
                                 ],
                               ),
-                            ),
-                          ],
+                              SizedBox(height: isMobile ? 12 : 16),
+                              Padding(
+                                padding:
+                                    EdgeInsets.only(left: isMobile ? 0 : 8),
+                                child: _buildConductorInfo(bus),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -1027,43 +1118,6 @@ class _BusHomeState extends State<BusHome> {
                   ),
                 ),
         ],
-      ),
-      bottomNavigationBar: SafeArea(
-        bottom: true,
-        top: false,
-        left: false,
-        right: false,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _selectedBusId != null
-                  ? const Color(0xFF0091AD)
-                  : Colors.grey.shade400,
-              minimumSize: Size(double.infinity, buttonHeight),
-            ),
-            onPressed: _selectedBusId != null
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ReservationForm(
-                          selectedBusIds: [_selectedBusId!],
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            child: Text(
-              'Continue with Selected Bus',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: buttonFontSize,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

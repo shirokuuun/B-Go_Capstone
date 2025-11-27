@@ -1,6 +1,7 @@
 import 'package:b_go/pages/passenger/home_page.dart';
 import 'package:flutter/material.dart';
-import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_home.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/bus_calendar_page.dart';
+import 'package:b_go/pages/bus_reserve/bus_reserve_pages/user_reservations.dart';
 import 'package:responsive_framework/responsive_framework.dart';
 
 class UserSelection extends StatefulWidget {
@@ -18,29 +19,31 @@ class _UserSelectionState extends State<UserSelection> {
       'name': 'Passenger',
       'description': 'Track buses in real time and ride with ease.',
       'icon': Icons.person,
-      'color': Color(0xFF0091AD), // Teal color
+      'color': Color(0xFF0091AD),
     },
     {
       'name': 'Bus Reservation',
-      'description': 'Manage trips, seats, and schedules seamlessly.',
+      'description': 'Reserve a bus for your trip.',
       'icon': Icons.directions_bus,
-      'color': Color(0xFF0091AD), // Teal color
+      'color': Color(0xFF0091AD),
+    },
+    {
+      'name': 'My Reservations',
+      'description': 'View and manage your bus reservations.',
+      'icon': Icons.receipt_long,
+      'color': Color(0xFF0091AD),
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    // Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
     
-    // Get screen dimensions
     final screenHeight = MediaQuery.of(context).size.height;
     
-    // Responsive sizing
     final titleFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
     final containerWidth = isMobile ? 0.85 : isTablet ? 0.7 : 0.6;
-    // Slightly bigger for small screens to prevent overflow - 150px
     final containerHeight = screenHeight < 700 ? 130.0 : (isMobile ? 120.0 : isTablet ? 150.0 : 160.0);
     final iconSize = isMobile ? 40.0 : isTablet ? 48.0 : 56.0;
     final sparkleSize = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
@@ -50,7 +53,7 @@ class _UserSelectionState extends State<UserSelection> {
     final bottomPadding = isMobile ? 16.0 : 24.0;
     
     return PopScope(
-      canPop: false, // This disables the back button
+      canPop: false,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -62,81 +65,116 @@ class _UserSelectionState extends State<UserSelection> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Role selection containers
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Title section - positioned above Passenger container
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            left: MediaQuery.of(context).size.width * ((1 - containerWidth) / 2),
-                            bottom: 12,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(height: 20),
+                        // Title section
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              left: MediaQuery.of(context).size.width * ((1 - containerWidth) / 2),
+                              bottom: 12,
+                            ),
+                            child: Text(
+                              'Choose your role below',
+                              style: TextStyle(
+                                fontSize: titleFontSize,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                                fontFamily: 'Outfit',
+                              ),
+                            ),
                           ),
+                        ),
+                        
+                        // Passenger option
+                        _buildRoleContainer(
+                          context,
+                          roles[0],
+                          0,
+                          containerWidth,
+                          containerHeight,
+                          iconSize,
+                          sparkleSize,
+                          circleSize,
+                          isMobile,
+                          screenHeight,
+                          () {
+                            setState(() {
+                              selectedIndex = 0;
+                            });
+                          },
+                        ),
+                        
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: screenHeight < 700 ? 8.0 : 12.0),
                           child: Text(
-                            'Choose your role below',
+                            'or',
                             style: TextStyle(
-                              fontSize: titleFontSize,
-                              fontWeight: FontWeight.bold,
+                              fontSize: titleFontSize * 0.8,
                               color: Colors.black,
                               fontFamily: 'Outfit',
                             ),
                           ),
                         ),
-                      ),
-                      // Passenger option
-                      _buildRoleContainer(
-                        context,
-                        roles[0],
-                        0, // index
-                        containerWidth,
-                        containerHeight,
-                        iconSize,
-                        sparkleSize,
-                        circleSize,
-                        isMobile,
-                        screenHeight,
-                        () {
-                          setState(() {
-                            selectedIndex = 0;
-                          });
-                        },
-                      ),
-                      
-                      // "or" separator
-                      Padding(
-                        padding: EdgeInsets.symmetric(vertical: screenHeight < 700 ? 8.0 : 12.0),
-                        child: Text(
-                          'or',
-                          style: TextStyle(
-                            fontSize: titleFontSize * 0.8,
-                            color: Colors.black,
-                            fontFamily: 'Outfit',
+                        
+                        // Bus Reservation option
+                        _buildRoleContainer(
+                          context,
+                          roles[1],
+                          1,
+                          containerWidth,
+                          containerHeight,
+                          iconSize,
+                          sparkleSize,
+                          circleSize,
+                          isMobile,
+                          screenHeight,
+                          () {
+                            setState(() {
+                              selectedIndex = 1;
+                            });
+                          },
+                        ),
+                        
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: screenHeight < 700 ? 8.0 : 12.0),
+                          child: Text(
+                            'or',
+                            style: TextStyle(
+                              fontSize: titleFontSize * 0.8,
+                              color: Colors.black,
+                              fontFamily: 'Outfit',
+                            ),
                           ),
                         ),
-                      ),
-                      
-                      // Bus Reservation option
-                      _buildRoleContainer(
-                        context,
-                        roles[1],
-                        1, // index
-                        containerWidth,
-                        containerHeight,
-                        iconSize,
-                        sparkleSize,
-                        circleSize,
-                        isMobile,
-                        screenHeight,
-                        () {
-                          setState(() {
-                            selectedIndex = 1;
-                          });
-                        },
-                      ),
-                    ],
+                        
+                        // My Reservations option
+                        _buildRoleContainer(
+                          context,
+                          roles[2],
+                          2,
+                          containerWidth,
+                          containerHeight,
+                          iconSize,
+                          sparkleSize,
+                          circleSize,
+                          isMobile,
+                          screenHeight,
+                          () {
+                            setState(() {
+                              selectedIndex = 2;
+                            });
+                          },
+                        ),
+                        
+                        SizedBox(height: 20),
+                      ],
+                    ),
                   ),
                 ),
                 
@@ -185,6 +223,7 @@ class _UserSelectionState extends State<UserSelection> {
   void _handleContinue() {
     if (selectedIndex != null) {
       if (selectedIndex == 0) {
+        // Navigate to Passenger
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -192,9 +231,16 @@ class _UserSelectionState extends State<UserSelection> {
           ),
         );
       } else if (selectedIndex == 1) {
+        // Navigate to Bus Reservation (Calendar)
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (context) => BusHome()),
+          MaterialPageRoute(builder: (context) => BusCalendarPage()),
+        );
+      } else if (selectedIndex == 2) {
+        // Navigate to My Reservations
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => UserReservations()),
         );
       }
     }
@@ -214,7 +260,6 @@ class _UserSelectionState extends State<UserSelection> {
     VoidCallback onTap,
   ) {
     final isSelected = selectedIndex == index;
-    // Adjust font sizes for small screens - slightly bigger now
     final titleSize = screenHeight < 700 ? 17.0 : (isMobile ? 18.0 : 22.0);
     final descSize = screenHeight < 700 ? 13.0 : (isMobile ? 14.0 : 16.0);
     final adjustedIconSize = screenHeight < 700 ? 40.0 : iconSize;
@@ -277,7 +322,7 @@ class _UserSelectionState extends State<UserSelection> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Person illustration (icon)
+                  // Icon
                   Container(
                     width: adjustedIconSize,
                     height: adjustedIconSize,
@@ -294,7 +339,7 @@ class _UserSelectionState extends State<UserSelection> {
                   
                   SizedBox(width: 16),
                   
-                  // Text content - Using Flexible to prevent overflow
+                  // Text content
                   Flexible(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,

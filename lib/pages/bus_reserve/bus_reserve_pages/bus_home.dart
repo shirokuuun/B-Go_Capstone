@@ -1,4 +1,3 @@
-import 'package:b_go/pages/bus_reserve/bus_reserve_pages/reservation_form.dart';
 import 'package:b_go/pages/bus_reserve/bus_reserve_pages/user_reservations.dart';
 import 'package:b_go/pages/user_role/user_selection.dart';
 import 'package:flutter/material.dart';
@@ -107,7 +106,7 @@ class _BusHomeState extends State<BusHome> {
     // Check if bus is available for reservation
     final plateNumber = bus['plateNumber'] as String? ?? '';
     bool isAvailable = busAvailabilityStatus == 'available';
-    
+
     if (_selectedWeekday != null && isAvailable) {
       final selectedDate = _getDateFromWeekday(_selectedWeekday!);
       isAvailable = ReservationService.isBusAvailableForReservation(
@@ -173,7 +172,11 @@ class _BusHomeState extends State<BusHome> {
                     Text(
                       'Bus Details',
                       style: GoogleFonts.outfit(
-                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontSize: isMobile
+                            ? 20
+                            : isTablet
+                                ? 22
+                                : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
@@ -244,7 +247,9 @@ class _BusHomeState extends State<BusHome> {
                               SizedBox(height: 12),
                               _buildDetailRow(
                                 'Plate Number',
-                                conductor?['plateNumber'] ?? bus['plateNumber'] ?? 'N/A',
+                                conductor?['plateNumber'] ??
+                                    bus['plateNumber'] ??
+                                    'N/A',
                                 isMobile,
                                 isTablet,
                               ),
@@ -272,7 +277,8 @@ class _BusHomeState extends State<BusHome> {
                               SizedBox(height: 12),
                               _buildDetailRow(
                                 'Available Days',
-                                List<String>.from(bus['codingDays'] ?? []).join(', '),
+                                List<String>.from(bus['codingDays'] ?? [])
+                                    .join(', '),
                                 isMobile,
                                 isTablet,
                               ),
@@ -285,12 +291,17 @@ class _BusHomeState extends State<BusHome> {
                               ),
                               SizedBox(height: 12),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     'Status',
                                     style: GoogleFonts.outfit(
-                                      fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+                                      fontSize: isMobile
+                                          ? 14
+                                          : isTablet
+                                              ? 16
+                                              : 18,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.black87,
                                     ),
@@ -311,7 +322,11 @@ class _BusHomeState extends State<BusHome> {
                                     child: Text(
                                       statusText,
                                       style: GoogleFonts.outfit(
-                                        fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+                                        fontSize: isMobile
+                                            ? 12
+                                            : isTablet
+                                                ? 14
+                                                : 16,
                                         fontWeight: FontWeight.w600,
                                         color: statusColor,
                                       ),
@@ -326,41 +341,34 @@ class _BusHomeState extends State<BusHome> {
                         SizedBox(height: 20),
 
                         // Continue Button
-                        SizedBox(
-                          width: double.infinity,
-                          height: isMobile ? 50 : isTablet ? 55 : 60,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isAvailable
-                                  ? Color(0xFF0091AD)
-                                  : Colors.grey.shade400,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF0091AD).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Color(0xFF0091AD).withOpacity(0.3),
                             ),
-                            onPressed: isAvailable
-                                ? () {
-                                    Navigator.pop(context);
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => ReservationForm(
-                                          selectedBusIds: [bus['id']],
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                : null,
-                            child: Text(
-                              isAvailable
-                                  ? 'Continue with Selected Bus'
-                                  : 'Bus Not Available',
-                              style: GoogleFonts.outfit(
-                                color: Colors.white,
-                                fontSize: isMobile ? 16 : isTablet ? 18 : 20,
-                                fontWeight: FontWeight.bold,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: Color(0xFF0091AD),
+                                size: isMobile ? 20 : 24,
                               ),
-                            ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'To make a reservation, please go back and use the calendar to select your preferred date first.',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: isMobile ? 14 : 16,
+                                    color: Color(0xFF0091AD),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -375,7 +383,8 @@ class _BusHomeState extends State<BusHome> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, bool isMobile, bool isTablet) {
+  Widget _buildDetailRow(
+      String label, String value, bool isMobile, bool isTablet) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -385,7 +394,11 @@ class _BusHomeState extends State<BusHome> {
           child: Text(
             label,
             style: GoogleFonts.outfit(
-              fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+              fontSize: isMobile
+                  ? 14
+                  : isTablet
+                      ? 16
+                      : 18,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
@@ -396,7 +409,11 @@ class _BusHomeState extends State<BusHome> {
           child: Text(
             value,
             style: GoogleFonts.outfit(
-              fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+              fontSize: isMobile
+                  ? 14
+                  : isTablet
+                      ? 16
+                      : 18,
               color: Colors.grey[800],
             ),
             textAlign: TextAlign.right,
@@ -432,7 +449,11 @@ class _BusHomeState extends State<BusHome> {
           label,
           style: GoogleFonts.outfit(
             color: isSelected ? Colors.white : Colors.black87,
-            fontSize: isMobile ? 12 : isTablet ? 14 : 16,
+            fontSize: isMobile
+                ? 12
+                : isTablet
+                    ? 14
+                    : 16,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -606,7 +627,11 @@ class _BusHomeState extends State<BusHome> {
                     Text(
                       'Filter by Day',
                       style: GoogleFonts.outfit(
-                        fontSize: isMobile ? 20 : isTablet ? 22 : 24,
+                        fontSize: isMobile
+                            ? 20
+                            : isTablet
+                                ? 22
+                                : 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.black87,
                       ),
@@ -683,7 +708,11 @@ class _BusHomeState extends State<BusHome> {
                               Text(
                                 'Show All Days',
                                 style: GoogleFonts.outfit(
-                                  fontSize: isMobile ? 16 : isTablet ? 18 : 20,
+                                  fontSize: isMobile
+                                      ? 16
+                                      : isTablet
+                                          ? 18
+                                          : 20,
                                   fontWeight: _selectedWeekday == null
                                       ? FontWeight.w600
                                       : FontWeight.w500,
@@ -788,17 +817,61 @@ class _BusHomeState extends State<BusHome> {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
 
-    final drawerHeaderFontSize = isMobile ? 30.0 : isTablet ? 34.0 : 38.0;
-    final drawerItemFontSize = isMobile ? 18.0 : isTablet ? 20.0 : 22.0;
-    final titleFontSize = isMobile ? 25.0 : isTablet ? 28.0 : 32.0;
-    final busListingsFontSize = isMobile ? 24.0 : isTablet ? 28.0 : 32.0;
-    final busNameFontSize = isMobile ? 16.0 : isTablet ? 18.0 : 20.0;
-    final expandedHeight = isMobile ? 70.0 : isTablet ? 80.0 : 90.0;
-    final horizontalPadding = isMobile ? 16.0 : isTablet ? 20.0 : 24.0;
-    final verticalPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    final containerPadding = isMobile ? 12.0 : isTablet ? 16.0 : 20.0;
-    final marginSpacing = isMobile ? 6.0 : isTablet ? 8.0 : 10.0;
-    final horizontalMargin = isMobile ? 10.0 : isTablet ? 12.0 : 16.0;
+    final drawerHeaderFontSize = isMobile
+        ? 30.0
+        : isTablet
+            ? 34.0
+            : 38.0;
+    final drawerItemFontSize = isMobile
+        ? 18.0
+        : isTablet
+            ? 20.0
+            : 22.0;
+    final titleFontSize = isMobile
+        ? 25.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final busListingsFontSize = isMobile
+        ? 24.0
+        : isTablet
+            ? 28.0
+            : 32.0;
+    final busNameFontSize = isMobile
+        ? 16.0
+        : isTablet
+            ? 18.0
+            : 20.0;
+    final expandedHeight = isMobile
+        ? 70.0
+        : isTablet
+            ? 80.0
+            : 90.0;
+    final horizontalPadding = isMobile
+        ? 16.0
+        : isTablet
+            ? 20.0
+            : 24.0;
+    final verticalPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final containerPadding = isMobile
+        ? 12.0
+        : isTablet
+            ? 16.0
+            : 20.0;
+    final marginSpacing = isMobile
+        ? 6.0
+        : isTablet
+            ? 8.0
+            : 10.0;
+    final horizontalMargin = isMobile
+        ? 10.0
+        : isTablet
+            ? 12.0
+            : 16.0;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -886,7 +959,7 @@ class _BusHomeState extends State<BusHome> {
             title: Padding(
               padding: EdgeInsets.only(top: 22.0),
               child: Text(
-                'Bus Reservation',
+                'BATRASCO',
                 style: GoogleFonts.outfit(
                   fontSize: titleFontSize,
                   color: Colors.white,
@@ -990,7 +1063,11 @@ class _BusHomeState extends State<BusHome> {
                         Text(
                           'Filter:',
                           style: GoogleFonts.outfit(
-                            fontSize: isMobile ? 14 : isTablet ? 16 : 18,
+                            fontSize: isMobile
+                                ? 14
+                                : isTablet
+                                    ? 16
+                                    : 18,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

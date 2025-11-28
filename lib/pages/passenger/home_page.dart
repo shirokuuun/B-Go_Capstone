@@ -56,6 +56,9 @@ class _HomePageState extends State<HomePage> {
   // Store ETA calculations for each bus with timestamp
   Map<String, Map<String, dynamic>> _busETAs = {};
 
+  // Track which buses have already triggered notifications to avoid duplicates
+  Set<String> _notifiedBuses = {};
+
   @override
   void initState() {
     super.initState();
@@ -188,6 +191,8 @@ class _HomePageState extends State<HomePage> {
           _buses = buses;
           _debugBusData(); // Add debug output
           _updateMarkers();
+          // Check for nearby buses and show notification
+          _checkNearbyBuses();
           // Note: ETAs are no longer calculated automatically
           // They will be calculated only when user taps a bus
         });
@@ -366,14 +371,255 @@ class _HomePageState extends State<HomePage> {
       if (mounted) {
         setState(() {
           _updateMarkers();
-          // Note: ETAs are no longer calculated automatically
-          // They will be calculated only when user taps a bus
+          // Check for nearby buses after getting location
+          _checkNearbyBuses();
         });
       }
     } catch (e) {
       print('❌ Error getting user location: $e');
       _userLocation = const LatLng(13.9407, 121.1529); // Fallback to center
     }
+  }
+
+  // Check for nearby buses and show notification
+  void _checkNearbyBuses() {
+    if (_userLocation == null) return;
+
+    for (final bus in _buses) {
+      // Calculate distance to user
+      final distance = _calculateDistance(
+        bus.location.latitude,
+        bus.location.longitude,
+        _userLocation!.latitude,
+        _userLocation!.longitude,
+      );
+
+      // Check if bus is within 1km to 1.5km range
+      if (distance >= 1.0 && distance <= 1.5) {
+        // Only notify if this bus hasn't been notified before
+        if (!_notifiedBuses.contains(bus.conductorId)) {
+          _notifiedBuses.add(bus.conductorId);
+          _showBusNearbyNotification(bus, distance);
+          print(
+              '🔔 Notification shown for bus: ${bus.conductorId} at ${distance.toStringAsFixed(2)}km');
+        }
+      } else if (distance > 1.5) {
+        // Reset notification status if bus moves away
+        _notifiedBuses.remove(bus.conductorId);
+      }
+    }
+  }
+
+  // Show bus nearby notification modal
+  void _showBusNearbyNotification(BusLocation bus, double distance) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Subscribe to bus updates to get real-time distance
+            return StreamBuilder<List<BusLocation>>(
+              stream: _busLocationService.getOnlineBuses(),
+              builder: (context, snapshot) {
+                // Find the current bus from the stream
+                BusLocation? currentBus;
+                double currentDistance = distance;
+
+                if (snapshot.hasData) {
+                  try {
+                    currentBus = snapshot.data!.firstWhere(
+                      (b) => b.conductorId == bus.conductorId,
+                    );
+
+                    // Calculate current distance
+                    if (_userLocation != null) {
+                      currentDistance = _calculateDistance(
+                        currentBus.location.latitude,
+                        currentBus.location.longitude,
+                        _userLocation!.latitude,
+                        _userLocation!.longitude,
+                      );
+                    }
+                  } catch (e) {
+                    currentBus = bus;
+                    currentDistance = distance;
+                  }
+                } else {
+                  currentBus = bus;
+                }
+
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  child: Container(
+                    margin: EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF0091AD), Color(0xFF00C4CC)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black38,
+                          blurRadius: 20,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Animated bus icon
+                        Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 10,
+                                offset: Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.directions_bus,
+                            size: 48,
+                            color: Color(0xFF0091AD),
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        // Title
+                        Text(
+                          '🚌 Bus Approaching!',
+                          style: GoogleFonts.outfit(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 12),
+                        // Route info
+                        Container(
+                          padding:
+                              EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            currentBus?.route.trim() ?? bus.route.trim(),
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        // Distance info - NOW UPDATES IN REAL-TIME
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              currentDistance < 1
+                                  ? '${(currentDistance * 1000).round()} m away'
+                                  : '${currentDistance.toStringAsFixed(1)} km away',
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        // Conductor name
+                        Text(
+                          'Conductor: ${currentBus?.conductorName ?? bus.conductorName}',
+                          style: GoogleFonts.outfit(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.9),
+                          ),
+                        ),
+                        SizedBox(height: 24),
+                        // Action buttons
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      Colors.white.withOpacity(0.2),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                        color: Colors.white, width: 1),
+                                  ),
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: Text(
+                                  'Dismiss',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _showBusInfoPopup(currentBus ?? bus);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Color(0xFF0091AD),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: EdgeInsets.symmetric(vertical: 12),
+                                ),
+                                child: Text(
+                                  'View Details',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   // Calculate ETA for a bus to reach user's location using actual roads
@@ -638,8 +884,7 @@ class _HomePageState extends State<HomePage> {
         print('⏰ Cache expired for ${bus.conductorId}, will recalculate');
       }
     }
-
-    // Only calculate ETA if we don't have a valid cache or bus moved significantly
+// Only calculate ETA if we don't have a valid cache or bus moved significantly
     if (!hasValidCache || needsRecalculation) {
       print('🔄 Calculating new ETA for ${bus.conductorId}');
       _calculateRoadBasedETA(bus);
@@ -831,19 +1076,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Helper method to match routes properly (handles trailing spaces)
+// Helper method to match routes properly (handles trailing spaces)
   bool _matchesRoute(String busRoute, String selectedRoute) {
     final normalizedBusRoute = busRoute.trim().toLowerCase();
     final normalizedSelectedRoute = selectedRoute.trim().toLowerCase();
     return normalizedBusRoute == normalizedSelectedRoute;
   }
 
-  // Updated _getBusIcon with better fallback logic
+// Updated _getBusIcon with better fallback logic
   BitmapDescriptor _getBusIcon(String route) {
     final routeKey = route.trim().toLowerCase();
-    print('Getting bus icon for route: "$route" (normalized: "$routeKey")');
+    print(
+        'Getting bus icon for route: "route"(normalized:"route" (normalized: "route"(normalized:"routeKey")');
 
-    // If icons are not loaded yet, use default colored markers immediately
+// If icons are not loaded yet, use default colored markers immediately
     if (!_iconsLoaded || _busIcons.isEmpty) {
       print('Icons not ready, using fallback color marker');
       switch (routeKey) {
@@ -870,13 +1116,13 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // Try exact match first
+// Try exact match first
     if (_busIcons.containsKey(routeKey)) {
       print('Found exact match for route: $routeKey');
       return _busIcons[routeKey]!;
     }
 
-    // Try partial matches
+// Try partial matches
     for (String key in _busIcons.keys) {
       if (key != 'default' &&
           (routeKey.contains(key) || key.contains(routeKey))) {
@@ -885,7 +1131,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
 
-    // Fallback to default
+// Fallback to default
     print('Using default bus icon for route: $routeKey');
     return _busIcons['default'] ??
         BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
@@ -915,7 +1161,6 @@ class _HomePageState extends State<HomePage> {
   void _showFilterBottomSheet() {
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -1149,11 +1394,10 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Get responsive breakpoints
+// Get responsive breakpoints
     final isMobile = ResponsiveBreakpoints.of(context).isMobile;
     final isTablet = ResponsiveBreakpoints.of(context).isTablet;
-
-    // Responsive sizing
+// Responsive sizing
     final titleFontSize = isMobile
         ? 20.0
         : isTablet

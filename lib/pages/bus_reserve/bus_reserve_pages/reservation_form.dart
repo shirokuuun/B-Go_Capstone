@@ -10,8 +10,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class ReservationForm extends StatefulWidget {
   final List<String> selectedBusIds;
+  final DateTime selectedDate; // Added selectedDate parameter
 
-  ReservationForm({Key? key, required this.selectedBusIds}) : super(key: key);
+  ReservationForm({
+    Key? key, 
+    required this.selectedBusIds,
+    required this.selectedDate, // Made it required
+  }) : super(key: key);
 
   @override
   State<ReservationForm> createState() => _ReservationFormState();
@@ -21,15 +26,11 @@ class _ReservationFormState extends State<ReservationForm> {
   final TextEditingController _fromController = TextEditingController();
   final TextEditingController _toController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _contactNumberController =
-      TextEditingController();
-  final TextEditingController _departureTimeController =
-      TextEditingController();
-  final TextEditingController _passengerCountController =
-      TextEditingController();
+  final TextEditingController _contactNumberController = TextEditingController();
+  final TextEditingController _departureTimeController = TextEditingController();
+  final TextEditingController _passengerCountController = TextEditingController();
 
   bool _isRoundTrip = false;
-  DateTime? _departureDate;
   Map<String, dynamic>? _selectedBus;
 
   @override
@@ -131,7 +132,6 @@ class _ReservationFormState extends State<ReservationForm> {
       _departureTimeController.clear();
       _passengerCountController.clear();
       _isRoundTrip = false;
-      _departureDate = null;
     });
   }
 
@@ -147,118 +147,91 @@ class _ReservationFormState extends State<ReservationForm> {
     });
   }
 
-  List<String> _getSelectedBusCodingDays() {
-    if (_selectedBus == null) return [];
+  Future<void> _submitReservation() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.email == null) {
+      _showCustomSnackBar('Please log in to make a reservation', 'error');
+      return;
+    }
 
-    final codingDays = List<String>.from(_selectedBus!['codingDays'] ?? []);
-    return codingDays;
-  }
+    final from = _fromController.text.trim();
+    final to = _toController.text.trim();
+    final fullName = _fullNameController.text.trim();
+    final email = user.email!;
+    final contactNumber = _contactNumberController.text.trim();
+    final departureTime = _departureTimeController.text.trim();
+    final passengerCount = _passengerCountController.text.trim();
 
-  bool _isDateValidForSelectedBus(DateTime date) {
-    final selectedCodingDays = _getSelectedBusCodingDays();
-    if (selectedCodingDays.isEmpty) return true;
+    if (from.isEmpty ||
+        to.isEmpty ||
+        fullName.isEmpty ||
+        contactNumber.isEmpty ||
+        departureTime.isEmpty ||
+        passengerCount.isEmpty) {
+      _showCustomSnackBar('Please fill out all fields', 'warning');
+      return;
+    }
 
-    final weekday = DateFormat('EEEE').format(date);
-    return selectedCodingDays.contains(weekday);
-  }
+    if (!_isValidPhoneNumber(contactNumber)) {
+      _showCustomSnackBar(
+          'Please enter a valid contact number (10-11 digits)', 'warning');
+      return;
+    }
 
-Future<void> _submitReservation() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null || user.email == null) {
-    _showCustomSnackBar('Please log in to make a reservation', 'error');
-    return;
-  }
+    if (!_isValidPassengerCount(passengerCount)) {
+      _showCustomSnackBar(
+          'Please enter a valid number of passengers (1-22)', 'warning');
+      return;
+    }
 
-  final from = _fromController.text.trim();
-  final to = _toController.text.trim();
-  final fullName = _fullNameController.text.trim();
-  final email = user.email!;
-  final contactNumber = _contactNumberController.text.trim();
-  final departureTime = _departureTimeController.text.trim();
-  final passengerCount = _passengerCountController.text.trim();
+    try {
+      final reservationId = await ReservationService.saveReservation(
+        selectedBusIds: widget.selectedBusIds,
+        from: from,
+        to: to,
+        isRoundTrip: _isRoundTrip,
+        fullName: fullName,
+        email: email,
+        departureDate: widget.selectedDate, // Use the passed selectedDate
+        departureTime: departureTime,
+        passengerCount: passengerCount,
+      );
 
-  if (from.isEmpty ||
-      to.isEmpty ||
-      fullName.isEmpty ||
-      contactNumber.isEmpty ||
-      departureTime.isEmpty ||
-      passengerCount.isEmpty ||
-      _departureDate == null) {
-    _showCustomSnackBar('Please fill out all fields', 'warning');
-    return;
-  }
+      // Get conductor data from _selectedBus
+      final conductorData = _selectedBus?['conductorData'] as Map<String, dynamic>?;
 
-  if (!_isDateValidForSelectedBus(_departureDate!)) {
-    final selectedCodingDays = _getSelectedBusCodingDays();
-    _showCustomSnackBar(
-      'Selected date is not available for the chosen bus. Available days: ${selectedCodingDays.join(', ')}',
-      'error',
-    );
-    return;
-  }
+      final reservationDetails = {
+        'from': from,
+        'to': to,
+        'isRoundTrip': _isRoundTrip,
+        'fullName': fullName,
+        'email': email,
+        'departureDate': DateFormat('EEE, MMM d, yyyy').format(widget.selectedDate),
+        'departureTime': departureTime,
+        'passengerCount': passengerCount,
+        'contactNumber': contactNumber,
+        // Add bus information
+        'driverName': conductorData?['driverName'] ?? 'N/A',
+        'plateNumber': conductorData?['plateNumber'] ?? _selectedBus?['plateNumber'] ?? 'N/A',
+        'busNumber': conductorData?['busNumber']?.toString() ?? _selectedBus?['busNumber']?.toString() ?? 'N/A',
+      };
 
-  if (!_isValidPhoneNumber(contactNumber)) {
-    _showCustomSnackBar(
-        'Please enter a valid contact number (10-11 digits)', 'warning');
-    return;
-  }
+      _clearForm();
 
-  if (!_isValidPassengerCount(passengerCount)) {
-    _showCustomSnackBar(
-        'Please enter a valid number of passengers (1-22)', 'warning');
-    return;
-  }
-
-  try {
-    final reservationId = await ReservationService.saveReservation(
-      selectedBusIds: widget.selectedBusIds,
-      from: from,
-      to: to,
-      isRoundTrip: _isRoundTrip,
-      fullName: fullName,
-      email: email,
-      departureDate: _departureDate,
-      departureTime: departureTime,
-      passengerCount: passengerCount,
-    );
-
-    // Get conductor data from _selectedBus
-    final conductorData = _selectedBus?['conductorData'] as Map<String, dynamic>?;
-
-    final reservationDetails = {
-      'from': from,
-      'to': to,
-      'isRoundTrip': _isRoundTrip,
-      'fullName': fullName,
-      'email': email,
-      'departureDate': _departureDate != null
-          ? DateFormat('EEE, MMM d, yyyy').format(_departureDate!)
-          : 'Not selected',
-      'departureTime': departureTime,
-      'passengerCount': passengerCount,
-      'contactNumber': contactNumber,
-      // Add bus information
-      'driverName': conductorData?['driverName'] ?? 'N/A',
-      'plateNumber': conductorData?['plateNumber'] ?? _selectedBus?['plateNumber'] ?? 'N/A',
-      'busNumber': conductorData?['busNumber']?.toString() ?? _selectedBus?['busNumber']?.toString() ?? 'N/A',
-    };
-
-    _clearForm();
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PaymentPage(
-          reservationId: reservationId,
-          selectedBusIds: widget.selectedBusIds,
-          reservationDetails: reservationDetails,
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentPage(
+            reservationId: reservationId,
+            selectedBusIds: widget.selectedBusIds,
+            reservationDetails: reservationDetails,
+          ),
         ),
-      ),
-    );
-  } catch (e) {
-    _showCustomSnackBar('Error: $e', 'error');
+      );
+    } catch (e) {
+      _showCustomSnackBar('Error: $e', 'error');
+    }
   }
-}
 
   Widget _buildFormField(
     String label,
@@ -343,40 +316,7 @@ Future<void> _submitReservation() async {
   bool _isValidPassengerCount(String count) {
     if (count.isEmpty) return false;
     final number = int.tryParse(count);
-    return number != null &&
-        number > 0 &&
-        number <= 22; 
-  }
-
-  Future<void> _selectDepartureDate() async {
-    final selectedCodingDays = _getSelectedBusCodingDays();
-
-    if (selectedCodingDays.isEmpty) {
-      _showCustomSnackBar(
-          'No bus selected or coding days not found', 'warning');
-      return;
-    }
-
-    DateTime initialDate = _departureDate ?? DateTime.now();
-    while (!_isDateValidForSelectedBus(initialDate)) {
-      initialDate = initialDate.add(Duration(days: 1));
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 365)),
-      selectableDayPredicate: (DateTime date) {
-        return _isDateValidForSelectedBus(date);
-      },
-    );
-
-    if (picked != null && picked != _departureDate) {
-      setState(() {
-        _departureDate = picked;
-      });
-    }
+    return number != null && number > 0 && number <= 22;
   }
 
   Future<void> _selectDepartureTime() async {
@@ -444,7 +384,7 @@ Future<void> _submitReservation() async {
                   color: Color(0xFF0091AD), size: isMobile ? 20 : 24),
               SizedBox(width: 8),
               Text(
-                'Selected Bus',
+                'Selected Bus & Date',
                 style: GoogleFonts.outfit(
                   fontSize: isMobile
                       ? 16
@@ -480,6 +420,25 @@ Future<void> _submitReservation() async {
                     color: Color(0xFF0091AD),
                   ),
                 ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 16, color: Colors.grey[700]),
+                    SizedBox(width: 8),
+                    Text(
+                      'Departure Date: ${DateFormat('EEE, MMM d, yyyy').format(widget.selectedDate)}',
+                      style: GoogleFonts.outfit(
+                        fontSize: isMobile
+                            ? 12
+                            : isTablet
+                                ? 14
+                                : 16,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
                 SizedBox(height: 4),
                 Text(
                   'Available Days: ${List<String>.from(_selectedBus!['codingDays'] ?? []).join(', ')}',
@@ -492,6 +451,7 @@ Future<void> _submitReservation() async {
                     color: Colors.grey.shade700,
                   ),
                 ),
+                SizedBox(height: 4),
                 Text(
                   'Price: ₱${_selectedBus!['Price']}',
                   style: GoogleFonts.outfit(
@@ -507,27 +467,6 @@ Future<void> _submitReservation() async {
               ],
             ),
           ),
-          if (_getSelectedBusCodingDays().isNotEmpty)
-            Container(
-              margin: EdgeInsets.only(top: 8),
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Text(
-                'Note: You can only select dates on ${_getSelectedBusCodingDays().join(', ')}',
-                style: GoogleFonts.outfit(
-                  fontSize: isMobile
-                      ? 11
-                      : isTablet
-                          ? 12
-                          : 14,
-                  color: Colors.blue.shade800,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -581,9 +520,7 @@ Future<void> _submitReservation() async {
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
                 onPressed: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => BusHome()),
-                  );
+                  Navigator.of(context).pop();
                 },
               ),
             ),
@@ -658,7 +595,7 @@ Future<void> _submitReservation() async {
                   _buildFormField('From', _fromController),
                   _buildFormField('To', _toController),
                   Text(
-                    'Date & Time',
+                    'Departure Time',
                     style: GoogleFonts.outfit(
                       fontSize: sectionFontSize,
                       fontWeight: FontWeight.bold,
@@ -666,74 +603,6 @@ Future<void> _submitReservation() async {
                     ),
                   ),
                   SizedBox(height: isMobile ? 8 : 12),
-                  GestureDetector(
-                    onTap: _selectDepartureDate,
-                    child: Container(
-                      margin: EdgeInsets.symmetric(
-                          vertical: isMobile
-                              ? 8
-                              : isTablet
-                                  ? 10
-                                  : 12),
-                      padding: EdgeInsets.symmetric(
-                          horizontal: isMobile
-                              ? 12
-                              : isTablet
-                                  ? 16
-                                  : 20,
-                          vertical: isMobile
-                              ? 4
-                              : isTablet
-                                  ? 6
-                                  : 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(
-                            color: _getSelectedBusCodingDays().isEmpty
-                                ? Colors.red.shade300
-                                : Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.shade200,
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          )
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today,
-                              color: _getSelectedBusCodingDays().isEmpty
-                                  ? Colors.red.shade600
-                                  : Color(0xFF0091AD)),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _departureDate != null
-                                  ? DateFormat('EEE, MMM d, yyyy')
-                                      .format(_departureDate!)
-                                  : _getSelectedBusCodingDays().isEmpty
-                                      ? 'No valid dates available for selected bus'
-                                      : 'Select Departure Date (${_getSelectedBusCodingDays().join(', ')})',
-                              style: GoogleFonts.outfit(
-                                fontSize: isMobile
-                                    ? 14
-                                    : isTablet
-                                        ? 16
-                                        : 18,
-                                color: _departureDate != null
-                                    ? Colors.black
-                                    : _getSelectedBusCodingDays().isEmpty
-                                        ? Colors.red.shade600
-                                        : Colors.grey,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   _buildFormField(
                     'Departure Time',
                     _departureTimeController,
@@ -785,10 +654,11 @@ Future<void> _submitReservation() async {
                   SizedBox(height: isMobile ? 8 : 12),
                   _buildFormField('Full Name', _fullNameController),
                   Container(
+                    margin: EdgeInsets.symmetric(vertical: isMobile ? 8 : 12),
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
                       color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: Row(
@@ -853,8 +723,7 @@ Future<void> _submitReservation() async {
                       _fullNameController.text.isNotEmpty &&
                       _contactNumberController.text.isNotEmpty &&
                       _departureTimeController.text.isNotEmpty &&
-                      _passengerCountController.text.isNotEmpty &&
-                      _departureDate != null
+                      _passengerCountController.text.isNotEmpty
                   ? const Color(0xFF0091AD)
                   : Colors.grey.shade400,
               minimumSize: Size(
@@ -870,8 +739,7 @@ Future<void> _submitReservation() async {
                     _fullNameController.text.isNotEmpty &&
                     _contactNumberController.text.isNotEmpty &&
                     _departureTimeController.text.isNotEmpty &&
-                    _passengerCountController.text.isNotEmpty &&
-                    _departureDate != null
+                    _passengerCountController.text.isNotEmpty
                 ? () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
@@ -883,7 +751,7 @@ Future<void> _submitReservation() async {
                               color: Color(0xFF0091AD),
                             )),
                         content: Text(
-                          'You are about to reserve an entire bus. Please note that this booking is non-refundable once confirmed.\n\nDo you wish to proceed?',
+                          'You are about to reserve an entire bus for ${DateFormat('EEE, MMM d, yyyy').format(widget.selectedDate)}. Please note that this booking is non-refundable once confirmed.\n\nDo you wish to proceed?',
                           style: GoogleFonts.outfit(
                               fontSize: 15,
                               color: Colors.grey[600],

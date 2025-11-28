@@ -327,10 +327,12 @@ class ReservationService {
     final firestore = FirebaseFirestore.instance;
     final reservationsRef = firestore.collection('reservations');
 
-    final snapshot = await reservationsRef.get();
-    final newReservationId = 'reservation ${snapshot.docs.length + 1}';
+    // ✅ FIX: Use auto-generated unique ID instead of counting
+    final newReservationRef = reservationsRef.doc(); // Auto-generates unique ID
+    final newReservationId = newReservationRef.id; // Get the generated ID
 
-    await reservationsRef.doc(newReservationId).set({
+    // Create reservation data
+    final reservationData = {
       'selectedBusIds': selectedBusIds,
       'from': from,
       'to': to,
@@ -343,8 +345,12 @@ class ReservationService {
       'passengerCount': passengerCount,
       'timestamp': FieldValue.serverTimestamp(),
       'status': 'pending',
-    });
+    };
 
+    // Save reservation with auto-generated ID
+    await newReservationRef.set(reservationData);
+
+    // Update conductor documents
     for (String conductorId in selectedBusIds) {
       final conductorRef = firestore.collection('conductors').doc(conductorId);
 

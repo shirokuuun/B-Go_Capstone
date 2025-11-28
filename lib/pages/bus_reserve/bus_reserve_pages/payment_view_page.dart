@@ -147,80 +147,145 @@ class _PaymentViewPageState extends State<PaymentViewPage> {
   }
 
   Future<void> _cancelReservation() async {
-    // Show confirmation dialog
+    // Show confirmation dialog with checkbox
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Cancel Reservation',
-            style: GoogleFonts.outfit(
-              fontWeight: FontWeight.bold,
-              fontSize: 20,
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Are you sure you want to cancel this reservation?',
-                style: GoogleFonts.outfit(fontSize: 16),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+        // Use StatefulBuilder to manage checkbox state within dialog
+        bool isAgreed = false;
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                'Cancel Reservation',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
                 ),
-                child: Row(
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning, color: Colors.red.shade700, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'No refunds will be issued for cancelled reservations.',
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: Colors.red.shade700,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    Text(
+                      'Are you sure you want to cancel this reservation?',
+                      style: GoogleFonts.outfit(fontSize: 16),
+                    ),
+                    SizedBox(height: 16),
+                    // Cancellation Policy Box
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.warning,
+                                  color: Colors.red.shade700, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Cancellation Policy',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            '• You can cancel this reservation at any time\n'
+                            '• No refunds will be issued for cancelled reservations\n'
+                            '• The bus will become available for other users\n'
+                            '• This action cannot be undone',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              color: Colors.red.shade800,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    // Agreement Checkbox
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          isAgreed = !isAgreed;
+                        });
+                      },
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: Checkbox(
+                              value: isAgreed,
+                              onChanged: (value) {
+                                setState(() {
+                                  isAgreed = value ?? false;
+                                });
+                              },
+                              activeColor: Colors.red,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'I understand and agree to the cancellation policy. No refunds will be issued.',
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              child: Text(
-                'No, Keep It',
-                style: GoogleFonts.outfit(
-                  color: Colors.grey.shade600,
-                  fontSize: 16,
+              actions: [
+                TextButton(
+                  child: Text(
+                    'No, Keep It',
+                    style: GoogleFonts.outfit(
+                      color: Colors.grey.shade600,
+                      fontSize: 16,
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(false),
                 ),
-              ),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              child: Text(
-                'Yes, Cancel',
-                style: GoogleFonts.outfit(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        isAgreed ? Colors.red : Colors.grey.shade300,
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Text(
+                    'Yes, Cancel',
+                    style: GoogleFonts.outfit(
+                      color: isAgreed ? Colors.white : Colors.grey.shade500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  onPressed:
+                      isAgreed ? () => Navigator.of(context).pop(true) : null,
                 ),
-              ),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
@@ -424,8 +489,8 @@ class _PaymentViewPageState extends State<PaymentViewPage> {
                         if (widget.reservationDetails['departureDate'] != null)
                           _buildSummaryRow(
                               'Departure Date',
-                              _formatDateOnly(widget.reservationDetails[
-                                  'departureDate'])),
+                              _formatDateOnly(
+                                  widget.reservationDetails['departureDate'])),
                         if (widget.reservationDetails['departureTime'] != null)
                           _buildSummaryRow('Departure Time',
                               widget.reservationDetails['departureTime']),
